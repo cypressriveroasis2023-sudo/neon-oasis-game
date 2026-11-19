@@ -1,9 +1,9 @@
 import {useEffect,useState} from 'react';
-import {fleetMapStageActive,STAGE_MIN_WIDTH_PX,stageIcon,unitsForBox,type StageBox,type StageBoxId,type StageUnitInput} from './fleetMapStage';
+import {fleetMapStageActive,FLEET_BOARD_MIN_WIDTH_PX,stageIcon,unitsForBox,type StageBox,type StageBoxId,type StageUnitInput} from './fleetMapStage';
 import './fleetMapStage.css';
 
 export function useFleetMapStage(){
-  const query = `(min-width: ${STAGE_MIN_WIDTH_PX}px)`;
+  const query = `(min-width: ${FLEET_BOARD_MIN_WIDTH_PX}px)`;
   const [wide,setWide] = useState(()=>typeof matchMedia==='function'&&matchMedia(query).matches);
   useEffect(()=>{
     if(typeof matchMedia!=='function')return;

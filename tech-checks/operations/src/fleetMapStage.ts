@@ -83,9 +83,11 @@ export function fleetBoardRequested() {
   catch { return false; }
 }
 
+/** Phone and tablet keep the reviewed board. 1440 and wider can opt in. */
+export const FLEET_BOARD_MIN_WIDTH_PX = 1440;
+
 export function fleetMapStageActive(wide: boolean, enabled = FLEET_MAP_STAGE_LAYOUT) {
-  void wide;
-  return enabled && fleetBoardRequested() && !fleetStageRollbackRequested();
+  return enabled && wide && fleetBoardRequested() && !fleetStageRollbackRequested();
 }
 
 export function fleetMapStageEnabled(enabled = FLEET_MAP_STAGE_LAYOUT) {

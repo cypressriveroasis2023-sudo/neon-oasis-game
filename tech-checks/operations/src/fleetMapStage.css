@@ -12,8 +12,9 @@ html.cos-fleet-stage-lock .company-shell>.owner-it-main{
   overflow:hidden!important;padding-bottom:0!important;box-sizing:border-box
 }
 html.cos-fleet-stage-lock .company-utility-bar{flex:none;height:52px!important;min-height:52px!important;margin-bottom:0!important}
-html.cos-fleet-stage-lock #root .operations-sidebar{display:none!important}
-html.cos-fleet-stage-lock #root .company-shell{grid-template-columns:minmax(0,1fr)!important}
+html.cos-fleet-stage-lock #root#root .company-shell{display:grid!important;grid-template-columns:minmax(0,1fr)!important}
+html.cos-fleet-stage-lock #root#root .company-shell>.operations-sidebar{display:none!important}
+html.cos-fleet-stage-lock #root#root .company-shell>.owner-it-main{grid-column:1!important;width:100%!important;max-width:none!important;min-width:0!important}
 html.cos-fleet-stage-lock .leaflet-control-zoom{display:none!important}
 html.cos-fleet-stage-lock .cos-fleet-board.cos-fleet-stage-on{
   flex:1 1 auto!important;height:0!important;min-height:0!important;max-height:none!important;
@@ -101,10 +102,10 @@ aside.cos-stage-drawer{
 .tv-fleet-view.cos-tv-stage .tv-fleet-map{flex:1;height:100%;min-height:0}
 .tech-check-tv:has(.cos-tv-stage){position:relative;height:100dvh;gap:0!important;padding:0!important}
 .tech-check-tv:has(.cos-tv-stage) .tech-check-tv-header,
-.tech-check-tv:has(.cos-tv-stage) .tech-check-tv-page-title,
-.tech-check-tv:has(.cos-tv-stage) .tech-check-tv-footer,
-.tech-check-tv:has(.cos-tv-stage) .tech-check-tv-warning{display:none!important}
-.tv-fleet-view.cos-tv-stage{position:absolute;inset:0;height:auto}
+.tech-check-tv:has(.cos-tv-stage) .tech-check-tv-page-title{display:none!important}
+.tech-check-tv:has(.cos-tv-stage) .tech-check-tv-warning{display:block!important;position:relative;z-index:40;flex:none;margin:8px 12px 0;padding:14px 18px;font-size:22px;font-weight:800}
+.tech-check-tv:has(.cos-tv-stage) .tech-check-tv-footer{display:flex!important;position:relative;z-index:40;flex:none}
+.tv-fleet-view.cos-tv-stage{position:relative;inset:auto;flex:1 1 auto;height:auto;min-height:0}
 .tv-fleet-view.cos-tv-stage .tv-fleet-map-wrap{border:0;border-radius:0;margin:0}
 .tv-fleet-view.cos-tv-stage>.cos-board{left:16px;right:16px;top:12px}
 .tech-check-tv:has(.cos-tv-stage) .tech-check-tv-eye{width:40px;height:40px}
@@ -178,8 +179,9 @@ html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on button.
 .cos-board-immix{display:inline-block;margin-left:10px;background:#3b2a5c;color:#d9c8ff;border-radius:8px;padding:2px 8px;font-size:14px;vertical-align:middle}
 .cos-fleet-map-panel .cos-board-note{position:absolute;top:12px;left:12px;right:auto;z-index:4;margin:0;max-width:280px;color:#ffd37a;background:#0b1118cc;border:1px dashed #c98a00;border-radius:10px;padding:6px 10px;font-size:13px}
 .tv-fleet-map-wrap .cos-board-note,.tv-fleet-view.cos-tv-stage .cos-board-note{position:absolute;top:auto;bottom:12px;left:360px;right:auto;z-index:7;margin:0;max-width:320px;color:#ffd37a;background:#0b1118cc;border:1px dashed #c98a00;border-radius:10px;padding:6px 10px;font-size:13px}
-.cos-fleet-map-panel .cos-board-legend,.tv-fleet-map-wrap .cos-board-legend{position:absolute;left:12px;bottom:10px;z-index:4;margin:0;display:flex;gap:14px;align-items:center;color:#c9d4e0;background:#0b1118cc;border-radius:10px;padding:6px 10px;font-size:13px}
-.cos-fleet-map-panel .cos-board-foot,.tv-fleet-map-wrap .cos-board-foot{position:absolute;right:12px;bottom:10px;z-index:4;margin:0;color:#9fb0c3;background:#0b1118cc;border-radius:10px;padding:6px 10px;font-size:13px}
+.cos-fleet-map-panel .cos-board-legend,.tv-fleet-map-wrap .cos-board-legend{position:absolute;left:12px;bottom:10px;right:auto;z-index:4;margin:0;display:flex;gap:14px;align-items:center;max-width:calc(100% - 24px);color:#c9d4e0;background:#0b1118cc;border-radius:10px;padding:6px 10px;font-size:13px}
+.cos-fleet-map-panel .cos-board-foot{position:absolute;left:12px;right:auto;bottom:48px;z-index:4;margin:0;max-width:calc(100% - 24px);color:#9fb0c3;background:#0b1118cc;border-radius:10px;padding:6px 10px;font-size:13px}
+.tv-fleet-map-wrap .cos-board-foot{position:absolute;right:12px;left:auto;bottom:10px;z-index:4;margin:0;max-width:46%;color:#9fb0c3;background:#0b1118cc;border-radius:10px;padding:6px 10px;font-size:13px}
 .cos-board-legend i{width:12px;height:12px;border-radius:50%;display:inline-block;margin-right:6px}
 .cos-board-legend .is-green{background:#3ddc84}.cos-board-legend .is-red{background:#ff4d52}.cos-board-legend .is-grey{background:#7c8796}
 .tv-fleet-view.cos-tv-stage .tv-fleet-summary,.tv-fleet-view.cos-tv-stage .cos-source-strip,.tv-fleet-view.cos-tv-stage .tv-map-legend,.tv-fleet-view.cos-tv-stage .tv-map-area,.tv-fleet-view.cos-tv-stage .leaflet-control-zoom{display:none!important}

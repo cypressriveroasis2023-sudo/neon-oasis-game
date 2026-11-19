@@ -1,9 +1,11 @@
 import {test,expect} from '@playwright/test';
 import {mountFleet,field} from './fleet-dashboard-fixtures.mjs';
 import {resource,snapshot,withStatus,fresh} from './fixtures/camera-evidence-fixtures.mjs';
+import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 
+const boardWidth = (frame) => frame.locator('.cos-fleet-board').evaluate(node => node.getBoundingClientRect().width / window.innerWidth);
 const fits = (frame)=>frame.locator('html').evaluate(()=>({
   html: document.documentElement.scrollHeight<=document.documentElement.clientHeight+1,
   body: document.body.scrollHeight<=document.body.clientHeight+1,
@@ -33,6 +35,23 @@ const prepared = () => {
   return next;
 };
 
+test('the fleet board flag is ignored below 1440', async ({page}) => {
+  const width = page.viewportSize()?.width ?? 0;
+  const {app} = await mountFleet(page, true);
+  await page.locator('iframe').evaluate(frame => {
+    const url = new URL(frame.src);
+    url.searchParams.set('fleetBoard', '1');
+    frame.src = url.pathname + url.search + url.hash;
+  });
+  if (width < 1440) {
+    await expect(app.locator('.cos-board')).toHaveCount(0);
+    await expect(app.locator('.cos-fleet-unit-row').first()).toBeVisible();
+  } else {
+    await expect(app.locator('.cos-board')).toBeVisible();
+    await expect.poll(() => boardWidth(app)).toBeGreaterThanOrEqual(0.95);
+  }
+});
+
 test('reviewed unit rows stay mounted at 390, 1024, and 1440', async ({page}) => {
   const {app} = await mountFleet(page, true);
   await expect(app.locator('.cos-fleet-unit-row').first()).toBeVisible();
@@ -56,6 +75,10 @@ test('the desktop board stays on one screen and opens problems and a site', asyn
   const {app} = await mountFleet(page, true, {field: prepared(), fleetBoard: true});
   const board = app.locator('.cos-board');
   await expect(board).toBeVisible();
+  await page.setViewportSize({width: 1440, height: 900});
+  await expect.poll(() => boardWidth(app)).toBeGreaterThanOrEqual(0.95);
+  await page.setViewportSize({width: 1920, height: 1080});
+  await expect.poll(() => boardWidth(app)).toBeGreaterThanOrEqual(0.95);
   await expect(board.locator('[data-board-box=units]')).toContainText('Units online');
   await expect(board.locator('[data-board-box=cameras]')).toContainText('Cameras online');
   await expect(board.locator('[data-board-box=sites]')).toContainText('not available');
@@ -73,6 +96,7 @@ test('the desktop board stays on one screen and opens problems and a site', asyn
   const legend = await app.locator('.cos-board-legend').boundingBox();
   const read = await app.locator('.cos-board-read').boundingBox();
   const note = await app.locator('.cos-board-note').boundingBox();
+  const foot = await app.locator('.cos-board-foot').boundingBox();
   const overlaps = (a, b) => a.x < b.x + b.width - 1 && a.x + a.width - 1 > b.x && a.y < b.y + b.height - 1 && a.y + a.height - 1 > b.y;
   expect(boxes).toHaveLength(4);
   for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) expect(overlaps(boxes[i], boxes[j])).toBe(false);
@@ -82,7 +106,9 @@ test('the desktop board stays on one screen and opens problems and a site', asyn
     expect(overlaps(box, note)).toBe(false);
   }
   expect(overlaps(legend, read)).toBe(false);
+  expect(overlaps(legend, foot)).toBe(false);
   expect(overlaps(note, legend)).toBe(false);
+  expect(overlaps(note, foot)).toBe(false);
   expect(overlaps(note, read)).toBe(false);
   await expect(app.locator('.leaflet-control-zoom')).toHaveCount(0);
   await expect(app.locator('label.cos-board-search')).toHaveCount(0);
@@ -114,8 +140,15 @@ test('the desktop board stays on one screen and opens problems and a site', asyn
   await expect(card).toContainText('555-0100');
   await expect(card).toContainText('Armed schedule');
   await expect(card.locator('.cos-board-missing').first()).toBeVisible();
+  await expect(card.locator('.cos-board-immix')).toBeVisible();
   await page.screenshot({path: '/opt/cursor/artifacts/fleet_board_1920_site_immix.png'});
+  await card.locator('h2').evaluate(node => { node.hidden = true; });
+  await expect(card.locator('.cos-board-immix')).toBeHidden();
+  await expect(card.getByRole('heading', {name: 'Site contacts'})).toBeVisible();
   await page.screenshot({path: '/opt/cursor/artifacts/fleet_board_1920_contacts.png'});
+  const immixBytes = createHash('md5').update(await readFile('/opt/cursor/artifacts/fleet_board_1920_site_immix.png')).digest('hex');
+  const contactBytes = createHash('md5').update(await readFile('/opt/cursor/artifacts/fleet_board_1920_contacts.png')).digest('hex');
+  expect(immixBytes).not.toBe(contactBytes);
   await app.locator('.cos-board-overlay').click({position: {x: 420, y: 30}});
   await expect(card).toHaveCount(0);
   const dot = app.locator('.cos-board-dot[data-dot=red]');
@@ -131,6 +164,7 @@ test('the map fills 1600x900 without a page scroll', async ({page}, info) => {
   await page.setViewportSize({width: 1600, height: 900});
   const {app} = await mountFleet(page, true, {field: prepared(), fleetBoard: true});
   await expect(app.locator('.cos-board')).toBeVisible();
+  await expect.poll(() => boardWidth(app)).toBeGreaterThanOrEqual(0.95);
   const canvas = await app.locator('.cos-fleet-map-canvas').boundingBox();
   expect(canvas.height).toBeGreaterThan(500);
   await expect.poll(() => fits(app)).toEqual({html: true, body: true, y: 0});
@@ -250,6 +284,74 @@ test('the TV board does not accept interaction and a late read is Unknown', asyn
   await expect(frame.locator('.cos-board-dot[data-dot=grey]').first()).toBeVisible();
   await expect(frame.locator('.cos-board-card')).toHaveCount(0);
   await page.screenshot({path: '/opt/cursor/artifacts/fleet_board_tv_stale.png'});
+});
+
+test('a failed TV refresh shows UPDATES DELAYED by 120 seconds and Unknown after 20 minutes', async ({page}, info) => {
+  test.skip(info.project.name !== 'desktop-1440');
+  const started = new Date('2026-11-19T18:00:00.000Z');
+  await page.clock.install({time: started});
+  await page.setViewportSize({width: 1920, height: 1080});
+  const dist = fileURLToPath(new URL('../dist/', import.meta.url));
+  const harness = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/operations-host.css"><style>body{margin:0}#cosOperationsMount{height:100dvh}</style></head><body><div id="appView"><div id="view-owner"><div id="cosOperationsMount"></div><div id="cosOperationsLegacy"></div></div></div><script>window.TechCheckContext={getRole:()=>"owner",getEffectiveRole:()=>"owner",getSession:()=>({user:{id:"fixture-owner"}}),db:{auth:{onAuthStateChange:()=>{},getSession:async()=>({data:{session:{user:{id:"fixture-owner"},access_token:"synthetic-owner-session"}}})}}};</script><script type="module" src="/operations-host.js"></script></body></html>`;
+  const time = started.toISOString();
+  const unit = {id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', unitNumber: 'North Yard', modelName: 'SNIPER', status: 'installed', placement: 'FIELD', site: 'Synthetic yard', address: '100 Synthetic Rd', latitude: 29.98, longitude: -95.31, locationVerification: 'owner_verified', locationVerifiedAt: time, gpsRecordedAt: time};
+  const down = {...unit, id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', unitNumber: 'South Yard', latitude: 30.05, longitude: -95.2};
+  const served = new Set();
+  await page.route('**/*', async route => {
+    const url = new URL(route.request().url());
+    if (url.origin === origin) {
+      if (url.pathname === '/tv-stage') return route.fulfill({contentType: 'text/html', body: harness});
+      if (url.pathname === '/operations-host.js') return route.fulfill({contentType: 'application/javascript', body: await readFile(new URL('../../operations-host.js', import.meta.url), 'utf8')});
+      if (url.pathname === '/field-map-display-host.js') return route.fulfill({contentType: 'application/javascript', body: await readFile(new URL('../../field-map-display-host.js', import.meta.url), 'utf8')});
+      if (url.pathname === '/operations-host.css') return route.fulfill({contentType: 'text/css', body: await readFile(new URL('../../operations-host.css', import.meta.url), 'utf8')});
+      if (url.pathname.startsWith('/operations/dist/')) return route.fulfill({path: dist + url.pathname.slice('/operations/dist/'.length)});
+      return route.continue();
+    }
+    if (!url.href.endsWith('/functions/v1/cos-operations-pages')) return route.abort('blockedbyclient');
+    const headers = {'access-control-allow-origin': origin, 'access-control-allow-headers': 'authorization,content-type', 'access-control-allow-methods': 'POST, OPTIONS'};
+    if (route.request().method() === 'OPTIONS') return route.fulfill({status: 204, headers});
+    const request = route.request().postDataJSON();
+    if (request.method !== 'GET') return route.fulfill({status: 403, headers, json: {error: 'Display cannot write'}});
+    const path = request.path;
+    const repeat = ['/api/daily-board', '/api/field-map', '/api/camera-health/summary-v3'].includes(path);
+    if (repeat && served.has(path)) return route.fulfill({status: 503, headers, json: {error: 'read failed'}});
+    if (repeat) served.add(path);
+    if (path === '/api/tv-board/settings') return route.fulfill({headers, json: {sections: ['map'], revision: 1, updatedAt: time, rotationSeconds: 60}});
+    if (path === '/api/daily-board') return route.fulfill({headers, json: {jobs: [], tasks: [], readiness: [], asOf: time}});
+    if (path === '/api/field-map') return route.fulfill({headers, json: {items: [unit, down], summary: {fieldUnits: 2, mappedUnits: 2, unitGps: 2, missingGps: 0}, generatedAt: time, savedBoardReadAt: time}});
+    if (path === '/api/routers') return route.fulfill({headers, json: {items: [], generatedAt: time, source: 'camera_health', gpsAvailable: false}});
+    if (path === '/api/camera-health/summary-v3') return route.fulfill({headers, json: snapshot([
+      resource(1, 'North Yard', {evidence: {...resource(1).evidence, observedAt: time, lastOnlineAt: time}}),
+      withStatus(resource(2, 'South Yard'), 'offline', time),
+    ])});
+    if (path === '/api/session') return route.fulfill({headers, json: {authorized: true, legacyOwner: true, role: 'Owner', name: 'Fixture Owner', productionOwnerUserId: '11111111-1111-4111-8111-111111111111', features: {fleetAccess: true}}});
+    return route.fulfill({headers, json: {items: []}});
+  });
+  await page.goto('/tv-stage?tvBoard=1&fleetBoard=1');
+  const frame = page.frameLocator('#cosOperationsFrame');
+  await expect(frame.locator('.cos-board[data-board-mode=wall]')).toBeVisible();
+  await expect(frame.locator('[data-board-box=units] strong')).toContainText('2');
+  await expect(frame.locator('[data-board-box=units] strong')).not.toHaveText('—');
+  await page.clock.fastForward(130_000);
+  const alert = frame.locator('.tech-check-tv-warning');
+  const footer = frame.locator('.tech-check-tv-footer');
+  await expect(alert).toBeVisible();
+  await expect(alert).toContainText('UPDATES DELAYED');
+  await expect(footer).toBeVisible();
+  const prominent = async locator => locator.evaluate(node => {
+    const box = node.getBoundingClientRect();
+    if (box.width <= 0 || box.height <= 0) return false;
+    if (box.top < 0 || box.left < 0 || box.bottom > window.innerHeight || box.right > window.innerWidth) return false;
+    const hit = document.elementFromPoint(box.left + box.width / 2, box.top + Math.min(box.height / 2, 16));
+    return hit === node || node.contains(hit);
+  });
+  await expect.poll(() => prominent(alert)).toBe(true);
+  await expect.poll(() => prominent(footer)).toBe(true);
+  await page.screenshot({path: '/opt/cursor/artifacts/fleet_board_tv_delayed.png'});
+  await page.clock.fastForward(19 * 60 * 1000);
+  await expect(frame.locator('.cos-board-banner')).toBeVisible();
+  await expect(frame.locator('[data-board-box=problems]')).toHaveAttribute('data-problem-tone', 'unknown');
+  await expect(frame.locator('[data-board-box=units] strong')).toHaveText('—');
 });
 
 test('a desktop late read keeps problems closed', async ({page}, info) => {

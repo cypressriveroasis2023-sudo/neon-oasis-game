@@ -39,7 +39,8 @@ const transientReadStatus=(status:number|null)=>status!==null&&[502,503,504,546]
 // every reading in an older board and print zeros instead of its real totals.
 const savedBoardTime=(field:unknown)=>{const at=Date.parse(String((field as any)?.savedBoardReadAt||''));return Number.isFinite(at)&&at<=Date.now()?at:null;};
 const empty:Snapshot={units:[],inventory:[],health:null,routers:null,readAt:null,estimates:new Map(),fieldSource:null,addressMap:null};
-export default function TvFleetView({api,enabled,mode,page,width,height,refreshId,onPages,onSharedCounts,sharedCount=null}:{api:Api;enabled:boolean;mode:'camera'|'map'|null;page:number;width:number;height:number;refreshId:number;onPages:(pages:FleetPages)=>void;onSharedCounts?:(counts:TvSharedCounts|null)=>void;sharedCount?:StageSharedMonitoredCount|null}){
+const WATCHFUL_ALERT_MS = 12 * 60 * 1000;
+export default function TvFleetView({api,enabled,mode,page,width,height,refreshId,onPages,onSharedCounts,onWatchfulLate,sharedCount=null}:{api:Api;enabled:boolean;mode:'camera'|'map'|null;page:number;width:number;height:number;refreshId:number;onPages:(pages:FleetPages)=>void;onSharedCounts?:(counts:TvSharedCounts|null)=>void;onWatchfulLate?:(late:boolean)=>void;sharedCount?:StageSharedMonitoredCount|null}){
   const [data,setData]=useState<Snapshot>(empty),[error,setError]=useState(''),[clock,setClock]=useState(Date.now());
   const generation=useRef(0),running=useRef(false),lastAttempt=useRef(0),lastRouterAttempt=useRef(0),alive=useRef(false);
   // Errors are retained per source group. A pass only reports for the sources
@@ -200,6 +201,7 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
     });
     return buildBoard(inputs,sharedCount,data.readAt?new Date(data.readAt).toISOString():null,clock);
   },[rows,sharedCount,data.readAt,clock]);
+  useEffect(()=>{onWatchfulLate?.(Boolean(data.readAt&&clock-data.readAt>WATCHFUL_ALERT_MS));},[onWatchfulLate,data.readAt,clock]);
   const tvBoardRef=useRef(tvBoard);tvBoardRef.current=tvBoard;
   const [mapRevision,setMapRevision]=useState(0);
   const [groupDetails,setGroupDetails]=useState<{members:CompactMapMember[];zoom?:()=>void}|null>(null);

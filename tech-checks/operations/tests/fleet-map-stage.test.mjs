@@ -123,7 +123,7 @@ test('rollback turns the single-screen stage off and the reviewed board stays in
   globalThis.location = {search: '?fleetBoard=1'};
   try {
     assert.equal(fleetMapStageActive(true),true);
-    assert.equal(fleetMapStageActive(false),true);
+    assert.equal(fleetMapStageActive(false),false);
   } finally {
     if (previousLocation === undefined) delete globalThis.location;
     else globalThis.location = previousLocation;
