@@ -1,6 +1,7 @@
 {
   "contract": "COS_FLEET_MAP_STAGE_PRESERVATION_V1",
   "provenance": "James 11:48 AM CT Nov 19: map-centered single-screen layout",
+  "regenerateAfter": "After #451 or #452 changes FleetDashboard.tsx, do not edit baselineBlob 769c97949d852551fc09689301f64e87bbc0ac2b or any count-trust pin. Re-apply only the stageRows={rows} wire on the landed file, set candidateBlob to that file's git blob, and leave the count-trust manifest alone. #454 and #458 conflict only in dist/index.html; regenerate that file with npm run build and keep the rest of those branches.",
   "files": [
     {
       "path": "FleetDashboard.tsx",

@@ -3,47 +3,68 @@ html.cos-fleet-stage-lock,
 html.cos-fleet-stage-lock body,
 html.cos-fleet-stage-lock #root,
 html.cos-fleet-stage-lock .shell{
-  height:100dvh;max-height:100dvh;overflow:hidden
+  height:100dvh!important;max-height:100dvh!important;min-height:0!important;overflow:hidden!important
 }
 html.cos-fleet-stage-lock .shell{grid-template-rows:minmax(0,1fr)}
 html.cos-fleet-stage-lock .owner-it-main,
 html.cos-fleet-stage-lock .company-shell>.owner-it-main{
-  display:flex;flex-direction:column;height:100dvh;max-height:100dvh;min-height:0;
-  overflow:hidden;padding-bottom:0!important
+  display:flex!important;flex-direction:column!important;height:100dvh!important;max-height:100dvh!important;min-height:0!important;
+  overflow:hidden!important;padding-bottom:0!important;box-sizing:border-box
 }
-html.cos-fleet-stage-lock .company-utility-bar{flex:none}
+html.cos-fleet-stage-lock .company-utility-bar{flex:none;height:52px!important;min-height:52px!important;margin-bottom:0!important}
 html.cos-fleet-stage-lock .cos-fleet-board.cos-fleet-stage-on{
-  height:100%;max-height:100%;overflow:hidden;display:flex;flex-direction:column;
-  padding:10px 12px 12px!important;gap:10px
+  flex:1 1 auto!important;height:0!important;min-height:0!important;max-height:none!important;
+  overflow:hidden;display:flex!important;flex-direction:column!important;
+  padding:8px 12px 8px!important;gap:8px
 }
 html.cos-fleet-stage-lock .cos-fleet-board.cos-fleet-stage-on>.cos-stage{order:-1;flex:none}
 html.cos-fleet-stage-lock .cos-fleet-board.cos-fleet-stage-on>.cos-fleet-content{
-  display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;padding:0!important
+  display:flex!important;flex-direction:column!important;flex:1 1 auto!important;height:0!important;min-height:0!important;overflow:hidden;padding:0!important
 }
-html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-fleet-content>:not(.cos-fleet-workspace),
+html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-fleet-content>:not(.cos-fleet-workspace):not(.cos-fleet-heading):not(.cos-fleet-status-strip):not(.cos-source-alerts):not(.cos-source-strip):not(.cos-mhelp-connection-alert):not(.cos-equipment-totals),
 html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on>:not(.cos-stage):not(.cos-fleet-content){
   display:none!important
 }
-html.cos-fleet-stage-lock .cos-fleet-board.cos-fleet-stage-on .cos-fleet-workspace{
-  display:block!important;flex:1;min-height:0;height:100%;margin:0
+html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-equipment-totals{display:block!important;margin:0}
+html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-equipment-totals>:not(.cos-monitored-count):not(.cos-immix-monitored):not(.cos-monitored-amber):not(.cos-monitored-exception):not(.cos-monitored-check){display:none!important}
+html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-fleet-heading{margin:0!important}
+html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-fleet-heading p{display:none!important}
+html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-fleet-heading,
+html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-fleet-status-strip,
+html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-source-alerts,
+html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-source-strip,
+html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-mhelp-connection-alert{
+  flex:none;max-height:40px;margin:0!important;overflow:auto
 }
-html.cos-fleet-stage-lock .cos-fleet-board.cos-fleet-stage-on .cos-fleet-unit-panel{display:none!important}
-html.cos-fleet-stage-lock .cos-fleet-board.cos-fleet-stage-on .cos-fleet-map-panel,
-html.cos-fleet-stage-lock .cos-fleet-board.cos-fleet-stage-on .cos-fleet-map-panel:not(:fullscreen):not(.cos-fleet-map-expanded){
-  min-height:0!important;height:100%!important;display:flex;flex-direction:column
+html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-fleet-workspace{
+  display:flex!important;flex:1 1 auto!important;height:0!important;min-height:0!important;margin:0
 }
-html.cos-fleet-stage-lock .cos-fleet-board.cos-fleet-stage-on .cos-fleet-map-canvas,
-html.cos-fleet-stage-lock .cos-fleet-board.cos-fleet-stage-on .cos-fleet-map-panel:not(:fullscreen):not(.cos-fleet-map-expanded) .cos-fleet-map-canvas{
-  flex:1;height:auto!important;min-height:0!important
+html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-fleet-unit-panel{display:none!important}
+html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-fleet-map-panel,
+html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-fleet-map-panel:not(:fullscreen):not(.cos-fleet-map-expanded){
+  position:relative;flex:1 1 auto;min-height:0!important;height:100%!important;display:flex!important;flex-direction:column
 }
+html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-fleet-map-canvas,
+html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-fleet-map-panel:not(:fullscreen):not(.cos-fleet-map-expanded) .cos-fleet-map-canvas{
+  flex:1 1 auto!important;height:100%!important;min-height:0!important;max-height:none!important
+}
+html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-fleet-map-toolbar{
+  position:absolute;top:8px;left:8px;right:8px;z-index:3;margin:0;background:#101e2ee6;border-radius:8px
+}
+html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-fleet-map-legend,
+html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-fleet-pin-view{
+  position:absolute;left:12px;z-index:2;margin:0
+}
+html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-fleet-pin-view{top:52px}
+html.cos-fleet-stage-lock #root#root .cos-fleet-board.cos-fleet-stage-on .cos-fleet-map-legend{bottom:8px}
 
 .cos-stage{display:flex;flex-direction:column;gap:8px;min-height:0}
 .cos-stage-counts{
-  display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:0
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:0
 }
 .cos-stage-count{
-  display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-height:84px;
-  padding:12px 14px;text-align:left;background:#162233;color:#e7eef6;
+  display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-height:64px;
+  padding:8px 12px;text-align:left;background:#162233;color:#e7eef6;
   border:1px solid #314556;border-radius:12px;cursor:pointer
 }
 .cos-stage-count strong{
@@ -54,15 +75,16 @@ html.cos-fleet-stage-lock .cos-fleet-board.cos-fleet-stage-on .cos-fleet-map-pan
 .cos-stage-count[aria-pressed=true]{border-color:#8ea3b8;background:#1c2c3e}
 .cos-stage-count-stale strong,.cos-stage-count-stale span{color:#94a3b8}
 .cos-stage-count-shop strong{color:#94a3b8}
-.cos-stage-drawer{
+aside.cos-stage-drawer{
   position:absolute;top:108px;right:16px;bottom:16px;z-index:6;width:min(380px,34vw);
+  height:auto!important;max-height:calc(100dvh - 124px);
   display:flex;flex-direction:column;gap:8px;padding:14px;overflow:hidden;
   background:#121c28;color:#e7eef6;border:1px solid #314556;border-radius:14px;
   box-shadow:0 16px 40px #03071155
 }
 .cos-stage-drawer h2{margin:0;font-size:18px}
 .cos-stage-drawer-note{margin:0;font-size:13px;color:#9aafc3}
-.cos-stage-list{list-style:none;margin:0;padding:0;overflow:auto;min-height:0;flex:1}
+.cos-stage-list{list-style:none;margin:0;padding:0;overflow:auto;min-height:0;flex:1;overscroll-behavior:contain}
 .cos-stage-list li{margin:0 0 8px}
 .cos-stage-list button{
   width:100%;display:flex;justify-content:space-between;gap:10px;text-align:left;
@@ -81,14 +103,23 @@ html.cos-fleet-stage-lock .cos-fleet-board.cos-fleet-stage-on .cos-fleet-map-pan
   background:transparent;border:1px solid #314556;color:#d5e0ec
 }
 
-.tv-fleet-view.cos-tv-stage{height:100%;min-height:0;display:flex;flex-direction:column;overflow:hidden;position:relative}
+.tv-fleet-view.cos-tv-stage{flex:1 1 auto;height:0;min-height:0;display:flex;flex-direction:column;overflow:hidden;position:relative}
 .tv-fleet-view.cos-tv-stage .cos-stage-counts{flex:none}
-.tv-fleet-view.cos-tv-stage .tv-fleet-summary{flex:none}
-.tv-fleet-view.cos-tv-stage .tv-fleet-map-wrap{flex:1;min-height:0}
-.tv-fleet-view.cos-tv-stage .cos-stage-drawer{top:168px;z-index:8}
+.tv-fleet-view.cos-tv-stage .tv-fleet-summary,.tv-fleet-view.cos-tv-stage .cos-source-strip{flex:none;max-height:40px;overflow:auto;margin:0}
+.tv-fleet-view.cos-tv-stage .tv-fleet-map-wrap{flex:1 1 auto;height:0;min-height:0;display:flex}
+.tv-fleet-view.cos-tv-stage .tv-fleet-map{flex:1;height:100%;min-height:0}
+.tech-check-tv:has(.cos-tv-stage){gap:8px!important;padding:12px 16px!important}
+.tech-check-tv:has(.cos-tv-stage) .tech-check-tv-eye{width:40px;height:40px}
+.tech-check-tv:has(.cos-tv-stage) .tech-check-tv-brand h1{font-size:22px}
+.tech-check-tv:has(.cos-tv-stage) .tech-check-tv-clock b{font-size:28px}
+.tech-check-tv:has(.cos-tv-stage) .tech-check-tv-page-title h2{font-size:18px!important}
+.tech-check-tv:has(.cos-tv-stage) .tech-check-tv-footer{padding-top:6px}
+.tech-check-tv:has(.cos-tv-stage) .tech-check-tv-content{display:flex;flex-direction:column;min-height:0;height:0;flex:1 1 auto}
+.tv-fleet-view.cos-tv-stage aside.cos-stage-drawer{top:12px;bottom:12px;z-index:8;max-height:calc(100dvh - 24px)}
 .tv-fleet-view.cos-tv-stage .tv-map-area{z-index:1}
 .tv-fleet-view.cos-tv-stage:has(.cos-stage-drawer) .tv-map-area{visibility:hidden}
 .tech-check-tv:has(.cos-tv-stage){overflow:hidden}
+.tech-check-tv:has(.cos-tv-stage) .tech-check-tv-content{display:flex;flex-direction:column;min-height:0}
 @media(max-width:1100px){
   .cos-stage-counts{grid-template-columns:repeat(3,minmax(0,1fr))}
   .cos-stage-drawer{width:min(380px,46vw)}

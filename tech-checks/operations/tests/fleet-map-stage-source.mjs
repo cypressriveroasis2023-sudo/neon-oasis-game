@@ -7,7 +7,11 @@ assert.equal(manifest.contract,'COS_FLEET_MAP_STAGE_PRESERVATION_V1');
 assert.equal(manifest.provenance,'James 11:48 AM CT Nov 19: map-centered single-screen layout');
 const blob = source=>{const bytes = Buffer.from(source);return createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');};
 
-/** Peel only the stage wiring. Count-trust and older pins then see the reviewed bytes. */
+/** Peel only the stage wiring. Count-trust and older pins then see the reviewed bytes.
+ * After #451 or #452 edits FleetDashboard.tsx, regenerate candidateBlob only:
+ * re-apply `stageRows={rows}` on that landed file and record its git blob here.
+ * Do not change baselineBlob or the count-trust manifest. #454 and #458 conflict only in dist/index.html.
+ */
 export function beforeFleetMapStageSource(name,source){
   const file = manifest.files.find(item=>item.path===name);
   if(!file)return source;

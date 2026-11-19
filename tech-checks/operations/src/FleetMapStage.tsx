@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import {fleetMapStageActive,STAGE_MIN_WIDTH_PX,stageCountBoxes,stageIcon,unitsForBox,type StageBoxId,type StageUnitInput} from './fleetMapStage';
+import {fleetMapStageActive,STAGE_MIN_WIDTH_PX,stageIcon,unitsForBox,type StageBox,type StageBoxId,type StageUnitInput} from './fleetMapStage';
 import './fleetMapStage.css';
 
 export function useFleetMapStage(){
@@ -18,6 +18,7 @@ export function useFleetMapStage(){
 
 type Props = {
   units: readonly StageUnitInput[];
+  boxes: readonly StageBox[];
   now: number;
   active: StageBoxId | null;
   selectedId: string | null;
@@ -26,9 +27,15 @@ type Props = {
   onClose: ()=>void;
 };
 
-export default function FleetMapStage({units,now,active,selectedId,onBox,onUnit,onClose}:Props){
-  const boxes = stageCountBoxes(units,now);
-  const listed = active?unitsForBox(units,active,now):[];
+export default function FleetMapStage({units,boxes,now,active,selectedId,onBox,onUnit,onClose}:Props){
+  const open = Boolean(active || selectedId);
+  useEffect(()=>{
+    if(!open)return;
+    const onKey = (event: KeyboardEvent)=>{ if(event.key==='Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return ()=>window.removeEventListener('keydown', onKey);
+  },[open,onClose]);
+  const listed = active?unitsForBox(units,active):[];
   const selected = selectedId?units.find(unit=>unit.id===selectedId)||null:null;
   const selectedIcon = selected?stageIcon(selected,now):null;
   return <div className='cos-stage'>
