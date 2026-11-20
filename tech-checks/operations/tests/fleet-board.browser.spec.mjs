@@ -382,6 +382,17 @@ for (const flagged of [false, true]) test(`a healthy durable TV ${flagged ? 'wit
     }
   };
   const readsIdle = () => openReads === 0 ? Promise.resolve() : new Promise(done => idleWaiters.push(done));
+  const settled = async () => {
+    for (let turn = 0; turn < 6; turn++) {
+      await page.evaluate(() => {});
+      if (openReads === 0) {
+        await page.evaluate(() => {});
+        if (openReads === 0) return;
+      }
+      await readsIdle();
+    }
+    if (openReads > 0) await readsIdle();
+  };
   const envelopes = new Map();
   const envelope = () => {
     const at = publishedMs();
@@ -429,16 +440,13 @@ for (const flagged of [false, true]) test(`a healthy durable TV ${flagged ? 'wit
   const warning = frame.locator('.tech-check-tv-warning');
   if (flagged) await expect(frame.locator('.cos-board[data-board-mode=wall]')).toBeVisible();
   else await expect(frame.locator('.tv-fleet-summary')).toBeVisible();
-  await readsIdle();
+  await settled();
   await expect(warning).toHaveCount(0);
   const advance = async (ms, clear) => {
-    await readsIdle();
-    await page.evaluate(() => {});
+    await settled();
     simulated += ms;
     await page.clock.fastForward(ms);
-    await page.evaluate(() => {});
-    await readsIdle();
-    await page.evaluate(() => {});
+    await settled();
     if (clear) await expect(warning).toHaveCount(0);
   };
   for (let minute = 1; minute <= 60; minute++) {
@@ -451,11 +459,11 @@ for (const flagged of [false, true]) test(`a healthy durable TV ${flagged ? 'wit
     expect(savedGets).toBeGreaterThanOrEqual(20);
     holdAt = publishedMs();
     let steps = 0;
-    while (await warning.count() === 0) {
-      if (steps >= 15) throw new Error('A frozen Watchful read did not show UPDATES DELAYED within 5 minutes.');
+    while (steps < 15 && await warning.count() === 0) {
       await advance(20_000, false);
       steps += 1;
     }
+    await expect(warning).toBeVisible({timeout: 10_000});
     await expect(warning).toContainText('UPDATES DELAYED');
   }
 });
