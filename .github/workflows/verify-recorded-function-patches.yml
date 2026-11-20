@@ -1,0 +1,39 @@
+# Pull-request check for the recorded-function deploy tooling.
+# It compares hashes only. It does not deploy and it uses no secret.
+name: Verify recorded function patches
+on:
+  pull_request:
+    paths:
+      - '.github/scripts/deploy-recorded-function*.mjs'
+      - '.github/scripts/preflight-live-function-pins.mjs'
+      - '.github/scripts/preflight-live-function-pins.test.mjs'
+      - '.github/workflows/cos-deploy-recorded-function.yml'
+      - '.github/workflows/verify-recorded-function-patches.yml'
+      - '.github/function-patches/**'
+permissions:
+  contents: read
+jobs:
+  recorded-patches:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Unit-test the deploy script
+        run: node --test .github/scripts/deploy-recorded-function.test.mjs
+      - name: Dry run every recorded patch
+        run: |
+          set -euo pipefail
+          found=0
+          while IFS= read -r -d '' patch; do
+            found=1
+            echo "::group::$patch"
+            node .github/scripts/deploy-recorded-function.mjs "$patch" --dry-run
+            echo "::endgroup::"
+          done < <(find .github/function-patches -name '*.json' -print0 | sort -z)
+          if [ "$found" -eq 0 ]; then
+            echo "::error::No patch JSON files found."
+            exit 1
+          fi

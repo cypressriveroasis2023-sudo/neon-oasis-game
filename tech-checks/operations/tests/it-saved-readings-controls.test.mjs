@@ -1,4 +1,6 @@
 import {beforeFleetCountTrustSource} from './fleet-count-trust-source.mjs';
+import {beforeBoardFreshStatusSource} from './board-fresh-status-source.mjs';
+import {beforeWatchfulMonitoredCountSource} from './watchful-monitored-count-source.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -46,5 +48,5 @@ test('Data sources omit both manual refresh and fallback retry when no callback 
 });
 for(const name of ['App.tsx','FleetDashboard.tsx','it-daily-mode.browser.spec.mjs','mhelp-live-inventory.browser.spec.mjs'])test('IT follow-up reverses exactly to protected source: '+name,()=>{
  const directory=name.endsWith('.browser.spec.mjs')?'./':'../src/';
- originalItSavedReadingSource(name,previousReviewedMainSource(name,beforeFleetCountTrustSource(name,readFileSync(new URL(directory+name,import.meta.url),'utf8'))));
+ originalItSavedReadingSource(name,previousReviewedMainSource(name,beforeFleetCountTrustSource(name,beforeWatchfulMonitoredCountSource(name,beforeBoardFreshStatusSource(name,readFileSync(new URL(directory+name,import.meta.url),'utf8'))))));
 });

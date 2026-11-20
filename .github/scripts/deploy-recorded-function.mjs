@@ -91,6 +91,85 @@ export function liveMatchesPrecondition(live,required){
   return problems;
 }
 
+// Larger than any recorded bundle (the biggest prepared payload is about
+// 1.4 MB) and the over-1 MB unit fixture. A bigger response is unreadable:
+// the caller stays INCONCLUSIVE rather than treating it as verified.
+export const SERVED_BODY_MAX_BYTES=8*1024*1024;
+
+// GET /v1/projects/{ref}/functions/{slug}/body is documented as a streamable
+// body. With Accept: multipart/form-data the platform extracts the eszip
+// bundle and returns one form part per source file (filename in
+// Content-Disposition). A JSON body with a files array is the older shape.
+// A raw ESZIP or EZBR blob has no per-file listing, so it stays unreadable.
+// The boundary parameter value is case-sensitive. Only the media type and
+// the parameter name are compared without regard to case.
+export function readServedFunctionBody(contentType,body){
+  const bytes=Buffer.isBuffer(body)?body:Buffer.from(body??'');
+  if(bytes.length>SERVED_BODY_MAX_BYTES)return null;
+  const header=String(contentType||'');
+  const type=header.toLowerCase();
+  if(type.includes('multipart/')){
+    const files=parseMultipartFiles(header,bytes);
+    return files&&files.length?files:null;
+  }
+  const text=bytes.toString('utf8');
+  const start=text.trimStart();
+  if(type.includes('json')||start.startsWith('{')||start.startsWith('[')){
+    let parsed;
+    try{parsed=JSON.parse(text);}catch{return null;}
+    return jsonFileList(parsed);
+  }
+  return null;
+}
+
+function parseMultipartFiles(contentType,bytes){
+  const match=/boundary=(?:"([^"]+)"|([^;\s]+))/i.exec(contentType);
+  if(!match)return null;
+  const boundary=Buffer.from('--'+(match[1]||match[2]));
+  const files=[];
+  let cursor=bytes.indexOf(boundary);
+  if(cursor<0)return null;
+  while(cursor>=0){
+    const next=bytes.indexOf(boundary,cursor+boundary.length);
+    if(next<0)break;
+    let chunk=bytes.subarray(cursor+boundary.length,next);
+    if(chunk[0]===13&&chunk[1]===10)chunk=chunk.subarray(2);
+    else if(chunk[0]===10)chunk=chunk.subarray(1);
+    if(chunk[0]===45&&chunk[1]===45)break;
+    const crlf=chunk.indexOf(Buffer.from('\r\n\r\n'));
+    const lf=crlf<0?chunk.indexOf(Buffer.from('\n\n')):-1;
+    const headerEnd=crlf>=0?crlf:lf;
+    if(headerEnd<0)return null;
+    const header=chunk.subarray(0,headerEnd).toString('utf8');
+    const gap=crlf>=0?4:2;
+    let content=chunk.subarray(headerEnd+gap);
+    if(content.length>=2&&content[content.length-2]===13&&content[content.length-1]===10)content=content.subarray(0,content.length-2);
+    else if(content.length&&content[content.length-1]===10)content=content.subarray(0,content.length-1);
+    const filename=filenameOf(header);
+    if(filename)files.push({name:filename,content:Buffer.from(content)});
+    cursor=next;
+  }
+  return files;
+}
+
+function filenameOf(header){
+  const quoted=/filename="([^"]*)"/i.exec(header);
+  if(quoted)return quoted[1];
+  const plain=/filename=([^;\r\n]+)/i.exec(header);
+  return plain?plain[1].trim():'';
+}
+
+function jsonFileList(parsed){
+  const list=Array.isArray(parsed)?parsed:parsed&&typeof parsed==='object'&&Array.isArray(parsed.files)?parsed.files:null;
+  if(!list)return null;
+  const files=[];
+  for(const file of list){
+    if(!file||typeof file.name!=='string'||(typeof file.content!=='string'&&!Buffer.isBuffer(file.content)))return null;
+    files.push({name:file.name,content:typeof file.content==='string'?file.content:file.content.toString('utf8')});
+  }
+  return files.length?files:null;
+}
+
 // Post-deploy readback comparison. Pure. Served file names are compared by
 // their full deployed path first, then by basename only if the platform
 // returns bare names; a basename match is reported as such.
@@ -107,7 +186,7 @@ export function compareServedFiles(served,expectedFiles){
       else if(candidates.length>1){problems.push(`served file name is ambiguous for ${expected.name}`);continue;}
     }
     if(content===undefined){problems.push(`file missing from deployment: ${expected.name}`);continue;}
-    const actual=sha256(Buffer.from(content,'utf8'));
+    const actual=sha256(Buffer.isBuffer(content)?content:Buffer.from(content,'utf8'));
     if(actual!==expected.sha256) problems.push(`served sha256 differs for ${expected.name} (expected ${expected.sha256.slice(0,12)}..., served ${actual.slice(0,12)}..., matched by ${matchedBy})`);
   }
   if(served.length!==expectedFiles.length) problems.push(`deployment serves ${served.length} files, expected ${expectedFiles.length}`);
@@ -156,9 +235,12 @@ async function main(){
   const after=await fetch(`${api}/${patch.slug}`,{headers:auth}).catch(cause=>({ok:false,status:String(cause)}));
   if(!after.ok){console.error(`INCONCLUSIVE: deploy was accepted but the live function could not be read back (HTTP ${after.status}). Verify manually before trusting this deployment.`);process.exit(2);}
   const liveAfter=await after.json();
-  const body=await fetch(`${api}/${patch.slug}/body`,{headers:auth}).catch(()=>({ok:false,status:'unreachable'}));
-  const served=body.ok?await body.json().catch(()=>null):null;
-  const servedFiles=Array.isArray(served?.files)?served.files:null;
+  const body=await fetch(`${api}/${patch.slug}/body`,{headers:{...auth,Accept:'multipart/form-data'}}).catch(()=>({ok:false,status:'unreachable'}));
+  let servedFiles=null;
+  if(body.ok){
+    const raw=Buffer.from(await body.arrayBuffer());
+    servedFiles=readServedFunctionBody(body.headers?.get?.('content-type')||'',raw);
+  }
   if(!servedFiles){console.error(`INCONCLUSIVE: deploy accepted (v${liveAfter.version}) but served source could not be read (HTTP ${body.status}); file-level verification NOT performed.`);process.exit(2);}
   const problems=compareServedFiles(servedFiles,files);
   if(liveAfter.status!=='ACTIVE') problems.push(`live status after deploy is ${liveAfter.status}`);

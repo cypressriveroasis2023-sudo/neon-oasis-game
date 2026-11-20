@@ -1,4 +1,6 @@
 import {beforeFleetCountTrustSource} from './fleet-count-trust-source.mjs';
+import {beforeBoardFreshStatusSource} from './board-fresh-status-source.mjs';
+import {beforeWatchfulMonitoredCountSource} from './watchful-monitored-count-source.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -40,7 +42,7 @@ test('the currently selected secondary view is visible in the collapsed summary'
  const html=render(true,5);assert.match(html,/<summary aria-label="More fleet tools" aria-current="page">/);assert.match(html,/<small>Data sources<\/small>/);
 });
 test('the reviewed Fleet baseline is preserved by the explicit runtime and wrapper reversals',()=>{
- const old=originalFleetViewMarkup(previousReviewedMainSource('FleetDashboard.tsx',beforeFleetCountTrustSource('FleetDashboard.tsx',readFileSync(new URL('../src/FleetDashboard.tsx',import.meta.url),'utf8'))));
+ const old=originalFleetViewMarkup(previousReviewedMainSource('FleetDashboard.tsx',beforeFleetCountTrustSource('FleetDashboard.tsx',beforeWatchfulMonitoredCountSource('FleetDashboard.tsx',beforeBoardFreshStatusSource('FleetDashboard.tsx',readFileSync(new URL('../src/FleetDashboard.tsx',import.meta.url),'utf8'))))));
  assert.equal(createHash('sha1').update('blob '+Buffer.byteLength(old)+'\0').update(old).digest('hex'),'8d711a97853b5f646d892f5552a792656623a9f8');
 });
 test('wrapper contains no data source, clock, link rewriting or new routing',()=>{

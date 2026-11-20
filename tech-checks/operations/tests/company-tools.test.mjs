@@ -44,11 +44,20 @@ const markupHashes = {
 const theme = readFileSync(new URL('../../company-tools-theme.css',import.meta.url),'utf8');
 for (const [name,hash] of Object.entries(scriptHashes)) {
   test(`company tools ${name} preserves reviewed script bytes and loads final theme`,()=>{
-    const original=readFileSync(new URL(`../../${name}.html`,import.meta.url),'utf8');
+    let original=readFileSync(new URL(`../../${name}.html`,import.meta.url),'utf8');
     // User-requested 15-minute saved-camera cadence; preserve all other bytes.
     // Real scheduler/hidden-tab/freshness behavior is tested separately.
     let navigationPreserved=original;
     if(name==='camera-health'){
+      // Reviewed reversal for the Watchful monitored field count. The script
+      // and markup hashes below stay the reviewed baselines.
+      const monitoredFunction="function sharedMonitoredField(){const snapshot=window.COS_WATCHFUL_SNAPSHOT;if(!snapshot||snapshot.contract!=='COS_WATCHFUL_MONITORED_V1'||snapshot.fresh!==true||!Number.isInteger(snapshot.units))return null;return snapshot;}\n";
+      const monitoredCall='sharedMonitored=sharedMonitoredField(),';
+      const monitoredScope="(sharedMonitored?sharedMonitored.units:groups.filter(g=>g.scope==='field').length)";
+      assert.equal(original.split(monitoredFunction).length-1,1,'camera-health monitored function');
+      assert.equal(original.split(monitoredCall).length-1,1,'camera-health monitored call');
+      assert.equal(original.split(monitoredScope).length-1,1,'camera-health monitored scope');
+      original=original.replace(monitoredFunction,'').replace(monitoredCall,'').replace(monitoredScope,"groups.filter(g=>g.scope==='field').length");
       assert.equal(original.split('const CAMERA_AUTO_REFRESH_MS=15*60*1000;').length-1,1);
       assert.equal(original.split('Saved status refreshes every 15 minutes;').length-1,1);
       navigationPreserved=original.replace('const CAMERA_AUTO_REFRESH_MS=15*60*1000;','const CAMERA_AUTO_REFRESH_MS=4*60*1000;').replace('Saved status refreshes every 15 minutes;','Saved status refreshes every 4 minutes;');
