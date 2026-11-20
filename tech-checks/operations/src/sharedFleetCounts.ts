@@ -266,9 +266,10 @@ function commandPlacement(item: CommandCountProduct): CountUnit['placement'] {
 }
 
 function commandDoNotUse(item: CommandCountProduct): boolean {
-  if (item.doNotUse === true) return true;
-  const life = (item.lifecycle || '').trim().toUpperCase().replace(/ /g, '_');
-  return life === 'DO_NOT_USE';
+  // A Product-ID census row stays in its health bucket. The field inventory
+  // screen still counts a DO NOT USE field record as unknown. Exclusion is
+  // explicit on a count unit, which is how Sniper 318 and the camera feed opt in.
+  return item.doNotUse === true;
 }
 
 export function censusFromCommandProducts(items: readonly CommandCountProduct[], now = Date.now()): CountUnit[] {
