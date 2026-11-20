@@ -72,6 +72,14 @@ for (const [name,hash] of Object.entries(scriptHashes)) {
       navigationPreserved=original.replace(fleet,'').replace(script,'onsite-vision.js?v=vision-composer-20261006a').replace(style,'onsite-vision.css?v=vision-integrated-20260927');
     }
     if(name==='camera-health'){
+      // Rule change, reviewer finding on #458: healthAssessment keeps a status
+      // word only when that value's observation time is inside 20 minutes.
+      // Older, missing, or future times are not online and not Down.
+      const reviewedAssessment="function healthAssessment(d){const h=health[d.id]||{},raw=String(h.overall_status||d.source_status||d.vigilant_status||'unknown').toLowerCase(),";
+      const currentAssessment="function healthAssessment(d){const h=health[d.id]||{},freshWord=(status,at)=>{const word=String(status||'').toLowerCase();return word&&CameraHealthHistory.timestamp(at).state==='fresh'?word:'';},raw=freshWord(h.overall_status,h.checked_at)||freshWord(d.source_status,d.source_last_seen_at)||freshWord(d.vigilant_status,d.source_last_seen_at)||'unknown',";
+      assert.equal(navigationPreserved.split(currentAssessment).length-1,1);
+      assert.equal(navigationPreserved.split(reviewedAssessment).length-1,0);
+      navigationPreserved=navigationPreserved.replace(currentAssessment,reviewedAssessment);
       const entry='function openSharedCameraHealth(){\n';
       const reviewedGuard='  // The parent chose diagnostics for this embedded board. Redirecting to the\n'
         +'  // main COS app would mount another board and repeat the workspace launch.\n'

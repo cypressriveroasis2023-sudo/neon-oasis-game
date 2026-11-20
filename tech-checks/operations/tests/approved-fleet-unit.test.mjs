@@ -53,6 +53,22 @@ for (const [name,sha] of Object.entries(expected)) test('unit presentation prese
  const current=['FleetDashboard.tsx','useCameraHealth.ts'].includes(name)?previousReviewedMainSource(name,reviewed):reviewed;
  const restored=name==='FleetDashboard.tsx'?originalFleetViewMarkup(current):['api.ts','useCameraHealth.ts'].includes(name)?originalFleetConnectionReadSource(name,current):name==='App.tsx'?originalItSavedReadingSource(name,current):null;
  const b=Buffer.from(restored===null?current:restored);
+ if(name==='cameraEvidence.ts'){
+  // Rule change, reviewer finding on #458: a camera health value older than
+  // 20 minutes, missing, or in the future is grey Unknown (#94a3b8), never
+  // online and never Down. CAMERA_FRESH_MS and cameraTimestamp stay as pinned.
+  const marker='\n/** Grey used when a camera health value is not a current observation. */\n';
+  const start=reviewed.indexOf(marker);
+  const stop=reviewed.indexOf('export function resourceKind', start);
+  assert.ok(start>0&&stop>start);
+  const prior=reviewed.slice(0,start)+reviewed.slice(stop);
+  const blob=text=>{const bytes=Buffer.from(text);return createHash('sha1').update('blob '+bytes.length+'\0').update(bytes).digest('hex');};
+  assert.equal(blob(prior),sha);
+  assert.equal(blob(reviewed),'8d043f986b5e478c628181683012ffd4cdd4a40f');
+  assert.match(reviewed.slice(start,stop),/presentedCameraHealth/);
+  assert.match(reviewed.slice(start,stop),/#94a3b8/);
+  return;
+ }
  assert.equal(createHash('sha1').update('blob '+b.length+'\0').update(b).digest('hex'),sha);
 });
 const css=readFileSync(new URL('../src/approvedFleetUnit.css',import.meta.url),'utf8');

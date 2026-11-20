@@ -1,6 +1,11 @@
 .cos-camera-status{display:flex;flex-direction:column;gap:12px}
 .cos-camera-status>header{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center}
 .cos-camera-board-total{margin:0;font-size:.9rem}
+.cos-camera-monitor-figures{display:flex;flex-wrap:wrap;gap:12px 18px;margin:0;font-size:.78rem}
+.cos-camera-monitor-figures span{display:inline-flex;align-items:baseline;gap:6px}
+.cos-camera-monitor-figures b{font-size:1.05rem;font-weight:700}
+.cos-camera-category-line{margin:0;font-size:.78rem}
+.cos-camera-status-flag{color:#9a6700;font-weight:600;opacity:1}
 .cos-camera-source-note{margin:0;font-size:.85rem}
 .cos-camera-about>summary{display:inline-flex;cursor:pointer;font-size:.8rem;min-height:32px;align-items:center}
 .cos-shared-counts{display:grid;gap:10px}
