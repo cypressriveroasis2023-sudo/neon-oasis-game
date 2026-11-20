@@ -142,17 +142,25 @@ test('serial labels stay and only the value is redacted', () => {
 });
 
 test('a long separator after a serial label stays within 50 ms', () => {
-  for (const label of ['S/N', 'serial']) {
-    for (const count of [30, 100, 1000]) {
-      for (const fill of [' ', ':']) {
-        const input = `${label}${fill.repeat(count)}none`;
-        const started = performance.now();
-        const cleaned = stripWatchfulIp(input);
-        const elapsed = performance.now() - started;
-        assert.ok(elapsed < 50, `${label} + ${count} ${fill === ' ' ? 'spaces' : 'colons'} took ${elapsed.toFixed(1)} ms`);
-        assert.equal(cleaned.text.includes('none'), true, input);
-      }
-    }
+  const now = Date.parse(at);
+  const cases = [
+    `Serial${' '.repeat(5000)}`,
+    `Serial${' - '.repeat(5000)}`,
+    `Serial${' ->'.repeat(5000)}`,
+    `S/N${' '.repeat(5000)}none`,
+  ];
+  for (const input of cases) {
+    const started = performance.now();
+    const cleaned = stripWatchfulIp(input);
+    const stripMs = performance.now() - started;
+    assert.ok(stripMs < 50, `strip ${input.slice(0, 12)} took ${stripMs.toFixed(1)} ms`);
+    const csv = `unit,site,group,status,cameras_up,cameras_down\nSniper 2,${input},Avigilon,up,1,0`;
+    const loadStarted = performance.now();
+    const loaded = loadWatchfulExport(csv, at, now);
+    const loadMs = performance.now() - loadStarted;
+    assert.ok(loadMs < 50, `load ${input.slice(0, 12)} took ${loadMs.toFixed(1)} ms`);
+    assert.equal(loaded.units.length, 1);
+    if (input.endsWith('none')) assert.equal(cleaned.text.includes('none'), true);
   }
 });
 
@@ -236,4 +244,5 @@ test('a blank read_at stays null and a future read time is refused', () => {
   assert.equal(blank.readAt, null);
   assert.notEqual(blank.readAt, known.readAt);
   assert.throws(() => loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down,read_at\nSniper 2,Fixture Site,Avigilon,up,1,0,2099-01-01T00:00:00Z\n', undefined, now), /future/);
+  assert.throws(() => loadWatchfulExport('unit,site,group,status,cameras_up,cameras_down,seen_at\nSniper 2,Fixture Site,Avigilon,up,1,0,2099-01-01T00:00:00Z\n', at, now), /future/);
 });

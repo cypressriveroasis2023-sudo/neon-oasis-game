@@ -55,6 +55,7 @@ test('the Watchful roster is private: RLS on, anon has nothing, authenticated ca
 });
 
 test('the read-time columns are additive and rollback keeps the row with a null observation time', async () => {
+  const notices = [];
   const db = new PGlite();
   await db.exec('create role anon; create role authenticated; create role service_role;');
   await db.exec(sql);
@@ -82,12 +83,14 @@ test('the read-time columns are additive and rollback keeps the row with a null 
     values ('3f2504e0-4f89-41d3-9b0c-030507090a0c', 'Sniper 9', 'SNIPER|9', 'Fixture Site', 'Avigilon', 'up', 1, 0, '2026-11-19T14:00:00Z', '2099-01-01T00:00:00Z')`), /future/);
   await db.exec(`insert into public.watchful_monitored_units
     (snapshot_id, unit_name, canonical_unit_key, site_name, unit_group, unit_status, cameras_up, cameras_down, snapshot_at, fetched_at, arming, project_id)
-    values ('3f2504e0-4f89-41d3-9b0c-030507090a0b', 'Sniper 2', 'SNIPER|2', 'Fixture Site', 'Avigilon', 'up', 1, 0, null, '2026-11-19T14:30:00Z', 'unknown', '3f2504e0-4f89-41d3-9b0c-030507090a0b')`);
-  await db.exec(readRollback);
-  const kept = await db.query(`select unit_name, snapshot_at from public.watchful_monitored_units`);
-  assert.equal(kept.rows.length, 1);
-  assert.equal(kept.rows[0].unit_name, 'Sniper 2');
-  assert.equal(kept.rows[0].snapshot_at, null);
+    values
+      ('3f2504e0-4f89-41d3-9b0c-030507090a0b', 'Sniper 2', 'SNIPER|2', 'Fixture Site', 'Avigilon', 'up', 1, 0, null, '2026-11-19T14:30:00Z', 'unknown', '3f2504e0-4f89-41d3-9b0c-030507090a0b'),
+      ('3f2504e0-4f89-41d3-9b0c-030507090a0d', 'Sniper 8', 'SNIPER|8', 'Fixture Site', 'Avigilon', 'down', 0, 1, null, null, 'armed', '3f2504e0-4f89-41d3-9b0c-030507090a0d')`);
+  await db.exec(readRollback, {onNotice: (notice) => notices.push(notice.message || '')});
+  const kept = await db.query(`select unit_name, snapshot_at from public.watchful_monitored_units order by unit_name`);
+  assert.equal(kept.rows.length, 2);
+  assert.deepEqual(kept.rows.map(row => row.snapshot_at), [null, null]);
+  assert.match(notices.join('\n'), /snapshot_at stays nullable: 2 row\(s\) have no observation time/);
   const after = await db.query(`
     select column_name, is_nullable
     from information_schema.columns

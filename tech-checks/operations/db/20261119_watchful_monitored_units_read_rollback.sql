@@ -6,6 +6,18 @@
 
 begin;
 
+-- Observation time is snapshot_at. Do not copy fetched_at into it.
+-- Leave snapshot_at nullable. Report how many rows have no observation time.
+do $$
+declare
+  missing integer;
+begin
+  select count(*) into missing
+  from public.watchful_monitored_units
+  where snapshot_at is null;
+  raise warning 'snapshot_at stays nullable: % row(s) have no observation time', missing;
+end $$;
+
 drop trigger if exists watchful_monitored_units_fetched_at_not_future on public.watchful_monitored_units;
 drop function if exists public.watchful_monitored_units_reject_future_fetch();
 
