@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {beforeFleetCountTrustSource} from './fleet-count-trust-source.mjs';
+import {beforeBoardFreshStatusSource} from './board-fresh-status-source.mjs';
 import {beforeWatchfulMonitoredCountSource} from './watchful-monitored-count-source.mjs';
 
 const expected={
@@ -22,7 +23,7 @@ const blob=source=>{const bytes=Buffer.from(source);return createHash('sha1').up
 for(const [name,baseline] of Object.entries(expected)){
  const source=readFileSync(new URL((name.endsWith('.browser.spec.mjs')?'./':'../src/')+name,import.meta.url),'utf8');
  test(name+' reverses to the original reviewed main blob',()=>{
-  assert.equal(blob(beforeFleetCountTrustSource(name,beforeWatchfulMonitoredCountSource(name,source))),baseline);
+  assert.equal(blob(beforeFleetCountTrustSource(name,beforeWatchfulMonitoredCountSource(name,beforeBoardFreshStatusSource(name,source)))),baseline);
  });
  test(name+' rejects even one undeclared byte and never treats earlier source as the candidate',()=>{
   assert.throws(()=>beforeFleetCountTrustSource(name,source+'\n'),/exact count-trust candidate/);

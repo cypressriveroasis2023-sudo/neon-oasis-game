@@ -14,6 +14,7 @@ import { TV_REFRESH_MS, tvBoardLink, tvBoardOptions } from './tvBoardData';
 import {useTvBoardSettings} from './useTvBoardSettings';
 import TvBoardControls from './TvBoardControls';
 import {setTvSessionHold,tvSessionHold} from './tvSessionHold';
+import {tvUpdatesDelayed} from './boardFreshStatus';
 
 type Props = { api: {get: (path: string) => Promise<{data: any}>; post: (path:string, body?:any)=>Promise<{data:any}>}; session: Record<string, any>; openWorkspace: (name:string)=>void; onTvChange?: (enabled:boolean)=>void;initialTv?:boolean;createTicket?:never };
 type AssignmentDraft={date:string;startTime:string;endTime:string;technician:string};
@@ -150,7 +151,7 @@ export default function DailyBoard({api,session,openWorkspace,onTvChange,initial
   const sameDay=Boolean(snapshot.asOf&&chicagoDay(snapshot.asOf)===today);
   const readiness=sameDay?snapshot.readiness.filter(r=>(!person||r.name===person)&&(!department||r.department===department)):[];
   const hiddenTests=showTest?0:cards.filter(c=>isTestRecord(c.record)).length;
-  const stale=Boolean(lastSuccess&&(now.getTime()-lastSuccess.getTime()>120000||!sameDay));
+  const stale=tvUpdatesDelayed({lastSuccessAt:lastSuccess?lastSuccess.getTime():null,now:now.getTime(),sameDay,watchfulOldestObservedAt:null});
   const counts=useMemo(()=>({
     unassigned:visible.filter(c=>c.assignee==='Unassigned').length,
     scheduled:visible.filter(c=>statusKey(c.status)==='scheduled').length,

@@ -1,3 +1,5 @@
+import {CAMERA_FRESH_MS} from './cameraEvidence';
+
 /** Automatic reads are gentle; manual actions still read immediately. Clock ticks never probe. */
 export const AUTO_REFRESH_MS=15*60*1000;
 // A 15-minute producer plus a 10-minute browser cache can miss the 20-minute
@@ -15,6 +17,22 @@ export const CONNECTION_AUTO_REFRESH_MS=2*60*1000;
 // health/map pair, never vendor probes, and this value is also the saved-pair
 // cache TTL in api.ts.
 export const CAMERA_AUTO_REFRESH_MS=10*60*1000;
+/**
+ * Readings are dated when the provider observed them, so a 10-minute cadence
+ * can still land after the 20-minute window. This does not widen that window
+ * and does not change the 10-minute cadence. It asks for one saved read when
+ * the newest observation would become Unknown before the next cadence.
+ */
+export const READING_REFRESH_LEAD_MS=2*60*1000;
+export function observationRefreshDue(newestObservedAt:number|null,lastAttemptAt:number,now:number,hidden:boolean){
+  if(hidden||newestObservedAt===null||!Number.isFinite(newestObservedAt)||!Number.isFinite(lastAttemptAt)||lastAttemptAt<=0||newestObservedAt>now)return false;
+  const age=now-newestObservedAt;
+  if(age<0||age>=CAMERA_FRESH_MS)return false;
+  const expiresAt=newestObservedAt+CAMERA_FRESH_MS;
+  const nextCadence=lastAttemptAt+CAMERA_AUTO_REFRESH_MS;
+  if(expiresAt>=nextCadence)return false;
+  return now>=expiresAt-READING_REFRESH_LEAD_MS;
+}
 export function automaticRefreshDue(lastAttemptAt:number,now:number,hidden:boolean,intervalMs=AUTO_REFRESH_MS) {
   return !hidden && Number.isFinite(now) && (lastAttemptAt===0 || now-lastAttemptAt>=intervalMs);
 }
