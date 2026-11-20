@@ -67,9 +67,9 @@ export function isSniper4100(name: string): boolean {
   return folded === 'sniper 4 100' || folded.replace(/ /g, '') === 'sniper4100';
 }
 
-/** Every technician item stays on the shared list. power_silent, address and SIM cancel are not removed. */
+/** power_silent stays out until a fresh Victron feed can gate it. Address and SIM-cancel cleanup stay. */
 export function fieldProblemList(problems: readonly TechnicianTodo[] = []): TechnicianTodo[] {
-  return [...problems];
+  return problems.filter(problem => problem.kind !== 'power_silent');
 }
 
 const emptyTriple = (): CountTriple => ({ online: 0, offline: 0, unknown: 0 });

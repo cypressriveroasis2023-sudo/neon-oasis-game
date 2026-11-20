@@ -67,3 +67,45 @@ test('Camera status, Fleet and the phone landing show the same battery-alarm cou
   await expect(camera).toContainText('voltage alarm');
   await expect(fleet).toHaveAttribute('data-shared-problem-count', '1');
 });
+
+const oldAt = '2026-10-01T00:00:00Z';
+
+async function expectNoPowerProblem(page, power) {
+  await page.addInitScript(() => {
+    localStorage.setItem('cos-power-alarm-settings-v1', JSON.stringify({lowVoltageV: 12, lowSocPercent: 20, silentHours: 1}));
+  });
+  const {app} = await mountFleet(page, false, {vrm: power, cameraStatus: report});
+  const fleet = app.locator('.cos-fleet-dashboard');
+  const phone = app.locator('.cos-phone-landing');
+  await expect(fleet).toHaveAttribute('data-shared-problem-count', '0');
+  await expect(phone).toHaveAttribute('data-problem-count', '0');
+  const phoneTodos = phone.locator('.cos-tech-todos');
+  await expect(phone.locator('.cos-todo-card')).toHaveCount(0);
+  await expect(phoneTodos).not.toContainText('Power readings have been silent');
+  await expect(phoneTodos).not.toContainText('voltage alarm');
+  await openFleetView(app, /Camera status/);
+  const camera = app.locator('.cos-camera-status');
+  const cameraTodos = camera.locator('.cos-tech-todos');
+  await expect(camera).toHaveAttribute('data-problem-count', '0');
+  await expect(camera.locator('.cos-todo-card')).toHaveCount(0);
+  await expect(cameraTodos).not.toContainText('Power readings have been silent');
+  await expect(cameraTodos).not.toContainText('voltage alarm');
+  await expect(cameraTodos).toContainText('No evidence-backed jobs');
+  await expect(fleet).toHaveAttribute('data-shared-problem-count', '0');
+}
+
+test('an old Victron read shows no power Problem', async ({page}, info) => {
+  test.skip(![390, 1440].includes(info.project.use.viewport?.width), 'covered at 390 and 1440');
+  const power = structuredClone(vrm);
+  for (const row of power.power) for (const sample of row.measurements) sample.observedAt = oldAt;
+  power.power[0].measurements.push({metric: 'battery_voltage', unit: 'V', value: 10, instance: 512, source: 'battery', observedAt: oldAt});
+  await expectNoPowerProblem(page, power);
+});
+
+test('a stalled Victron read shows no power Problem', async ({page}, info) => {
+  test.skip(![390, 1440].includes(info.project.use.viewport?.width), 'covered at 390 and 1440');
+  const power = structuredClone(vrm);
+  power.sync = {error: 'Synthetic Victron sync stalled', state: 'error', lastAttemptAt: oldAt, lastSuccessAt: oldAt};
+  power.power[0].measurements.push({metric: 'battery_voltage', unit: 'V', value: 10, instance: 512, source: 'battery', observedAt: fresh});
+  await expectNoPowerProblem(page, power);
+});
