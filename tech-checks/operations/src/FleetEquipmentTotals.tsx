@@ -1,5 +1,6 @@
 import {useState} from 'react';
 import {fleetEquipmentTotals,unverifiedTile,type EquipmentGroup} from './fleetEquipmentTotalsModel';
+import type {FleetCountSnapshot} from './sharedFleetCounts';
 import {countForPath, type SharedMonitoredCount} from './watchfulMonitoredCounts';
 import {formatObservedCt} from './watchfulObservation';
 import type {FleetCommandCenterData,FleetCommandProduct} from './fleetCommandCenterModel';
@@ -7,8 +8,9 @@ import FleetCardIcon from './FleetCardIcon';
 import FleetVerifyNow from './FleetVerifyNow';
 const titles={cameras:'Camera units',helios:'Helios',stands:'Stands'};
 type Status='all'|'online'|'offline'|'unverified'|'device_link'|'no_reading';
-export default function FleetEquipmentTotals({upload,data,now,onView,onOpen,onVerified,onDeviceLinks,healthCurrent=true,readingNote='',monitored=null}:{readingNote?:string;upload:unknown;data:FleetCommandCenterData|null;now:number;onView:(group:EquipmentGroup,placement:'field'|'shop'|'all')=>void;onOpen:(product:FleetCommandProduct)=>void;onVerified?:(connections?:unknown)=>Promise<unknown>;onDeviceLinks?:()=>void;healthCurrent?:boolean;monitored?:SharedMonitoredCount|null}){
- const totals=fleetEquipmentTotals(upload,data,now);
+export default function FleetEquipmentTotals({upload,data,now,onView,onOpen,onVerified,onDeviceLinks,healthCurrent=true,readingNote='',monitored=null,agreedCounts=null}:{readingNote?:string;upload:unknown;data:FleetCommandCenterData|null;now:number;onView:(group:EquipmentGroup,placement:'field'|'shop'|'all')=>void;onOpen:(product:FleetCommandProduct)=>void;onVerified?:(connections?:unknown)=>Promise<unknown>;onDeviceLinks?:()=>void;healthCurrent?:boolean;monitored?:SharedMonitoredCount|null;agreedCounts?:FleetCountSnapshot|null}){
+ const model=fleetEquipmentTotals(upload,data,now);
+ const totals=model&&agreedCounts?model.map(total=>total.key==='cameras'?{...total,online:agreedCounts.units.online,offline:agreedCounts.units.offline,unverified:agreedCounts.units.unknown}:total):model;
  const shared=monitored??countForPath('FleetEquipmentTotals',{snapshot:null,mhelp:[],now});
  const [selection,setSelection]=useState<{group:EquipmentGroup;status:Status}|null>(null);
  const [verificationBusy,setVerificationBusy]=useState(false);

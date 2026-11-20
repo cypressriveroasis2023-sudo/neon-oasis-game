@@ -19,7 +19,8 @@ import {fleetUnitPinMarkup,fleetAddressPinMarkup,fleetAddressHealth} from './fle
 import {compactMapGroups,compactMapStatusCounts,compactGroupMarkup,compactGroupDescription,compactGroupPopup,type CompactMapMember} from './fleetCompactMap';
 import {readMhelpAddressMapPins,type MhelpAddressMapResult} from './mhelpAddressMapPins';
 import {tvFieldCensus,tvCensusOutages} from './tvFieldCensus';
-import {censusFromCommandProducts,censusFromDashboardRows,selectFleetCounts,type CountTriple} from './sharedFleetCounts';
+import {censusFromCommandProducts,censusFromDashboardRows,fleetCountsFromCameraFeed,tvFleetCounts,type CountTriple} from './sharedFleetCounts';
+import {STAR_UNIT_STATUS_CONTRACT,type UnitCameraStatus} from '../shared/starUnitStatus';
 import {countForPath} from './watchfulMonitoredCounts';
 import {checkedAddressEstimate,addressEstimateLabel,type AddressEstimate} from './fieldAddressEstimates';
 import {tvMapTour,tvCameraPageSize} from './tvMapTour';
@@ -27,7 +28,7 @@ import type {FleetPages} from './tvBoardData';
 import SourceHealthStrip from './SourceHealthStrip';
 import {fleetSourceFacts} from './fleetSourceFacts';
 type Unit=FieldHealthUnit&FieldLocation&{activeJobNumber?:string};
-type Snapshot={units:Unit[];inventory:Unit[];health:Health|null;routers:RouterSnapshot|null;readAt:number|null;estimates:Map<string,AddressEstimate>;fieldSource:Record<string,any>|null;addressMap:MhelpAddressMapResult|null};
+type Snapshot={units:Unit[];inventory:Unit[];health:Health|null;routers:RouterSnapshot|null;readAt:number|null;estimates:Map<string,AddressEstimate>;fieldSource:Record<string,any>|null;addressMap:MhelpAddressMapResult|null;cameraUnits:UnitCameraStatus[]|null};
 type Api={get:(path:string)=>Promise<{data:any}>};
 export type TvSharedCounts={units:CountTriple|null;cameras:CountTriple|null;unitTitle:string;showCameras:boolean;field:number|null;shop:number|null;stands:number|null};
 const INITIAL_READ_RETRY_MS=30000;
@@ -36,7 +37,7 @@ const transientReadStatus=(status:number|null)=>status!==null&&[502,503,504,546]
 // Fleet dashboard does. Using the moment this browser fetched it would expire
 // every reading in an older board and print zeros instead of its real totals.
 const savedBoardTime=(field:unknown)=>{const at=Date.parse(String((field as any)?.savedBoardReadAt||''));return Number.isFinite(at)&&at<=Date.now()?at:null;};
-const empty:Snapshot={units:[],inventory:[],health:null,routers:null,readAt:null,estimates:new Map(),fieldSource:null,addressMap:null};
+const empty:Snapshot={units:[],inventory:[],health:null,routers:null,readAt:null,estimates:new Map(),fieldSource:null,addressMap:null,cameraUnits:null};
 export default function TvFleetView({api,enabled,mode,page,width,height,refreshId,onPages,onSharedCounts}:{api:Api;enabled:boolean;mode:'camera'|'map'|null;page:number;width:number;height:number;refreshId:number;onPages:(pages:FleetPages)=>void;onSharedCounts?:(counts:TvSharedCounts|null)=>void}){
   const [data,setData]=useState<Snapshot>(empty),[error,setError]=useState(''),[clock,setClock]=useState(Date.now());
   const generation=useRef(0),running=useRef(false),lastAttempt=useRef(0),lastRouterAttempt=useRef(0),alive=useRef(false);
@@ -73,8 +74,15 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
         health:health=>{nextHealth=health;},
         routers:routers=>{nextRouters=routers;}
       },force,{camera:readCamera,routers:readRouters});
+      let cameraUnits:UnitCameraStatus[]|null=null;
+      if(readCamera){
+        try{
+          const report=(await api.get('/api/unit-camera-status')).data;
+          if(report?.contract===STAR_UNIT_STATUS_CONTRACT&&Array.isArray(report.units))cameraUnits=report.units;
+        }catch{cameraUnits=null;}
+      }
       if(current()){
-        setData(previous=>({...previous,...(readCamera&&nextField&&nextHealth&&!retainCompletedConnectionMap(previous.fieldSource,nextField.fieldSource)?nextField:null),health:readCamera&&nextField&&nextHealth&&!retainCompletedConnectionMap(previous.fieldSource,nextField.fieldSource)?nextHealth:previous.health,routers:nextRouters===undefined?previous.routers:nextRouters}));
+        setData(previous=>({...previous,...(readCamera&&nextField&&nextHealth&&!retainCompletedConnectionMap(previous.fieldSource,nextField.fieldSource)?nextField:null),health:readCamera&&nextField&&nextHealth&&!retainCompletedConnectionMap(previous.fieldSource,nextField.fieldSource)?nextHealth:previous.health,routers:nextRouters===undefined?previous.routers:nextRouters,cameraUnits:readCamera?cameraUnits:previous.cameraUnits}));
         setClock(Date.now());
         lastErrors.current=retainSourceErrors(lastErrors.current,errors,{camera:readCamera,routers:readRouters});
         setError(sourceErrorText(lastErrors.current));
@@ -140,19 +148,26 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
     if(!data.readAt){onSharedCounts(null);return;}
     const now=snapshotClock;
     countForPath('TvFleetView',{snapshot:null,mhelp:[],now});
-    if(census.board){
-      const snapshot=selectFleetCounts(censusFromCommandProducts(census.board.items,now),now);
-      onSharedCounts({units:snapshot.units,cameras:null,unitTitle:'Field Product IDs',showCameras:false,field:census.board.field,shop:census.board.shop,stands:census.board.counts.support});
-      return;
-    }
-    const snapshot=selectFleetCounts(censusFromDashboardRows(rows.map(row=>({
-      name:row.unit.unitNumber,
-      placement:'field',
-      cameraState:row.health.state,
-      checkedAt:row.health.checkedAt||null,
-    })),now),now);
-    onSharedCounts({units:snapshot.units,cameras:snapshot.cameras,unitTitle:'Camera units',showCameras:true,field:null,shop:null,stands:null});
-  },[onSharedCounts,data.readAt,census,rows,snapshotClock]);
+    const counted=census.board
+      ?censusFromCommandProducts(census.board.items,now)
+      :censusFromDashboardRows(rows.map(row=>({
+        name:row.unit.unitNumber,
+        placement:'field',
+        cameraState:row.health.state,
+        checkedAt:row.health.checkedAt||null,
+      })),now);
+    const feed=data.cameraUnits?fleetCountsFromCameraFeed(data.cameraUnits,[],now,data.fieldSource):null;
+    const snapshot=feed??tvFleetCounts(counted,now);
+    onSharedCounts({
+      units:snapshot.units,
+      cameras:snapshot.cameras,
+      unitTitle:feed?'Camera units':census.board?'Field Product IDs':'Camera units',
+      showCameras:snapshot.cameras!==null,
+      field:census.board?.field??null,
+      shop:census.board?.shop??null,
+      stands:census.board?.counts.support??null,
+    });
+  },[onSharedCounts,data.readAt,data.cameraUnits,data.fieldSource,census,rows,snapshotClock]);
   const outages=useMemo(()=>tvCensusOutages(census.board,rows),[census,rows]);
   // Fleet and TV use the same strict mHelp Product-ID/address proof; never
   // convert a customer address into GPS verification or guess video health.
@@ -278,7 +293,8 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
   },[mode,height,width,area]);
   const locationsAvailable=Boolean(data.readAt);
   const healthAvailable=Boolean(data.health)&&(!census.board||census.board.healthVerified);
-  const totals={online:census.board?.counts.online??rows.filter(r=>r.health.state==='online').length,offline:census.board?.counts.offline??rows.filter(r=>r.health.state==='offline').length,unknown:census.board?.counts.unverified??rows.filter(r=>r.health.state==='unknown').length,mapped:tvPins.gpsVerified};
+  const feedCounts=data.cameraUnits?fleetCountsFromCameraFeed(data.cameraUnits,[],snapshotClock,data.fieldSource):null;
+  const totals=feedCounts?{online:feedCounts.units.online,offline:feedCounts.units.offline,unknown:feedCounts.units.unknown,mapped:tvPins.gpsVerified}:{online:census.board?.counts.online??rows.filter(r=>r.health.state==='online').length,offline:census.board?.counts.offline??rows.filter(r=>r.health.state==='offline').length,unknown:census.board?.counts.unverified??rows.filter(r=>r.health.state==='unknown').length,mapped:tvPins.gpsVerified};
   const sourceFacts=fleetSourceFacts({now:clock,map:data.fieldSource||undefined,connectionState:typeof data.fieldSource?.productConnectionsState==='string'?data.fieldSource.productConnectionsState:undefined,boardCheckedAt:data.readAt,trackerVerifiedAt:typeof data.fieldSource?.productConnections?.trackerVerifiedAt==='string'?data.fieldSource.productConnections.trackerVerifiedAt:null,includeTracker:Boolean(data.fieldSource)});
   return <div className='tv-fleet-view' hidden={!mode} aria-label={mode==='map'?'TV Field Map':'TV Camera Health'}>
     <SourceHealthStrip facts={sourceFacts}/>

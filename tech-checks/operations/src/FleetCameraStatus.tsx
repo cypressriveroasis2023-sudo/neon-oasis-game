@@ -27,10 +27,10 @@ import {fleetSourceFacts} from './fleetSourceFacts';
 import {cameraSourceNotice} from './sourceAttention';
 import {CosPowerChecks} from './CosPowerAlarmPanel';
 import {cosPowerVerdict, powerSamples, readPowerAlarmSettings} from './cosPowerAlarms';
-import {technicianTodos} from './technicianTodos';
+import {fleetProblems} from './technicianTodos';
 import TechnicianTodoList from './TechnicianTodoList';
 import CameraStatusBoardView from './CameraStatusBoardView';
-import {routerOfflineFact, IN_SHOP_LABEL, type FleetCountSnapshot} from './sharedFleetCounts';
+import {cameraStatusCounts, routerOfflineFact, IN_SHOP_LABEL, type FleetCountSnapshot} from './sharedFleetCounts';
 import {SHOP_CAMERA_RULE, SHOP_CAMERA_ONLINE_LABEL, applyShopCameraView, cameraStatusBoard, decideShopCameras, inShopLabel, liveFeedShopRows, type ShopCameraRule} from '../shared/shopCameraStatus';
 import {presentedCameraHealth, type CameraHealthChip} from './cameraEvidence';
 
@@ -189,12 +189,13 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
    return [{unit:unit.unit,placement:unit.placement,routerOffline:true,routerObservedAt:fact.at,cameraOnlineAt:Number.isFinite(cameraAt)?cameraAt:null}];
   });
  },[routers,units,now]);
- const todos=useMemo(()=>technicianTodos({
+ const victronFeedFresh=vrmReady&&Boolean(vrm)&&typeof vrm?.sync?.error!=='string';
+ const todos=useMemo(()=>cameraStatusCounts(null,now,fleetProblems({
   cameras:units.map(unit=>({unit:unit.unit,placement:unit.placement,state:unit.state,offline:unit.offline||0,online:unit.online||0,unknown:unit.unknown||0})),
   routers:routerTodos,
-  power:[...victron.entries()].map(([unit,power])=>{const picked=powerSamples(power.measurements);return {unit,placement:units.find(row=>row.unit===unit)?.placement,verdict:cosPowerVerdict({now,settings:powerSettings,voltage:picked.voltage,soc:picked.soc,newestObservedAt:picked.newestObservedAt,victronLowVoltage:picked.victronLowVoltage})};}),
-  addresses:(addressReviews||[]).map(review=>({unit:review.unitNumber,productId:review.productId,placement:'FIELD',address:review.address})),
- }),[units,routerTodos,victron,now,powerSettings,addressReviews]);
+  power:victronFeedFresh?[...victron.entries()].map(([unit,power])=>{const picked=powerSamples(power.measurements);return {unit,placement:units.find(row=>row.unit===unit)?.placement,verdict:cosPowerVerdict({now,settings:powerSettings,voltage:picked.voltage,soc:picked.soc,newestObservedAt:picked.newestObservedAt,victronLowVoltage:picked.victronLowVoltage})};}):[],
+  victronFeedFresh,
+ })).problems,[units,routerTodos,victron,now,powerSettings,victronFeedFresh]);
  const shown=useMemo(()=>report?groupedUnits(units,group,query,stateFilter,family):[],[report,units,group,query,stateFilter,family]);
  // Counted off the same units the list shows, so a brand tile and the rows
  // under it can never disagree.

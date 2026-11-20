@@ -115,3 +115,17 @@ export function technicianTodos(input: {
   const groupOf = (todo: TechnicianTodo): TodoGroup => todo.group ?? (todo.kind === 'mhelp_address' || todo.kind === 'sim_cancel' ? 'cleanup' : 'offline');
   return todos.sort((left, right) => groupOf(left) === groupOf(right) ? 0 : groupOf(left) === 'offline' ? -1 : 1);
 }
+
+const FIELD_PROBLEM_KINDS = new Set<TechnicianTodo['kind']>(['camera_offline', 'router_offline', 'battery_alarm']);
+
+/**
+ * Problems on every screen. Field kinds only.
+ * power_silent is omitted until a fresh Victron feed can gate it: an old last
+ * reading, which a failed sync also produces, must not raise a power Problem.
+ * A missing Victron feed (`victronFeedFresh: false`) drops power evidence entirely.
+ */
+export function fleetProblems(input: Parameters<typeof technicianTodos>[0] & { victronFeedFresh?: boolean } = {}): TechnicianTodo[] {
+  const {victronFeedFresh, ...rest} = input;
+  const power = victronFeedFresh === false ? [] : rest.power;
+  return technicianTodos({...rest, power}).filter(todo => FIELD_PROBLEM_KINDS.has(todo.kind));
+}

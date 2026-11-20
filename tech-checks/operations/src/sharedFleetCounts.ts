@@ -2,6 +2,8 @@ import {CAMERA_FRESH_MS, cameraTimestamp, resourceKind, type CameraRow} from './
 import {countForPath} from './watchfulMonitoredCounts';
 import {exactUnitName, ROUTER_FRESHNESS_MS, type RouterRow} from '../../supabase/functions/cos-operations-pages/routers';
 import {unitVerdict, type UnitCameraStatus} from '../shared/starUnitStatus';
+import {decideShopCameras, liveFeedShopRows} from '../shared/shopCameraStatus';
+import type {TechnicianTodo} from './technicianTodos';
 
 /** Shop placement is a label, not a health state. */
 export const IN_SHOP_LABEL = 'In Shop';
@@ -34,7 +36,13 @@ export type FleetCountSnapshot = {
   cameras: CountTriple;
   units: CountTriple;
   inShopUnits: number;
+  /** Shop, DO NOT USE. Out of the field totals, on its own line. */
+  doNotUseUnits: number;
+  /** DO NOT USE that mHelp still places in Field, including the reviewed Sniper 318 case. Out of every total. */
+  exceptionUnits: number;
   unverified: Record<UnverifiedReason, number>;
+  /** Field problems only. The count on every screen is this list's length. */
+  problems: TechnicianTodo[];
 };
 
 export type CountCamera = { state: 'online' | 'offline' | 'unknown'; observedAt: string | null };
@@ -47,7 +55,24 @@ export type CountUnit = {
   unverifiedReason: UnverifiedReason | null;
   deviceId?: string | null;
   serial?: string | null;
+  /** mHelp DO NOT USE. Excluded from field totals. Field + DO NOT USE is the Sniper 318 exception. */
+  doNotUse?: boolean;
+  /** Named exception. Out of every total, including the DO NOT USE line. */
+  exception?: boolean;
 };
+
+/** Watchful names this record SHOP. mHelp says Field. It counts as down. */
+export function isSniper4100(name: string): boolean {
+  const folded = name.trim().toLowerCase().replace(/[\s_-]+/g, ' ');
+  return folded === 'sniper 4 100' || folded.replace(/ /g, '') === 'sniper4100';
+}
+
+const FIELD_PROBLEM_KINDS = new Set(['camera_offline', 'router_offline', 'battery_alarm']);
+
+/** power_silent stays out until a fresh Victron feed can gate it. Cleanup kinds are not Problems. */
+export function fieldProblemList(problems: readonly TechnicianTodo[] = []): TechnicianTodo[] {
+  return problems.filter(problem => FIELD_PROBLEM_KINDS.has(problem.kind));
+}
 
 const emptyTriple = (): CountTriple => ({ online: 0, offline: 0, unknown: 0 });
 
@@ -67,40 +92,69 @@ export function presentedCameraState(camera: CountCamera, now = Date.now()): 'on
   return 'unknown';
 }
 
+function tallyFieldUnit(unit: CountUnit, cameras: CountTriple, unitCounts: CountTriple, unverified: Record<UnverifiedReason, number>, now: number) {
+  const states = unit.cameras.map(camera => presentedCameraState(camera, now));
+  const online = states.filter(state => state === 'online').length;
+  const offline = states.filter(state => state === 'offline').length;
+  const unknown = states.length - online - offline;
+  cameras.online += online;
+  cameras.offline += offline;
+  cameras.unknown += unknown;
+  const verdict = unitVerdict(online, offline, unknown);
+  if (verdict === 'GREEN') unitCounts.online += 1;
+  else if (verdict === 'RED' || verdict === 'YELLOW') unitCounts.offline += 1;
+  else {
+    unitCounts.unknown += 1;
+    const reason = unit.unverifiedReason
+      ?? (states.length === 0 ? 'no_reading'
+        : unit.cameras.some(camera => camera.state === 'offline' && presentedCameraState(camera, now) === 'unknown') ? 'stale_reading'
+        : 'no_reading');
+    unverified[reason] += 1;
+  }
+}
+
 /**
- * The only headline counter. Shop units add 0 to every total.
- * Camera status, the map, and About this board all call this.
+ * The only headline counter. Shop units add 0 to every field total.
+ * DO NOT USE is excluded. A DO NOT USE unit mHelp still places in Field
+ * (the reviewed Sniper 318 case) is out of every total.
+ * Unknown placement counts as Unknown, never as a field online or offline unit.
+ * Sniper 4-100 counts as down when its reading is a fresh offline.
+ * Camera status, the map, the TV, the phone and equipment totals all call this.
  */
-export function selectFleetCounts(units: readonly CountUnit[], now = Date.now()): FleetCountSnapshot {
+export function selectFleetCounts(units: readonly CountUnit[], now = Date.now(), problems: readonly TechnicianTodo[] = []): FleetCountSnapshot {
   const cameras = emptyTriple();
   const unitCounts = emptyTriple();
   const unverified = emptyUnverifiedReasons();
   let inShopUnits = 0;
+  let doNotUseUnits = 0;
+  let exceptionUnits = 0;
   for (const unit of units) {
+    if (isSniper4100(unit.name)) {
+      tallyFieldUnit(unit, cameras, unitCounts, unverified, now);
+      continue;
+    }
+    if (unit.exception === true || (unit.doNotUse === true && unit.placement === 'field')) {
+      exceptionUnits += 1;
+      continue;
+    }
+    if (unit.doNotUse === true) {
+      doNotUseUnits += 1;
+      continue;
+    }
     if (unit.placement === 'shop') {
       inShopUnits += 1;
       continue;
     }
-    const states = unit.cameras.map(camera => presentedCameraState(camera, now));
-    const online = states.filter(state => state === 'online').length;
-    const offline = states.filter(state => state === 'offline').length;
-    const unknown = states.length - online - offline;
-    cameras.online += online;
-    cameras.offline += offline;
-    cameras.unknown += unknown;
-    const verdict = unitVerdict(online, offline, unknown);
-    if (verdict === 'GREEN') unitCounts.online += 1;
-    else if (verdict === 'RED' || verdict === 'YELLOW') unitCounts.offline += 1;
-    else {
+    if (unit.placement === 'unknown') {
       unitCounts.unknown += 1;
-      const reason = unit.unverifiedReason
-        ?? (states.length === 0 ? 'no_reading'
-          : unit.cameras.some(camera => camera.state === 'offline' && presentedCameraState(camera, now) === 'unknown') ? 'stale_reading'
-          : 'no_reading');
-      unverified[reason] += 1;
+      cameras.unknown += unit.cameras.length;
+      unverified[unit.unverifiedReason ?? 'identity_hold'] += 1;
+      continue;
     }
+    tallyFieldUnit(unit, cameras, unitCounts, unverified, now);
   }
-  return { cameras, units: unitCounts, inShopUnits, unverified };
+  const listed = fieldProblemList(problems);
+  return { cameras, units: unitCounts, inShopUnits, doNotUseUnits, exceptionUnits, unverified, problems: listed };
 }
 
 export type ViewHeadlines = { cameras: CountTriple; units: CountTriple };
@@ -119,9 +173,23 @@ export function fleetCountsFromCameraFeed(
   units: readonly UnitCameraStatus[] | null,
   recorders: readonly RecorderLink[] = [],
   now = Date.now(),
+  fieldMap?: unknown,
+  problems: readonly TechnicianTodo[] = [],
 ): FleetCountSnapshot | null {
   if (!units) return null;
-  return selectFleetCounts(applyExactRecorderLinks(censusFromCameraUnits(units, now), recorders, now), now);
+  let census = applyExactRecorderLinks(censusFromCameraUnits(units, now), recorders, now);
+  if (fieldMap !== undefined) {
+    const report = decideShopCameras(liveFeedShopRows(units, fieldMap).inputs);
+    census = census.map(unit => {
+      const decision = report.byUnit.get(unit.name.trim().toUpperCase());
+      if (!decision || isSniper4100(unit.name)) return unit;
+      if (decision.category === 'exception') return { ...unit, doNotUse: true, exception: true };
+      if (decision.category === 'doNotUse') return { ...unit, doNotUse: true };
+      if (decision.category === 'inShop') return { ...unit, placement: 'shop', cameras: [] };
+      return unit;
+    });
+  }
+  return selectFleetCounts(census, now, problems);
 }
 
 export function mapHeadline(units: readonly CountUnit[], now = Date.now()): ViewHeadlines {
@@ -140,7 +208,8 @@ function cameraFromStatus(status: string, observedAt: string | null): CountCamer
 /** Star / unit-camera-status rows. Shop is kept so it can be shown as In Shop and then ignored by the totals. */
 export function censusFromCameraUnits(units: readonly UnitCameraStatus[], now = Date.now()): CountUnit[] {
   return units.map(unit => {
-    const placement = unit.placement === 'SHOP' ? 'shop' : unit.placement === 'FIELD' ? 'field' : 'unknown';
+    const marked = unit as UnitCameraStatus & { doNotUse?: boolean; exception?: boolean };
+    const placement = isSniper4100(unit.unit) ? 'field' : unit.placement === 'SHOP' ? 'shop' : unit.placement === 'FIELD' ? 'field' : 'unknown';
     const listed = (unit.cameraList || []).filter(camera => !camera.removed && (placement !== 'field' || camera.atSite !== false));
     const cameras = listed.length
       ? listed.map(camera => cameraFromStatus(camera.status, unit.observedAt))
@@ -157,6 +226,8 @@ export function censusFromCameraUnits(units: readonly UnitCameraStatus[], now = 
       cameras: placement === 'shop' ? [] : cameras,
       newestOnlineAt: Number.isFinite(onlineAt) ? onlineAt : null,
       unverifiedReason: null,
+      doNotUse: marked.doNotUse === true,
+      exception: marked.exception === true,
     };
   });
 }
@@ -171,7 +242,14 @@ export type DashboardCountRow = {
 };
 
 /** Linked fleet rows. One row is one camera unit. Channel rows are preferred when they are present. */
-export type CommandCountProduct = { status: string; unitNumber?: string | null; productId: string };
+export type CommandCountProduct = {
+  status: string;
+  unitNumber?: string | null;
+  productId: string;
+  lifecycle?: string | null;
+  doNotUse?: boolean;
+  placement?: string | null;
+};
 
 /**
  * Field Product IDs already classified by the command center.
@@ -180,16 +258,33 @@ export type CommandCountProduct = { status: string; unitNumber?: string | null; 
  * dropped stale and missing readings. fieldCameraHealth and the exact TCP check
  * admit online or offline only inside the freshness window. Anything else stays unverified.
  */
+function commandPlacement(item: CommandCountProduct): CountUnit['placement'] {
+  const placement = (item.placement || '').trim().toLowerCase();
+  if (placement === 'shop' || placement === 'warehouse') return 'shop';
+  if (placement === 'unknown') return 'unknown';
+  return 'field';
+}
+
+function commandDoNotUse(item: CommandCountProduct): boolean {
+  if (item.doNotUse === true) return true;
+  const life = (item.lifecycle || '').trim().toUpperCase().replace(/ /g, '_');
+  return life === 'DO_NOT_USE';
+}
+
 export function censusFromCommandProducts(items: readonly CommandCountProduct[], now = Date.now()): CountUnit[] {
   const fresh = new Date(now).toISOString();
   return items.filter(item => item.status !== 'not_applicable').map(item => {
     const state = item.status === 'online' || item.status === 'offline' ? item.status : 'unknown';
+    const placement = commandPlacement(item);
+    const doNotUse = commandDoNotUse(item);
     return {
       name: item.unitNumber || item.productId,
-      placement: 'field',
+      placement,
       cameras: [cameraFromStatus(state, state === 'unknown' ? null : fresh)],
       newestOnlineAt: state === 'online' ? now : null,
       unverifiedReason: state === 'unknown' ? 'no_reading' : null,
+      doNotUse,
+      exception: doNotUse && placement === 'field',
     };
   });
 }
@@ -325,3 +420,34 @@ export function sharedFleetMonitoredCount(input: Parameters<typeof countForPath>
 export function cameraProvesRouterUp(cameraOnlineAt: number | null, routerObservedAt: number | null): boolean {
   return cameraOnlineAt !== null && routerObservedAt !== null && Number.isFinite(cameraOnlineAt) && Number.isFinite(routerObservedAt) && cameraOnlineAt > routerObservedAt;
 }
+
+export type PresentedFleetCounts = FleetCountSnapshot & { problemCount: number } | {
+  units: null;
+  cameras: null;
+  problems: TechnicianTodo[];
+  problemCount: number;
+  inShopUnits: number;
+  doNotUseUnits: number;
+  exceptionUnits: number;
+  unverified: Record<UnverifiedReason, number>;
+};
+
+/** One reading. A missing census is an em dash on every screen, never a number on one and a dash on another. */
+export function presentFleetCounts(units: readonly CountUnit[], now?: number, problems?: readonly TechnicianTodo[]): FleetCountSnapshot & { problemCount: number };
+export function presentFleetCounts(units: null, now?: number, problems?: readonly TechnicianTodo[]): Exclude<PresentedFleetCounts, FleetCountSnapshot>;
+export function presentFleetCounts(units: readonly CountUnit[] | null, now = Date.now(), problems: readonly TechnicianTodo[] = []): PresentedFleetCounts {
+  if (!units) {
+    return {
+      units: null, cameras: null, problems: fieldProblemList(problems), problemCount: fieldProblemList(problems).length,
+      inShopUnits: 0, doNotUseUnits: 0, exceptionUnits: 0, unverified: emptyUnverifiedReasons(),
+    };
+  }
+  const snapshot = selectFleetCounts(units, now, problems);
+  return { ...snapshot, problemCount: snapshot.problems.length };
+}
+
+export const fleetDashboardCounts = presentFleetCounts;
+export const cameraStatusCounts = presentFleetCounts;
+export const tvFleetCounts = presentFleetCounts;
+export const phoneLandingCounts = presentFleetCounts;
+export const equipmentTotalsCounts = presentFleetCounts;
