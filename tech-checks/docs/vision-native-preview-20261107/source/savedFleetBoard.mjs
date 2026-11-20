@@ -244,10 +244,6 @@ async function savedFleetBoard({ rpc, payloadText, read, force = false, waitUnti
 var CAMERA_FRESH_MS = 20 * 60 * 1e3;
 var POWER_FRESH_MS = 45 * 60 * 1e3;
 var normalized = (value) => typeof value === "string" ? value.trim().replace(/\s+/g, " ").toUpperCase() : "";
-function powerTimestamp(value, now = Date.now()) {
-  const stamp2 = cameraTimestamp(value, now);
-  return stamp2.at === null ? stamp2 : { at: stamp2.at, fresh: now - Date.parse(stamp2.at) <= POWER_FRESH_MS };
-}
 function cameraTimestamp(value, now = Date.now()) {
   if (typeof value !== "string") return { at: null, fresh: false };
   const p = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.\d{1,6})?(?:Z|[+-]\d{2}(?::?\d{2})?)$/.exec(value);
@@ -800,6 +796,38 @@ function readVrmFleetConfig(value) {
   } };
 }
 
+// src/feedFreshness.ts
+var FEED_UNKNOWN_MS = 20 * 60 * 1e3;
+var FUTURE_SLACK_MS = 6e4;
+function readInstant(value) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value !== "string" || value.length === 0) return null;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+function ageFeed(readAt, now, id) {
+  const at = readInstant(readAt);
+  if (at === null) return { id, state: "unknown", reason: "missing", readAt: null };
+  if (at > now + FUTURE_SLACK_MS) return { id, state: "unknown", reason: "future", readAt: at };
+  if (now - at > FEED_UNKNOWN_MS) return { id, state: "unknown", reason: "stale", readAt: at };
+  return { id, state: "fresh", reason: "fresh", readAt: at };
+}
+function powerSampleStamp(observedAt, now) {
+  const at = readInstant(observedAt);
+  if (at === null || at > now) return { at: null, fresh: false };
+  return { at: new Date(at).toISOString(), fresh: now - at <= FEED_UNKNOWN_MS };
+}
+function powerSampleFresh(observedAt, now) {
+  return powerSampleStamp(observedAt, now).fresh;
+}
+function victronFeedFresh(sync, now) {
+  if (!sync) return true;
+  if (sync.error || sync.errorCode) return false;
+  if (sync.state && sync.state !== "current") return false;
+  if (!sync.lastSuccessAt && sync.state !== "current") return true;
+  return ageFeed(sync.lastSuccessAt ?? null, now, "victron").state === "fresh";
+}
+
 // src/inhandRouterStatus.ts
 var INHAND_ROUTER_FRESHNESS_MS = 75 * 60 * 1e3;
 var INHAND_LIVE_STATUS_SOURCE = "InHand live pull";
@@ -895,19 +923,26 @@ function fleetDashboardRows(units, health, routers, vrm, now = Date.now()) {
     const batteryReadIssue = key?.startsWith("HELIOS|") ? p?.errorCode || vrm?.sync?.error || vrm?.sync?.state === "error" ? "Latest Victron read unavailable" : vrm?.sync?.state === "stale" ? "Victron sync is stale" : null : null;
     if (key?.startsWith("HELIOS|")) {
       batteryState = "unknown";
-      batteryReadings = (p?.measurements || []).filter((m) => m.metric === "battery_soc").map((m) => ({ source: "Victron \xB7 " + m.source + " " + m.instance, percent: m.value, observedAt: powerTimestamp(m.observedAt, now).at, fresh: powerTimestamp(m.observedAt, now).fresh }));
-      if (p && !batteryReadIssue) {
-        const recent = p.measurements.filter((m) => powerTimestamp(m.observedAt, now).fresh), soc = recent.filter((m) => m.metric === "battery_soc");
+      const feedFresh = victronFeedFresh(vrm?.sync, now);
+      batteryReadings = (p?.measurements || []).filter((m) => m.metric === "battery_soc").map((m) => {
+        const stamp2 = powerSampleStamp(m.observedAt, now);
+        return { source: "Victron \xB7 " + m.source + " " + m.instance, percent: m.value, observedAt: stamp2.at, fresh: feedFresh && stamp2.fresh };
+      });
+      if (p && !batteryReadIssue && feedFresh) {
+        const recent = p.measurements.filter((m) => powerSampleFresh(m.observedAt, now)), soc = recent.filter((m) => m.metric === "battery_soc");
         batteryPercent = soc.length ? Math.min(...soc.map((m) => m.value)) : null;
         batteryState = recent.some((m) => m.unit === "state" && m.value > 0) || batteryPercent !== null && batteryPercent < 20 ? "offline" : batteryPercent !== null ? "online" : "unknown";
       }
     } else if (key?.startsWith("RECON2|")) {
       const batteryRows = camera.identity === "matched" ? camera.rows.filter((r) => r.evidence?.source === "Reconeyez" && r.batteryEvidence) : [];
       const readings = batteryRows.map((r) => r.batteryEvidence).filter(Boolean);
-      batteryReadings = batteryRows.filter((r) => r.batteryEvidence.percent !== null).map((r) => ({ source: "Reconeyez \xB7 " + r.name, percent: r.batteryEvidence.percent, observedAt: powerTimestamp(r.batteryEvidence.percentObservedAt, now).at, fresh: powerTimestamp(r.batteryEvidence.percentObservedAt, now).fresh }));
-      const values = readings.filter((b) => b?.percent !== null && cameraTimestamp(b?.percentObservedAt, now).fresh).map((b) => b.percent);
+      batteryReadings = batteryRows.filter((r) => r.batteryEvidence.percent !== null).map((r) => {
+        const stamp2 = powerSampleStamp(r.batteryEvidence.percentObservedAt, now);
+        return { source: "Reconeyez \xB7 " + r.name, percent: r.batteryEvidence.percent, observedAt: stamp2.at, fresh: stamp2.fresh };
+      });
+      const values = readings.filter((b) => b?.percent !== null && powerSampleFresh(b?.percentObservedAt, now)).map((b) => b.percent);
       batteryPercent = values.length ? Math.min(...values) : null;
-      batteryState = combine(readings.map((b) => powerTimestamp(b?.statusObservedAt, now).fresh && b?.status ? b.status === "normal" ? "online" : "offline" : powerTimestamp(b?.percentObservedAt, now).fresh && b?.percent !== null ? b.percent < 20 ? "offline" : "online" : "unknown"));
+      batteryState = combine(readings.map((b) => powerSampleFresh(b?.statusObservedAt, now) && b?.status ? b.status === "normal" ? "online" : "offline" : powerSampleFresh(b?.percentObservedAt, now) && b?.percent !== null ? b.percent < 20 ? "offline" : "online" : "unknown"));
     }
     const locationVerified = isCurrentFieldPin(unit), locationNeedsReview = placement === "field" && !locationVerified;
     const review = [...placement === "unknown" ? ["Placement is unresolved. Check tracker and current mHelpDesk assignment."] : [], ...camera.state === "unknown" ? [camera.reason] : [], ...locationNeedsReview ? [locationExplanation(unit)] : [], ...unit.mhelpLocationReviewReason ? [String(unit.mhelpLocationReviewReason)] : []];
@@ -1047,8 +1082,8 @@ var unknown = (productId, reason) => ({
   reason
 });
 var deviceId = (v) => typeof v === "number" && Number.isSafeInteger(v) && v > 0 ? String(v) : typeof v === "string" && ID.test(v) ? v : null;
-function readExactProductConnections(value, sourceSha256, expectedFieldIds, now = Date.now(), mode = "receipt") {
-  const trackerKept = object4(value) && safeTime(value.trackerVerifiedAt, now, mode === "lastGood" ? Number.POSITIVE_INFINITY : TRACKER_RECEIPT_MS);
+function readExactProductConnections(value, sourceSha256, expectedFieldIds, now = Date.now()) {
+  const trackerKept = object4(value) && safeTime(value.trackerVerifiedAt, now, TRACKER_RECEIPT_MS);
   const trackerLive = Boolean(object4(value) && safeTime(value.trackerVerifiedAt, now, SOURCE_FRESH_MS));
   if (!object4(value) || value.contract !== EXACT_PRODUCT_CONNECTION_CONTRACT || value.sourceSha256 !== sourceSha256 || !HASH.test(sourceSha256) || !trackerKept || !Array.isArray(value.items) || value.items.length < expectedFieldIds.length || value.items.length > 1e4) return null;
   const expected = new Set(expectedFieldIds);
@@ -1060,7 +1095,7 @@ function readExactProductConnections(value, sourceSha256, expectedFieldIds, now 
     const observed = raw.status === "unknown" ? null : cameraTimestamp(raw.checkedAt, now);
     if (raw.status !== "unknown" && (!raw.resourceId || !observed?.at)) return null;
     seen.add(raw.productId);
-    if (expected.has(raw.productId)) result.set(raw.productId, mode === "lastGood" || !trackerLive || observed && !observed.fresh ? unknown(raw.productId, !trackerLive || mode === "lastGood" ? "The tracker read is not current. The last list is kept with its time." : "The saved connection check has expired; awaiting the next automatic check.") : raw);
+    if (expected.has(raw.productId)) result.set(raw.productId, !trackerLive || observed && !observed.fresh ? unknown(raw.productId, !trackerLive ? "The tracker read is not current." : "The saved connection check has expired; awaiting the next automatic check.") : raw);
   }
   return result.size === expected.size ? result : null;
 }
@@ -1329,10 +1364,10 @@ function buildFleetCommandCenter(upload, fieldHealth, healthReadSucceeded, rows,
     const row = unitRows.length === 1 ? unitRows[0] : null;
     const power = row?.power;
     const available = config?.items.filter((i) => i.installationId === power?.installationId && i.name === power?.name) || [];
-    const recent = power?.measurements.some((m) => powerTimestamp(m.observedAt, now).fresh) === true;
+    const recent = power?.measurements.some((m) => powerSampleFresh(m.observedAt, now)) === true && victronFeedFresh(config?.sync, now);
     const unique = Boolean(power && available.length === 1 && !seenInstallations.has(power.installationId));
     if (unique && power) seenInstallations.add(power.installationId);
-    const status = unique && recent && !power?.errorCode && config?.sync.state === "current" ? "online" : "unverified";
+    const status = unique && recent && !power?.errorCode ? "online" : "unverified";
     vrmCounts[status]++;
     const reason = status === "online" ? "Fresh, uniquely linked Victron telemetry. A low battery is an alert, not an offline camera." : !p.linked?.unitId ? "This mHelp Product ID has no currently usable verified COS equipment association for Victron telemetry. Review the Product ID / COS link." : !power ? "The verified COS unit has no unique matching Victron installation record. Check the approved installation ID." : !unique ? "The Victron installation association is duplicated or cannot be confirmed against the current installation roster." : Boolean(power.errorCode) ? "The saved Victron power read contains an error. Recheck the provider connection." : config?.sync.state !== "current" ? "The Victron fleet sync is not current. Await a successful refresh before verifying power." : !recent ? "The saved Victron measurement is stale or missing. No current power status is inferred." : "Victron power status is not yet verified.";
     return { ...p, status, reason };
@@ -1374,23 +1409,6 @@ function cameraFieldProducts(map, health, now, readSucceeded = true) {
   return buildFleetCommandCenter(upload, field, readSucceeded, rows, null, null, now, health.refreshedAt || null);
 }
 
-// src/feedFreshness.ts
-var FEED_UNKNOWN_MS = 20 * 60 * 1e3;
-var FUTURE_SLACK_MS = 6e4;
-function readInstant(value) {
-  if (typeof value === "number") return Number.isFinite(value) ? value : null;
-  if (typeof value !== "string" || value.length === 0) return null;
-  const parsed = Date.parse(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-function ageFeed(readAt, now, id) {
-  const at = readInstant(readAt);
-  if (at === null) return { id, state: "unknown", reason: "missing", readAt: null };
-  if (at > now + FUTURE_SLACK_MS) return { id, state: "unknown", reason: "future", readAt: at };
-  if (now - at > FEED_UNKNOWN_MS) return { id, state: "unknown", reason: "stale", readAt: at };
-  return { id, state: "fresh", reason: "fresh", readAt: at };
-}
-
 // durable-board/project.ts
 function feedStamp(id, value, at) {
   const age = ageFeed(typeof value === "string" || typeof value === "number" ? value : null, at, id);
@@ -1398,7 +1416,7 @@ function feedStamp(id, value, at) {
 }
 function completedBoard(health, map, connections, previous, at = Date.now()) {
   const upload = map?.uploadInventory, ids = upload?.records?.filter((r) => r.placement === "FIELD").map((r) => r.productId);
-  if (!upload || !ids?.length || !(readExactProductConnections(connections, upload.sourceSha256, ids, at) || readExactProductConnections(connections, upload.sourceSha256, ids, at, "lastGood"))) throw Error("connection_source_incomplete");
+  if (!upload || !ids?.length || !readExactProductConnections(connections, upload.sourceSha256, ids, at)) throw Error("connection_source_incomplete");
   prepareImmutableIdentityEnvelope(health);
   const reconciled = reconcileFleetSnapshot(health, { ...map, productConnections: connections, productConnectionsState: "ready" }, at);
   const { fleetFieldUnits, ...storedHealth } = reconciled.health;
@@ -1406,7 +1424,7 @@ function completedBoard(health, map, connections, previous, at = Date.now()) {
   prepareImmutableIdentityEnvelope(pair.health);
   const board = cameraFieldProducts(pair.fieldMap, pair.health, at, true);
   if (!board || !board.healthVerified) throw Error("inventory_source_incomplete");
-  return { contract: "COS_SAVED_FLEET_BOARD_V1", fleet: pair, counts: board.counts, units: board.items.map((p) => ({ productId: p.productId, unitNumber: p.unitNumber, status: p.status, checkedAt: p.linked?.evidence?.observedAt || null, reason: p.linked?.evidence?.reason || p.linked?.reviewReason || null })), inventory: { total: board.total, field: board.field, shop: board.shop }, feeds: { mhelp: feedStamp("mhelp", upload.receivedAt ?? upload.lastApiReadAt, at), tracker: feedStamp("tracker", connections?.trackerVerifiedAt, at), cameras: feedStamp("cameras", health?.refreshedAt ?? at, at) } };
+  return { contract: "COS_SAVED_FLEET_BOARD_V1", fleet: pair, counts: board.counts, units: board.items.map((p) => ({ productId: p.productId, unitNumber: p.unitNumber, status: p.status, checkedAt: p.linked?.evidence?.observedAt || null, reason: p.linked?.evidence?.reason || p.linked?.reviewReason || null })), inventory: { total: board.total, field: board.field, shop: board.shop }, feeds: { mhelp: feedStamp("mhelp", upload.receivedAt ?? upload.lastApiReadAt, at), tracker: feedStamp("tracker", connections?.trackerVerifiedAt, at), cameras: feedStamp("cameras", health?.refreshedAt, at) } };
 }
 export {
   COMMIT_REQUEST_MAX_MS,

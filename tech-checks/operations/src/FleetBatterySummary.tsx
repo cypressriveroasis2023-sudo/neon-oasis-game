@@ -1,5 +1,5 @@
 import {cameraTime} from './fieldCameraHealth';
-import {powerTimestamp} from './cameraEvidence';
+import {powerSampleFresh} from './feedFreshness';
 import type {FleetDashboardRow} from './fleetDashboardModel';
 
 /** The minimum is an alert-focused summary of source readings, never aggregate capacity. */
@@ -7,7 +7,7 @@ export default function FleetBatterySummary({row,now,compact=false}:{row:FleetDa
  if(row.batteryState==='not_available')return null;
  const readings=row.batteryReadings;
  const minimum=row.batteryPercent===null?null:readings.filter(r=>r.fresh&&r.percent===row.batteryPercent).sort((a,b)=>Date.parse(a.observedAt!)-Date.parse(b.observedAt!))[0];
- const alarm=!row.batteryReadIssue&&row.power?.measurements.some(m=>m.unit==='state'&&m.value>0&&powerTimestamp(m.observedAt,now).fresh);
+ const alarm=!row.batteryReadIssue&&row.power?.measurements.some(m=>m.unit==='state'&&m.value>0&&powerSampleFresh(m.observedAt,now));
  const unavailable=row.batteryReadIssue||(readings.length?'Charge is stale or unverified':'No verified charge reading');
  if(compact)return <small className='cos-fleet-battery-compact'>{minimum?<>Lowest reported charge {minimum.percent}% · {minimum.source}<br/>Measured {cameraTime(minimum.observedAt,now)}</>:unavailable}</small>;
  return <section className='cos-fleet-battery-summary' aria-label='Selected unit battery charge'>

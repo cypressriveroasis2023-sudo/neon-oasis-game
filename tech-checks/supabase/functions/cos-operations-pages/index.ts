@@ -22,7 +22,7 @@ import {createUnitTracker,UnitTrackerError} from './unitTracker.ts';
 import {createSheetsConnection,SheetsConnectionError} from './googleSheets.ts';
 import {read2027ProductIpsFromGoogle} from './mhelp2027ProductIpReader.ts';
 import {currentMhelpProductConnectionCensus} from './mhelpProductConnectionSource.ts';
-import {buildExactProductConnections, lastGoodExactConnections} from '../../../operations/src/exactProductConnection.ts';
+import {buildExactProductConnections} from '../../../operations/src/exactProductConnection.ts';
 import {createMhelpPartnerHandler,MhelpPartnerError} from './mhelpPartner.ts';
 import {createMhelpUnitLocationReader} from './mhelpUnitLocation.ts';
 import {createMhelpTicketReader,projectMhelpTicketPreview,MhelpTicketError} from './mhelpTickets.ts';
@@ -727,8 +727,7 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
           connectionRevision:device.connection_revision,monitoringEnabled:device.monitoring_enabled,
           portStatus:byId.get(String(device.id))?.port_status||null,
         }));
-        const evaluated=buildExactProductConnections(source.census,tracker,endpoints)
-          ?? lastGoodExactConnections(source.census,tracker,endpoints);
+        const evaluated=buildExactProductConnections(source.census,tracker,endpoints);
         if(!evaluated)fail('Current exact Product-ID/endpoint evidence could not be verified.',503);
         return json(evaluated);
       }

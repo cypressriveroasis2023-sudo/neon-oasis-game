@@ -5,7 +5,7 @@ import {type RouterRow} from '../../supabase/functions/cos-operations-pages/rout
 import {safeVrmPower,type SafeVrmPower} from '../../supabase/functions/cos-operations-pages/vrmSafePower';
 import {validVrmEmbed,type VrmUnit} from '../../supabase/functions/cos-operations-pages/vrm';
 import type {FleetDisplayAddress} from './fleetDisplayAddress';
-import {cameraTimestamp,powerTimestamp} from './cameraEvidence';
+import {powerSampleFresh, powerSampleStamp, victronFeedFresh} from './feedFreshness';
 import {inhandRouterReading,type InhandRouterReading} from './inhandRouterStatus';
 
 export type Signal='online'|'offline'|'unknown'|'support'|'not_available';
@@ -39,18 +39,19 @@ export function fleetDashboardRows(units:DashboardUnit[],health:Health|null,rout
   const batteryReadIssue=key?.startsWith('HELIOS|')?(p?.errorCode||vrm?.sync?.error||vrm?.sync?.state==='error'?'Latest Victron read unavailable':vrm?.sync?.state==='stale'?'Victron sync is stale':null):null;
   if(key?.startsWith('HELIOS|')){
    batteryState='unknown';
-   batteryReadings=(p?.measurements||[]).filter(m=>m.metric==='battery_soc').map(m=>({source:'Victron · '+m.source+' '+m.instance,percent:m.value,observedAt:powerTimestamp(m.observedAt,now).at,fresh:powerTimestamp(m.observedAt,now).fresh}));
-   if(p&&!batteryReadIssue){const recent=p.measurements.filter(m=>powerTimestamp(m.observedAt,now).fresh),soc=recent.filter(m=>m.metric==='battery_soc');
+   const feedFresh=victronFeedFresh(vrm?.sync,now);
+   batteryReadings=(p?.measurements||[]).filter(m=>m.metric==='battery_soc').map(m=>{const stamp=powerSampleStamp(m.observedAt,now);return {source:'Victron · '+m.source+' '+m.instance,percent:m.value,observedAt:stamp.at,fresh:feedFresh&&stamp.fresh};});
+   if(p&&!batteryReadIssue&&feedFresh){const recent=p.measurements.filter(m=>powerSampleFresh(m.observedAt,now)),soc=recent.filter(m=>m.metric==='battery_soc');
     // Multiple battery and system instances are normal in Victron. Surface the lowest recent charge.
     batteryPercent=soc.length?Math.min(...soc.map(m=>m.value)):null;
     batteryState=recent.some(m=>m.unit==='state'&&m.value>0)||batteryPercent!==null&&batteryPercent<20?'offline':batteryPercent!==null?'online':'unknown';}
   }else if(key?.startsWith('RECON2|')){
    const batteryRows=camera.identity==='matched'?camera.rows.filter(r=>r.evidence?.source==='Reconeyez'&&r.batteryEvidence):[];
    const readings=batteryRows.map(r=>r.batteryEvidence).filter(Boolean);
-   batteryReadings=batteryRows.filter(r=>r.batteryEvidence!.percent!==null).map(r=>({source:'Reconeyez · '+r.name,percent:r.batteryEvidence!.percent!,observedAt:powerTimestamp(r.batteryEvidence!.percentObservedAt,now).at,fresh:powerTimestamp(r.batteryEvidence!.percentObservedAt,now).fresh}));
-   const values=readings.filter(b=>b?.percent!==null&&cameraTimestamp(b?.percentObservedAt,now).fresh).map(b=>b!.percent!);
+   batteryReadings=batteryRows.filter(r=>r.batteryEvidence!.percent!==null).map(r=>{const stamp=powerSampleStamp(r.batteryEvidence!.percentObservedAt,now);return {source:'Reconeyez · '+r.name,percent:r.batteryEvidence!.percent!,observedAt:stamp.at,fresh:stamp.fresh};});
+   const values=readings.filter(b=>b?.percent!==null&&powerSampleFresh(b?.percentObservedAt,now)).map(b=>b!.percent!);
    batteryPercent=values.length?Math.min(...values):null;
-   batteryState=combine(readings.map(b=>powerTimestamp(b?.statusObservedAt,now).fresh&&b?.status?b.status==='normal'?'online':'offline':powerTimestamp(b?.percentObservedAt,now).fresh&&b?.percent!==null?(b!.percent!<20?'offline':'online'):'unknown'));
+   batteryState=combine(readings.map(b=>powerSampleFresh(b?.statusObservedAt,now)&&b?.status?b.status==='normal'?'online':'offline':powerSampleFresh(b?.percentObservedAt,now)&&b?.percent!==null?(b!.percent!<20?'offline':'online'):'unknown'));
   }
   const locationVerified=isCurrentFieldPin(unit),locationNeedsReview=placement==='field'&&!locationVerified;
   const review=[...(placement==='unknown'?['Placement is unresolved. Check tracker and current mHelpDesk assignment.']:[]),...(camera.state==='unknown'?[camera.reason]:[]),...(locationNeedsReview?[locationExplanation(unit)]:[]),...(unit.mhelpLocationReviewReason?[String(unit.mhelpLocationReviewReason)]:[])];

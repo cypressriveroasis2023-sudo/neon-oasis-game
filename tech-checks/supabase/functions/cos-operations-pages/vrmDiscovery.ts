@@ -1,4 +1,5 @@
 import {safeVrmPower} from './vrmSafePower.ts';
+import {FEED_UNKNOWN_MS} from '../../../operations/src/feedFreshness.ts';
 import { collectHeliosPower } from './vrmPower.ts';
 import { heliosVrmUnits, validInstallationId, validVrmName, VRM_MAX_INSTALLATIONS, vrmPortalConfig, readVrmFleetConfig, type VrmFleetConfig, type VrmInstallation, type VrmSync } from './vrm.ts';
 
@@ -90,7 +91,7 @@ export function createVrmFleetReader(options: VrmDiscoveryOptions) {
   const now = options.now || Date.now;
   const read = async () => readSnapshot(await options.rpc('cos_vrm_fleet_snapshot', {}));
   const present = async (snapshot: Snapshot, configured: boolean): Promise<VrmFleetConfig & {power?:ReturnType<typeof safeVrmPower>}> => {
-    const old = !snapshot.lastSuccessAt || now() - Date.parse(snapshot.lastSuccessAt) > 2 * VRM_SYNC_INTERVAL_MS;
+    const old = !snapshot.lastSuccessAt || now() - Date.parse(snapshot.lastSuccessAt) > FEED_UNKNOWN_MS;
     const sync: VrmSync = {
       state: !configured ? 'not_configured' : snapshot.syncing ? 'syncing' : snapshot.errorCode ? (snapshot.lastSuccessAt ? 'stale' : 'error') : old ? (snapshot.lastSuccessAt ? 'stale' : 'idle') : 'current',
       lastAttemptAt: snapshot.lastAttemptAt, lastSuccessAt: snapshot.lastSuccessAt, error: snapshot.errorCode ? messages[snapshot.errorCode] : null,

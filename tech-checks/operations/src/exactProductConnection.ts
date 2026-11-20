@@ -147,14 +147,14 @@ export function completedSavedTcpCheck(device:SavedTcpEndpoint,now=Date.now()):O
  * inventory, and still reserves held/Shop endpoint ownership. No IPs leave.
  */
 export function buildExactProductConnections(
- acceptedMhelp:unknown,tracker:unknown,devices:readonly SavedTcpEndpoint[],now=Date.now(),resourceMembership?:ReadonlyMap<string,readonly string[]>,reachabilityOnly=false,ignoreAge=false
+ acceptedMhelp:unknown,tracker:unknown,devices:readonly SavedTcpEndpoint[],now=Date.now(),resourceMembership?:ReadonlyMap<string,readonly string[]>,reachabilityOnly=false
 ):ExactProductConnectionEnvelope|null{
  const authority=readMhelpInventoryAuthority(acceptedMhelp,now);
- if(!authority||(!ignoreAge&&authority.stale)||!object(tracker)||![VERIFIED_TRACKER_IP_CONTRACT,TRACKER_CONNECTION_CENSUS_V2].includes(tracker.contract)
+ if(!authority||authority.stale||!object(tracker)||![VERIFIED_TRACKER_IP_CONTRACT,TRACKER_CONNECTION_CENSUS_V2].includes(tracker.contract)
   ||tracker.workbookId!==TRACKER_IP_WORKBOOK
   ||tracker.expectedMhelpSourceSha256!==authority.sourceSha256
   ||!HASH.test(tracker.expectedMhelpSourceSha256)
-  ||!safeTime(tracker.verifiedAt,now,ignoreAge?Number.POSITIVE_INFINITY:SOURCE_FRESH_MS)
+  ||!safeTime(tracker.verifiedAt,now,SOURCE_FRESH_MS)
   ||!Array.isArray(tracker.records)||tracker.records.length!==authority.total
   ||!Array.isArray(devices)||devices.length>10000)return null;
  const isolated=tracker.contract===TRACKER_CONNECTION_CENSUS_V2;
@@ -227,8 +227,8 @@ export function buildTrackerIpReachability(acceptedMhelp:unknown,tracker:unknown
  * This is a presentation check, not a substitute for the protected server's
  * independently retrieved and authenticated tracker/endpoint sources.
  */
-export function readExactProductConnections(value:unknown,sourceSha256:string,expectedFieldIds:readonly string[],now=Date.now(),mode:'receipt'|'lastGood'='receipt'):Map<string,ExactProductConnection>|null{
- const trackerKept=object(value)&&safeTime(value.trackerVerifiedAt,now,mode==='lastGood'?Number.POSITIVE_INFINITY:TRACKER_RECEIPT_MS);
+export function readExactProductConnections(value:unknown,sourceSha256:string,expectedFieldIds:readonly string[],now=Date.now()):Map<string,ExactProductConnection>|null{
+ const trackerKept=object(value)&&safeTime(value.trackerVerifiedAt,now,TRACKER_RECEIPT_MS);
  const trackerLive=Boolean(object(value)&&safeTime(value.trackerVerifiedAt,now,SOURCE_FRESH_MS));
  if(!object(value)||value.contract!==EXACT_PRODUCT_CONNECTION_CONTRACT||value.sourceSha256!==sourceSha256||!HASH.test(sourceSha256)
   ||!trackerKept||!Array.isArray(value.items)||value.items.length<expectedFieldIds.length||value.items.length>10000)return null;
@@ -248,28 +248,9 @@ export function readExactProductConnections(value:unknown,sourceSha256:string,ex
   seen.add(raw.productId);
   // A result can expire while the response is in flight or on screen. Age
   // belongs to that Product ID; it must not invalidate other fresh cameras.
-  if(expected.has(raw.productId))result.set(raw.productId,mode==='lastGood'||!trackerLive||(observed&&!observed.fresh)
-   ?unknown(raw.productId,!trackerLive||mode==='lastGood'?'The tracker read is not current. The last list is kept with its time.':'The saved connection check has expired; awaiting the next automatic check.')
+  if(expected.has(raw.productId))result.set(raw.productId,!trackerLive||(observed&&!observed.fresh)
+   ?unknown(raw.productId,!trackerLive?'The tracker read is not current.':'The saved connection check has expired; awaiting the next automatic check.')
    :raw as ExactProductConnection);
  }
  return result.size===expected.size?result:null;
-}
-
-/** When the live census is refused only because the mHelp list or tracker is
- * old, keep that list. Items are Unknown. A structural mismatch still returns null.
- * No addresses or network fields are copied onto the kept items. */
-export function lastGoodExactConnections(
- acceptedMhelp:unknown,tracker:unknown,devices:readonly SavedTcpEndpoint[],now=Date.now(),resourceMembership?:ReadonlyMap<string,readonly string[]>,reachabilityOnly=false
-):ExactProductConnectionEnvelope|null{
- if(buildExactProductConnections(acceptedMhelp,tracker,devices,now,resourceMembership,reachabilityOnly))return null;
- const authority=readMhelpInventoryAuthority(acceptedMhelp,now);
- if(!authority||!object(tracker)||typeof tracker.verifiedAt!=='string')return null;
- const trackerAt=Date.parse(tracker.verifiedAt);
- if(!Number.isFinite(trackerAt)||trackerAt>now+60_000)return null;
- const built=buildExactProductConnections(acceptedMhelp,tracker,devices,now,resourceMembership,reachabilityOnly,true);
- if(!built)return null;
- return {
-  contract:built.contract,sourceSha256:built.sourceSha256,trackerVerifiedAt:new Date(trackerAt).toISOString(),
-  items:built.items.map(item=>unknown(item.productId,'Last good connection list. Not a live check.')),
- };
 }

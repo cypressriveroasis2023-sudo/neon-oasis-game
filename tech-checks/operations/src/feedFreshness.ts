@@ -85,6 +85,28 @@ export type ShownValue = {
   note: string | null;
 };
 
+/** A power sample is Unknown after 20 minutes, and a future sample is not a time.
+ * This is separate from POWER_FRESH_MS, which an existing test still pins at 45 minutes. */
+export function powerSampleStamp(observedAt: number | string | null | undefined, now: number): {at: string | null; fresh: boolean} {
+  const at = readInstant(observedAt);
+  if (at === null || at > now) return {at: null, fresh: false};
+  return {at: new Date(at).toISOString(), fresh: now - at <= FEED_UNKNOWN_MS};
+}
+
+export function powerSampleFresh(observedAt: number | string | null | undefined, now: number): boolean {
+  return powerSampleStamp(observedAt, now).fresh;
+}
+
+/** A Victron sync is fresh only from a successful read inside 20 minutes.
+ * A failed attempt does not count. No sync record means the sample time is the gate. */
+export function victronFeedFresh(sync: {lastSuccessAt?: string | null; error?: string | null; errorCode?: string | null; state?: string | null} | null | undefined, now: number): boolean {
+  if (!sync) return true;
+  if (sync.error || sync.errorCode) return false;
+  if (sync.state && sync.state !== 'current') return false;
+  if (!sync.lastSuccessAt && sync.state !== 'current') return true;
+  return ageFeed(sync.lastSuccessAt ?? null, now, 'victron').state === 'fresh';
+}
+
 /** Live text when every input is fresh. Otherwise '?' and the last-known line. */
 export function presentValue(
   liveText: string,
