@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {join} from 'node:path';
-import {preparePayload, countOccurrences, replaceAll, liveMatchesPrecondition, compareServedFiles, sha256} from './deploy-recorded-function.mjs';
+import {preparePayload, countOccurrences, replaceAll, liveMatchesPrecondition, compareServedFiles, sha256, readPatchFile, readServedFunctionBody, SERVED_BODY_MAX_BYTES} from './deploy-recorded-function.mjs';
 
 const ROOT=new URL('../../',import.meta.url).pathname;
 const PATCHES=join(ROOT,'.github/function-patches/cos-operations-pages');
@@ -107,8 +107,98 @@ test('the committed CORS patch reproduces Vision\'s expected hashes from the rec
   assert.equal(countOccurrences(serve.content,Buffer.from('preview-vision-command-james')),0,'branch alias must not be allowed');
 });
 
+test('the routers address patch starts from the live serve.ts and the rollback restores that v169 bundle',()=>{
+  const forward=JSON.parse(readFileSync(join(PATCHES,'routers-without-addresses-v169.json'),'utf8'));
+  const back=JSON.parse(readFileSync(join(PATCHES,'rollback-routers-without-addresses-to-v169.json'),'utf8'));
+  assert.equal(forward.expectedBefore['serve.ts'],'a586f2152fdd1c073b5ff9be3258e6e2e1394380e6a84e58868af39e2c2fbbc9');
+  assert.equal(forward.expectedBefore['savedFleetBoard.mjs'],'f93b82b3c9aee80bb7921617fb1cca50ad72758dcd0a86d29e578cc796f2957a');
+  assert.equal(forward.requireLiveBeforeDeploy.version,169);
+  const files=preparePayload(forward,name=>readPatchFile(forward,name,ROOT));
+  const serve=files.find(f=>f.recordName==='serve.ts').content.toString('utf8');
+  assert.equal(files.find(f=>f.recordName==='serve.ts').sha256,'abae957db02f00ca06cc66cc5302626608c2d97633086a4f9542f7e934d442da');
+  assert.equal(files.find(f=>f.recordName==='savedFleetBoard.mjs').sha256,'f93b82b3c9aee80bb7921617fb1cca50ad72758dcd0a86d29e578cc796f2957a');
+  assert.equal(serve.includes('publicIp:text6(row2.router_public_ip)'),false);
+  assert.equal(serve.includes('unitIp:text6(row2.unit_ip)'),false);
+  assert.equal(serve.includes('camera_unit_routers?select=id,unit_key,router_name,router_model,router_public_ip'),false);
+  assert.equal(serve.includes('camera_unit_routers?select=id,unit_key,router_name,router_model,web_port'),true);
+  assert.equal(serve.includes('if(!context.legacyOwner&&!(verifiedFleetIt&&fleetRouteAllowed(method,path))&&fail16("An active COS Owner account is required.",403)'),true);
+  const restored=preparePayload(back,name=>readPatchFile(back,name,ROOT));
+  assert.equal(restored.find(f=>f.recordName==='serve.ts').sha256,'a586f2152fdd1c073b5ff9be3258e6e2e1394380e6a84e58868af39e2c2fbbc9');
+  assert.equal(restored.find(f=>f.recordName==='savedFleetBoard.mjs').sha256,'f93b82b3c9aee80bb7921617fb1cca50ad72758dcd0a86d29e578cc796f2957a');
+});
+
+test('the unit camera route patch applies to the v16 bundle and rollback restores that bundle',()=>{
+  const camera=join(ROOT,'.github/function-patches/cos-unit-camera-status');
+  const forward=JSON.parse(readFileSync(join(camera,'camera-routes-only-v16.json'),'utf8'));
+  const back=JSON.parse(readFileSync(join(camera,'rollback-to-v16-entry.json'),'utf8'));
+  assert.equal(forward.slug,'cos-unit-camera-status');
+  assert.equal(forward.expectedBefore['index.ts'],'f8de9ac5df1955803d6f37d5fbccfbdf3bce5e68079670f48418c414978830c9');
+  assert.equal(forward.requireLiveBeforeDeploy.version,16);
+  assert.equal(forward.requireLiveBeforeDeploy.ezbr_sha256.startsWith('47f904b7'),true);
+  const files=preparePayload(forward,name=>readFileSync(join(ROOT,forward.sourceDir,name)));
+  assert.equal(files.find(file=>file.recordName==='index.ts').sha256,'a9c7c08bb6fbb22e80c51792d28a8c0ea22fbf84cd84bf0128671ed890140b1f');
+  const restored=preparePayload(back,name=>readFileSync(join(ROOT,back.sourceDir,name)));
+  assert.equal(restored.find(file=>file.recordName==='index.ts').sha256,'f8de9ac5df1955803d6f37d5fbccfbdf3bce5e68079670f48418c414978830c9');
+});
+
 test('the committed rollback patch reproduces the original v134 bytes unchanged',()=>{
   const files=preparePayload(rollback,readRecorded(rollback));
   assert.equal(files.find(f=>f.recordName==='serve.ts').sha256,'d946e036682663566766314a7bea423ea43921ca33b253134adc62d5f78d4e12');
   assert.equal(files.find(f=>f.recordName==='serve.ts').bytes,1027995);
+});
+
+function multipartBody(files,{boundary='eszip-extract'}={}){
+  const chunks=[Buffer.from('')];
+  for(const file of files){
+    chunks.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${file.name}"\r\nContent-Type: application/typescript\r\n\r\n`));
+    chunks.push(Buffer.from(file.content));
+    chunks.push(Buffer.from('\r\n'));
+  }
+  chunks.push(Buffer.from(`--${boundary}--\r\n`));
+  return {type:`multipart/form-data; boundary=${boundary}`,body:Buffer.concat(chunks)};
+}
+
+test('a 200 multipart extraction of the eszip bundle passes, including a file over 1MB',()=>{
+  const large='x'.repeat(1024*1024+100);
+  const files=[{name:'fn/serve.ts',content:'export const marker="served";\n'},{name:'fn/deno.json',content:large}];
+  const packed=multipartBody(files);
+  const served=readServedFunctionBody(packed.type,packed.body);
+  assert.ok(served);
+  assert.deepEqual(compareServedFiles(served,files.map(file=>({name:file.name,sha256:sha256(Buffer.from(file.content))})) ),[]);
+});
+
+test('a served hash mismatch and a missing file stay failures',()=>{
+  const packed=multipartBody([{name:'fn/serve.ts',content:'wrong'},{name:'fn/deno.json',content:'{}'}]);
+  const served=readServedFunctionBody(packed.type,packed.body);
+  const mismatch=compareServedFiles(served,[{name:'fn/serve.ts',sha256:sha256(Buffer.from('right'))},{name:'fn/deno.json',sha256:sha256(Buffer.from('{}'))}]);
+  assert.match(mismatch.join('\n'),/served sha256 differs for fn\/serve\.ts/);
+  const missing=compareServedFiles(served,[{name:'fn/serve.ts',sha256:sha256(Buffer.from('wrong'))},{name:'fn/other.ts',sha256:sha256(Buffer.from('x'))}]);
+  assert.match(missing.join('\n'),/file missing from deployment: fn\/other\.ts/);
+});
+
+test('malformed read-back bodies stay unreadable instead of a passing file list',()=>{
+  assert.equal(readServedFunctionBody('multipart/form-data',Buffer.from('not a multipart body')),null);
+  assert.equal(readServedFunctionBody('application/json',Buffer.from('{not json')),null);
+  assert.equal(readServedFunctionBody('application/json',Buffer.from('{"message":"ok"}')),null);
+  assert.equal(readServedFunctionBody('application/vnd.denoland.eszip',Buffer.from('ESZIP2.3\0raw-bundle')),null);
+  assert.equal(readServedFunctionBody('application/octet-stream',Buffer.from('EZBRcompressed')),null);
+});
+
+test('a mixed-case multipart boundary is matched as written and the part bytes are hashed raw',()=>{
+  const raw=Buffer.from([0x68,0x69,0xff]);
+  const packed=multipartBody([{name:'fn/serve.ts',content:raw}],{boundary:'AbC123'});
+  const served=readServedFunctionBody('Multipart/Form-Data; Boundary=AbC123',packed.body);
+  assert.ok(served);
+  assert.equal(Buffer.isBuffer(served[0].content),true);
+  assert.deepEqual(compareServedFiles(served,[{name:'fn/serve.ts',sha256:sha256(raw)}]),[]);
+  assert.notEqual(sha256(raw),sha256(Buffer.from(raw.toString('utf8'),'utf8')));
+  assert.equal(readServedFunctionBody('multipart/form-data; boundary=abc123',packed.body),null);
+});
+
+test('a read-back larger than the size cap stays inconclusive',()=>{
+  const packed=multipartBody([{name:'fn/serve.ts',content:'ok'}]);
+  assert.ok(readServedFunctionBody(packed.type,packed.body));
+  const oversized=Buffer.concat([packed.body,Buffer.alloc(SERVED_BODY_MAX_BYTES+1-packed.body.length)]);
+  assert.equal(oversized.length,SERVED_BODY_MAX_BYTES+1);
+  assert.equal(readServedFunctionBody(packed.type,oversized),null);
 });

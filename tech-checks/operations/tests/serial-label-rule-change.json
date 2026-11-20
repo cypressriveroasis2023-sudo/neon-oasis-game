@@ -1,0 +1,7 @@
+{
+  "provenance": "Felix accepted FLAG 1 as a declared correction. The previous fixture value is 12 hex, so the MAC rule removed it before the label rule ran.",
+  "test": "the loader rejects an IP or serial column and strips an IP in a cell",
+  "oldFixture": "Fixture Site serial AB12CD34EF56 gate",
+  "newFixture": "Fixture Site serial ZZ12CD34 gate",
+  "expected": "Fixture Site serial gate"
+}

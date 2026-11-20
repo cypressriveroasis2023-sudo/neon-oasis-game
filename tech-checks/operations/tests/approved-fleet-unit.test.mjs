@@ -1,5 +1,6 @@
 import {beforeFleetCountTrustSource} from './fleet-count-trust-source.mjs';
 import {beforeBoardFreshStatusSource} from './board-fresh-status-source.mjs';
+import {beforeWatchfulMonitoredCountSource} from './watchful-monitored-count-source.mjs';
 import {originalItSavedReadingSource} from './it-saved-readings-source.mjs';
 import {originalFleetViewMarkup} from './approved-fleet-view-source.mjs';
 import {originalFleetConnectionReadSource} from './fleet-connection-read-source.mjs';
@@ -24,8 +25,9 @@ import {createHash} from 'node:crypto';
 // hiddenWorkspaces); fleetDashboard.css changes three colours from the old blue
 // to COS red. Neither touches how a unit is presented or counted.
 // Reviewed 2026-11-18: fleetDashboardModel.ts and FleetUnitHealth.tsx read the
-// live InHand status. Their pins move with that reading. The camera window,
-// the session guards, and the other presentation pins are unchanged.
+// live InHand status and do not print a router address. Their pins move with
+// that reading. The camera window, the session guards, and the other
+// presentation pins are unchanged.
 const expected={
   "FleetDashboard.tsx": "8d711a97853b5f646d892f5552a792656623a9f8",
   "FleetUnitHealth.tsx": "3ba1f2507241a63d839424bc1db28b6d584659c1",
@@ -47,7 +49,7 @@ const expected={
 };
 for (const [name,sha] of Object.entries(expected)) test('unit presentation preserves '+name,()=>{
  const raw=readFileSync(new URL('../src/'+name,import.meta.url));
- const reviewed=beforeFleetCountTrustSource(name,beforeBoardFreshStatusSource(name,raw.toString('utf8')));
+ const reviewed=beforeFleetCountTrustSource(name,beforeWatchfulMonitoredCountSource(name,beforeBoardFreshStatusSource(name,raw.toString('utf8'))));
  const current=['FleetDashboard.tsx','useCameraHealth.ts'].includes(name)?previousReviewedMainSource(name,reviewed):reviewed;
  const restored=name==='FleetDashboard.tsx'?originalFleetViewMarkup(current):['api.ts','useCameraHealth.ts'].includes(name)?originalFleetConnectionReadSource(name,current):name==='App.tsx'?originalItSavedReadingSource(name,current):null;
  const b=Buffer.from(restored===null?current:restored);

@@ -24,6 +24,10 @@ on:
           - rollback-original-v134
           - business-screens-410-v168
           - rollback-business-410-to-v168
+          - routers-without-addresses-v169
+          - rollback-routers-without-addresses-to-v169
+          - camera-routes-only-v16
+          - rollback-to-v16-entry
       confirm:
         description: 'Type the patch name again to confirm. Deploying changes production immediately.'
         required: true
@@ -51,19 +55,47 @@ jobs:
       - name: Pin the reviewed v168 rollback file
         if: inputs.patch == 'rollback-business-410-to-v168'
         run: printf '%s  %s\n' '2ef966757c72c203eee4b9cb93661b8052df30f3018045d841de3d72b72b6f0f' '.github/function-patches/cos-operations-pages/rollback-business-410-to-v168.json' | sha256sum -c -
+      - name: Pin the routers address removal patch file
+        if: inputs.patch == 'routers-without-addresses-v169'
+        run: printf '%s  %s\n' '90a9bbdb3b5f00f2d2a2b879e3f8087a2aa0bd69232689e003717782a5f01e82' '.github/function-patches/cos-operations-pages/routers-without-addresses-v169.json' | sha256sum -c -
+      - name: Pin the routers address removal rollback file
+        if: inputs.patch == 'rollback-routers-without-addresses-to-v169'
+        run: printf '%s  %s\n' '40c3d805bddcc8216399f8843abe3114680cc1ee2de9ef19dafa3d03f320ab21' '.github/function-patches/cos-operations-pages/rollback-routers-without-addresses-to-v169.json' | sha256sum -c -
+      - name: Pin the unit camera route patch file
+        if: inputs.patch == 'camera-routes-only-v16'
+        run: printf '%s  %s\n' 'd2a9bd1525d6ed45004f41c60dfd8ee80a0fe840a6db5cebd702349c1eff9215' '.github/function-patches/cos-unit-camera-status/camera-routes-only-v16.json' | sha256sum -c -
+      - name: Pin the unit camera route rollback file
+        if: inputs.patch == 'rollback-to-v16-entry'
+        run: printf '%s  %s\n' 'a59c119515b30ecdb6f4b2937f468eeb634d885407908eb73ec2306dfed8376e' '.github/function-patches/cos-unit-camera-status/rollback-to-v16-entry.json' | sha256sum -c -
+      - name: Pin the read-only live archive preflight
+        run: printf '%s  %s\n' 'd2ad5f05bc7e4539516137f14451a66b2e5c1931e2fcf786188ceb5b42b7ed6d' '.github/scripts/preflight-live-function-pins.mjs' | sha256sum -c -
+      - name: Choose the recorded patch path
+        id: recorded
+        run: |
+          name="${{ inputs.patch }}"
+          case "$name" in
+            camera-routes-only-v16|rollback-to-v16-entry)
+              echo "file=.github/function-patches/cos-unit-camera-status/${name}.json" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "file=.github/function-patches/cos-operations-pages/${name}.json" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Show the read-only live archive pins
+        run: node .github/scripts/preflight-live-function-pins.mjs
       - name: Unit-test the deploy script
-        run: node --test .github/scripts/deploy-recorded-function.test.mjs
+        run: node --test .github/scripts/deploy-recorded-function.test.mjs .github/scripts/preflight-live-function-pins.test.mjs
       - name: Dry run (hashes only, no network)
-        run: node .github/scripts/deploy-recorded-function.mjs ".github/function-patches/cos-operations-pages/${{ inputs.patch }}.json" --dry-run
+        run: node .github/scripts/deploy-recorded-function.mjs "${{ steps.recorded.outputs.file }}" --dry-run
       - name: Deploy and verify
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           set +e
-          node .github/scripts/deploy-recorded-function.mjs ".github/function-patches/cos-operations-pages/${{ inputs.patch }}.json" --deploy
+          node .github/scripts/deploy-recorded-function.mjs "${{ steps.recorded.outputs.file }}" --deploy
           status=$?
           set -e
           case "$status" in

@@ -1,15 +1,15 @@
 {
   "contract": "COS_BOARD_FRESH_STATUS_PRESERVATION_V1",
-  "scope": "Reviewed reversal of the fresh-status board path. FleetDashboard reverses to the count-trust candidate. refreshCadence reverses to its pinned bytes. Baselines and pins are unchanged. This layer sits outside the count-trust layer. If #451 merges first, rebase so this layer stays outside that one.",
+  "scope": "Reviewed reversal of the fresh-status board path. FleetDashboard reverses to the monitored-count candidate that landed with #451, then that layer reverses to the count-trust candidate. refreshCadence reverses to its pinned bytes. Inner baselines and pins are unchanged. This layer sits outside the monitored-count layer.",
   "files": [
     {
       "path": "FleetDashboard.tsx",
-      "candidateBlob": "e2ce8763531b6ba40ff283662e67fb216e7164dd",
-      "baselineBlob": "769c97949d852551fc09689301f64e87bbc0ac2b",
+      "candidateBlob": "d50002b0e1855f6e3bca54ecca96ad1151d913c8",
+      "baselineBlob": "0f1427aad67d9f5652038e4d861ec2c8a2590c54",
       "replacements": [
         {
-          "from": "import {safeVrmPower} from '../../supabase/functions/cos-operations-pages/vrmSafePower';\nimport {automaticRefreshDue,AUTO_REFRESH_MS,CAMERA_AUTO_REFRESH_MS} from './refreshCadence';\nimport {cameraTime,unitHealthLabel} from './fieldCameraHealth';",
-          "to": "import {safeVrmPower} from '../../supabase/functions/cos-operations-pages/vrmSafePower';\nimport {automaticRefreshDue,AUTO_REFRESH_MS,CAMERA_AUTO_REFRESH_MS} from './refreshCadence';\nimport {applyBoardFreshStatus} from './boardFreshStatus';\nimport {cameraTime,unitHealthLabel} from './fieldCameraHealth';",
+          "from": "import {safeVrmPower} from '../../supabase/functions/cos-operations-pages/vrmSafePower';\nimport {automaticRefreshDue,AUTO_REFRESH_MS,CAMERA_AUTO_REFRESH_MS} from './refreshCadence';\nimport {countForPath} from './watchfulMonitoredCounts';\nimport {cameraTime,unitHealthLabel} from './fieldCameraHealth';",
+          "to": "import {safeVrmPower} from '../../supabase/functions/cos-operations-pages/vrmSafePower';\nimport {automaticRefreshDue,AUTO_REFRESH_MS,CAMERA_AUTO_REFRESH_MS} from './refreshCadence';\nimport {applyBoardFreshStatus} from './boardFreshStatus';\nimport {countForPath} from './watchfulMonitoredCounts';\nimport {cameraTime,unitHealthLabel} from './fieldCameraHealth';",
           "count": 1
         },
         {
