@@ -131,12 +131,29 @@ test('serial labels stay and only the value is redacted', () => {
     ['"serialNo": "ZZ12CD34"', '"serialNo": ""'],
     ["Serial: 'ZZ12CD34'", "Serial: ''"],
     ['Serial N\u00ba ZZ12CD34', 'Serial N\u00ba'],
+    ['serial was ZZ12CD34', 'serial was'],
+    ['serial of ZZ12CD34', 'serial of'],
   ];
   for (const [input, expected] of forms) assert.equal(stripWatchfulIp(input).text, expected, input);
   assert.equal(stripWatchfulIp('Fixture Site AB12CD34EF56 gate').text, 'Fixture Site gate');
   assert.equal(stripWatchfulIp('Serial cameras gate').text, 'Serial cameras gate');
   assert.equal(stripWatchfulIp('Sniper 12 gate').text, 'Sniper 12 gate');
   assert.equal(stripWatchfulIp('Seen 14:00:00 gate').text, 'Seen 14:00:00 gate');
+});
+
+test('a long separator after a serial label stays within 50 ms', () => {
+  for (const label of ['S/N', 'serial']) {
+    for (const count of [30, 100, 1000]) {
+      for (const fill of [' ', ':']) {
+        const input = `${label}${fill.repeat(count)}none`;
+        const started = performance.now();
+        const cleaned = stripWatchfulIp(input);
+        const elapsed = performance.now() - started;
+        assert.ok(elapsed < 50, `${label} + ${count} ${fill === ' ' ? 'spaces' : 'colons'} took ${elapsed.toFixed(1)} ms`);
+        assert.equal(cleaned.text.includes('none'), true, input);
+      }
+    }
+  }
 });
 
 test('MAC values are redacted with colon, hyphen, dot, or no separator', () => {
