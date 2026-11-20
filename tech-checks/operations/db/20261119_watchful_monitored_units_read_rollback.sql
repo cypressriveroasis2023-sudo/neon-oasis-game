@@ -1,7 +1,9 @@
 -- Reverses tech-checks/operations/db/20261119_watchful_monitored_units_read.sql.
 -- One transaction. A failure leaves the added columns in place.
--- snapshot_at stays nullable. Our read time is not copied into it, so an old
--- observation is not made to look fresher. Does not restore NOT NULL.
+-- snapshot_at is Watchful's observation time. NOT NULL is not restored: rows
+-- that never had an observation are null, and filling them from fetched_at
+-- would make old data look fresher. SET NOT NULL would then fail on those
+-- rows. Leaving the column nullable keeps the real observation time.
 -- Does not drop the roster table.
 
 begin;

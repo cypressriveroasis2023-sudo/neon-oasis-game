@@ -24,9 +24,10 @@ alter table public.watchful_monitored_units
 create or replace function public.watchful_monitored_units_reject_future_fetch()
 returns trigger
 language plpgsql
+set search_path = ''
 as $$
 begin
-  if new.fetched_at is not null and new.fetched_at > clock_timestamp() + interval '5 minutes' then
+  if new.fetched_at is not null and new.fetched_at > pg_catalog.clock_timestamp() + interval '5 minutes' then
     raise exception 'fetched_at is in the future';
   end if;
   return new;
