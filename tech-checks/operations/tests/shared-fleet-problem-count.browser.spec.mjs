@@ -94,12 +94,28 @@ async function expectNoPowerProblem(page, power) {
   await expect(fleet).toHaveAttribute('data-shared-problem-count', '0');
 }
 
-test('an old Victron read shows no power Problem', async ({page}, info) => {
+test('an old silent Victron reading appears as a power Problem on every screen', async ({page}, info) => {
   test.skip(![390, 1440].includes(info.project.use.viewport?.width), 'covered at 390 and 1440');
   const power = structuredClone(vrm);
   for (const row of power.power) for (const sample of row.measurements) sample.observedAt = oldAt;
   power.power[0].measurements.push({metric: 'battery_voltage', unit: 'V', value: 10, instance: 512, source: 'battery', observedAt: oldAt});
-  await expectNoPowerProblem(page, power);
+  await page.addInitScript(() => {
+    localStorage.setItem('cos-power-alarm-settings-v1', JSON.stringify({lowVoltageV: 12, lowSocPercent: 20, silentHours: 1}));
+  });
+  const {app} = await mountFleet(page, false, {vrm: power, cameraStatus: report});
+  const fleet = app.locator('.cos-fleet-dashboard');
+  const phone = app.locator('.cos-phone-landing');
+  const phoneTodos = phone.locator('.cos-tech-todos');
+  await expect(fleet).toHaveAttribute('data-shared-problem-count', '1');
+  await expect(phone).toHaveAttribute('data-problem-count', '1');
+  await expect(phoneTodos).toContainText('Power readings have been silent');
+  await expect(phoneTodos).not.toContainText('voltage alarm');
+  await openFleetView(app, /Camera status/);
+  const cameraTodos = app.locator('.cos-camera-status .cos-tech-todos');
+  await expect(app.locator('.cos-camera-status')).toHaveAttribute('data-problem-count', '1');
+  await expect(cameraTodos).toContainText('Power readings have been silent');
+  await expect(cameraTodos).not.toContainText('voltage alarm');
+  await expect(fleet).toHaveAttribute('data-shared-problem-count', '1');
 });
 
 test('a stalled Victron read shows no power Problem', async ({page}, info) => {

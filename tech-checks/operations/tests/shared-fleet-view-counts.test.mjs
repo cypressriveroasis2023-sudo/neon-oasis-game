@@ -55,8 +55,8 @@ test('one synthetic fixture gives identical numbers on every view', () => {
   for (const name of names) assert.deepEqual(seen[name], seen.fleet, name);
   assert.deepEqual(seen.fleet.units, {online: 1, offline: 1, unknown: 2});
   assert.equal(seen.fleet.problemCount, seen.fleet.problems.length);
-  assert.equal(seen.fleet.problems.length, 4);
-  assert.deepEqual(seen.fleet.problems.map(problem => problem.kind), ['camera_offline', 'router_offline', 'battery_alarm', 'mhelp_address']);
+  assert.equal(seen.fleet.problems.length, 5);
+  assert.deepEqual(seen.fleet.problems.map(problem => problem.kind), ['camera_offline', 'router_offline', 'battery_alarm', 'power_silent', 'mhelp_address']);
 });
 
 test('cameras is never a dash on one view and a number on another', () => {
@@ -114,7 +114,7 @@ test('the Problems count equals the list length', () => {
   assert.equal(counts.problemCount, counts.problems.length);
   assert.equal(counts.problems.length, problems.length);
   assert.equal(counts.problems.some(problem => problem.kind === 'mhelp_address'), true);
-  assert.equal(counts.problems.some(problem => problem.kind === 'power_silent'), false);
+  assert.equal(counts.problems.some(problem => problem.kind === 'power_silent'), true);
   assert.equal(counts.problems.some(problem => problem.kind === 'sim_cancel'), false);
 });
 
@@ -129,12 +129,12 @@ test('a missing Victron feed raises no power Problem', () => {
   assert.equal(direct.some(problem => problem.kind === 'power_silent'), true);
   const missing = fleetProblems({power: [{unit: 'Helios 8', placement: 'FIELD', verdict}], victronFeedFresh: false});
   assert.deepEqual(missing, []);
-  const ungated = fleetProblems({power: [{unit: 'Helios 8', placement: 'FIELD', verdict}], victronFeedFresh: true});
-  assert.equal(ungated.some(problem => problem.kind === 'power_silent'), false);
-  assert.equal(ungated.some(problem => problem.kind === 'battery_alarm'), false);
+  const present = fleetProblems({power: [{unit: 'Helios 8', placement: 'FIELD', verdict}], victronFeedFresh: true});
+  assert.equal(present.some(problem => problem.kind === 'power_silent'), true);
+  assert.equal(present.some(problem => problem.kind === 'battery_alarm'), false);
 });
 
-test('a stalled or old Victron read raises no power Problem', () => {
+test('a stalled Victron feed raises no power Problem and an old reading stays power_silent', () => {
   const old = new Date(now - 5 * 60 * 60 * 1000).toISOString();
   const settings = {lowVoltageV: 12, lowSocPercent: 20, silentHours: 1};
   const units = [{unit: 'HELIOS 001', placement: 'FIELD'}];
@@ -151,7 +151,8 @@ test('a stalled or old Victron read raises no power Problem', () => {
   const aged = batteryAlarmPower(units, payload, now, settings, true);
   assert.equal(aged.some(row => row.verdict.silent === 'alarm'), true);
   const listed = fleetProblems({power: aged, victronFeedFresh: true});
-  assert.equal(listed.some(problem => problem.kind === 'power_silent' || problem.kind === 'battery_alarm'), false);
+  assert.equal(listed.some(problem => problem.kind === 'power_silent'), true);
+  assert.equal(listed.some(problem => problem.kind === 'battery_alarm'), false);
 });
 
 test('the five screens call the shared count', () => {
@@ -167,7 +168,7 @@ test('the five screens call the shared count', () => {
   assert.match(equipment, /agreedCounts\.units\.online/);
 });
 
-test('a battery alarm stays and power_silent stays out while cleanup stays', () => {
+test('a battery alarm and power_silent stay with address and SIM cancel', () => {
   const alarm = {voltage: 'alarm', soc: 'clear', silent: 'alarm', victronLowVoltage: 'clear'};
   const list = fleetProblems({
     power: [{unit: 'Helios 8', placement: 'FIELD', verdict: alarm}],
@@ -176,6 +177,6 @@ test('a battery alarm stays and power_silent stays out while cleanup stays', () 
     victronFeedFresh: true,
   });
   const snapshot = selectFleetCounts([unit('Helios 8', 'field', online(fresh))], now, list);
-  assert.deepEqual(snapshot.problems.map(problem => problem.kind), ['battery_alarm', 'sim_cancel', 'mhelp_address']);
-  assert.equal(snapshot.problems.length, 3);
+  assert.deepEqual(snapshot.problems.map(problem => problem.kind), ['battery_alarm', 'power_silent', 'sim_cancel', 'mhelp_address']);
+  assert.equal(snapshot.problems.length, 4);
 });
