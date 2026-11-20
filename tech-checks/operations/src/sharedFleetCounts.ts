@@ -61,7 +61,7 @@ export type CountUnit = {
   exception?: boolean;
 };
 
-/** Watchful names this record SHOP. mHelp says Field. It counts as down. */
+/** Sniper 4-100 is Down only on a fresh field offline read; in shop always wins; stale = Unknown. */
 export function isSniper4100(name: string): boolean {
   const folded = name.trim().toLowerCase().replace(/[\s_-]+/g, ' ');
   return folded === 'sniper 4 100' || folded.replace(/ /g, '') === 'sniper4100';
