@@ -1,6 +1,7 @@
 import {cameraTimestamp} from './cameraEvidence';
 
 /**
+ * The only copy of the Watchful freshness ruling.
  * Freshness is our read of Watchful. A unit lastConnection does not age the status.
  * A fresh read that says offline is Down. A read older than 20 minutes, missing, or failed is Unknown.
  */
