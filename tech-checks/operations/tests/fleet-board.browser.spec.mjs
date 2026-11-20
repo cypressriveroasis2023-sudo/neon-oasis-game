@@ -440,14 +440,27 @@ for (const flagged of [false, true]) test(`a healthy durable TV ${flagged ? 'wit
   const warning = frame.locator('.tech-check-tv-warning');
   if (flagged) await expect(frame.locator('.cos-board[data-board-mode=wall]')).toBeVisible();
   else await expect(frame.locator('.tv-fleet-summary')).toBeVisible();
+  const pageNow = () => frame.locator('body').evaluate(() => Date.now());
   await settled();
   await expect(warning).toHaveCount(0);
   const advance = async (ms, clear) => {
     await settled();
-    simulated += ms;
     await page.clock.fastForward(ms);
+    // The test clock and the iframe clock must be the same clock. A saved
+    // read stamped from a time the iframe has not reached is ignored and the
+    // board treats the read as fresh.
+    simulated = await pageNow();
     await settled();
     if (clear) await expect(warning).toHaveCount(0);
+  };
+  // The Watchful alert reads the board's React clock, which moves only when
+  // the 60s tick fires. A 20s step can leave that tick pending after the page
+  // time is already past 12 minutes, and a wall-clock wait does not fire it.
+  const flushBoardTick = async () => {
+    await settled();
+    await page.clock.fastForward(60_000);
+    simulated = await pageNow();
+    await settled();
   };
   for (let minute = 1; minute <= 60; minute++) {
     // Smaller than the 30s request abort, so a jump cannot cancel the read it starts.
@@ -459,9 +472,11 @@ for (const flagged of [false, true]) test(`a healthy durable TV ${flagged ? 'wit
     expect(savedGets).toBeGreaterThanOrEqual(20);
     holdAt = publishedMs();
     let steps = 0;
-    while (steps < 15 && await warning.count() === 0) {
+    while (steps < 20 && await warning.count() === 0) {
       await advance(20_000, false);
       steps += 1;
+      if (await warning.count() === 0 && await pageNow() - holdAt > 12 * 60 * 1000)
+        await flushBoardTick();
     }
     await expect(warning).toBeVisible({timeout: 10_000});
     await expect(warning).toContainText('UPDATES DELAYED');
