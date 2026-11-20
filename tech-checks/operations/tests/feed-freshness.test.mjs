@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import UpdatesDelayedLine from '../src/UpdatesDelayedLine.tsx';
+import FleetFreshFigure from '../src/FleetFreshFigure.tsx';
 import FleetUnitHealth from '../src/FleetUnitHealth.tsx';
 import FleetVictronSummary from '../src/FleetVictronSummary.tsx';
 import {stalePinClass} from '../src/fleetStalePins.ts';
@@ -263,7 +264,7 @@ test('a missing camera time and a missing unit list are Unknown on the dashboard
   assert.equal(fleetStatCount('field', 7, ages, now, true), '?');
   assert.equal(fleetStatCount('shop', 1, ages, now, true), '?');
   assert.equal(fleetStatCount('total', 8, ages, now, true), '?');
-  assert.equal(fleetStatCount('online', 1, ages, now, false), 1);
+  assert.equal(fleetStatCount('online', 1, ages, now, false), '?');
 });
 
 test('the Victron VRM page is fresh at 20:00 and stale one millisecond later', () => {
@@ -280,6 +281,29 @@ test('the Victron VRM page is fresh at 20:00 and stale one millisecond later', (
   assert.match(staleHtml, /Stale ·/);
   assert.match(staleHtml, /Saved readings · some are stale/);
   assert.match(staleHtml, /Last telemetry check:/);
+});
+
+test('the dashboard renders all feeds stale, a missing camera time, and a missing unit list', () => {
+  const now = Date.parse('2026-11-03T17:00:00.000Z');
+  const old = now - 46 * 60 * 1000;
+  const fresh = new Date(now - 2 * 60 * 1000).toISOString();
+  const staleAges = dashboardFeedAges(old, true, new Date(old).toISOString(), true, now);
+  const staleFigure = renderToStaticMarkup(React.createElement(FleetFreshFigure, {quick: 'online', count: 4, note: 'Current', ages: staleAges, now, censusFromUnitList: false}));
+  assert.match(staleFigure, />\?</);
+  assert.match(staleFigure, /as of /);
+  const line = renderToStaticMarkup(React.createElement(UpdatesDelayedLine, {line: updatesDelayedLine('mhelp', old)}));
+  assert.match(line, /Updates delayed · unit list from /);
+  const missingCamera = dashboardFeedAges(fresh, true, undefined, true, now);
+  assert.equal(missingCamera.find(age => age.id === 'cameras').reason, 'missing');
+  assert.equal(missingCamera.find(age => age.id === 'cameras').state, 'unknown');
+  const missingCameraFigure = renderToStaticMarkup(React.createElement(FleetFreshFigure, {quick: 'online', count: 4, note: 'Current', ages: missingCamera, now, censusFromUnitList: false}));
+  assert.match(missingCameraFigure, />\?</);
+  const missingList = dashboardFeedAges(null, false, fresh, true, now);
+  assert.equal(missingList.find(age => age.id === 'mhelp').reason, 'missing');
+  const placement = renderToStaticMarkup(React.createElement(FleetFreshFigure, {quick: 'field', count: 7, note: 'Current reconciled placement', ages: missingList, now, censusFromUnitList: false}));
+  assert.match(placement, /Placement unknown/);
+  const census = renderToStaticMarkup(React.createElement(FleetFreshFigure, {quick: 'field', count: 7, note: 'Current reconciled placement', ages: missingList, now, censusFromUnitList: true}));
+  assert.match(census, />\?</);
 });
 
 test('a stale unit list greys the map pins and renders the delayed line', () => {

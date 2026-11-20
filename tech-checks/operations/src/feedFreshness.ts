@@ -119,9 +119,9 @@ export function dashboardFeedAges(mhelpReceivedAt: number | string | null | unde
 export function fleetStatCount(quick: string, count: string | number, ages: readonly FeedAge[], now: number, censusFromUnitList: boolean): string | number {
   const mhelp = ages.find(age => age.id === 'mhelp');
   if ((!mhelp || mhelp.reason === 'missing') && censusFromUnitList && ['field', 'shop', 'total'].includes(quick)) return '?';
-  const present = ages.filter(age => age.reason !== 'missing');
-  if (['online', 'offline', 'unknown'].includes(quick) && present.length > 0 && worstFeed(present).state !== 'fresh') {
-    return presentValue(String(count), String(count), present, now).text;
+  const considered = ages.filter(age => !(age.id === 'mhelp' && age.reason === 'missing'));
+  if (['online', 'offline', 'unknown'].includes(quick) && considered.some(age => age.state !== 'fresh')) {
+    return presentValue(String(count), String(count), considered, now).text;
   }
   return count;
 }
