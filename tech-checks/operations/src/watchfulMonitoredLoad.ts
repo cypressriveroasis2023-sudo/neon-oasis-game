@@ -47,8 +47,13 @@ const MAC_PAIRS = /\b[0-9a-f]{2}(?:[:-][0-9a-f]{2}){5}\b/gi;
 const MAC_GROUPS = /\b[0-9a-f]{4}(?:[.:-][0-9a-f]{4}){2}\b/gi;
 const MAC_BARE = /\b[0-9a-f]{12}\b/gi;
 const PROJECT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-/** One separator class, capped. No nested quantifier, so a long run cannot backtrack. */
-const SERIAL_GAP_MAX = 12;
+/**
+ * One bounded gap, equivalent to (?:was\b|of\b|is\b|N[º°]|[^A-Za-z0-9]){0,24}.
+ * Each alternative consumes at least one character and the repeat stops at 24,
+ * so a long run of spaces cannot backtrack.
+ */
+const SERIAL_GAP = /^(?:was\b|of\b|is\b|N[º°]|[^A-Za-z0-9]){0,24}/i;
+const SERIAL_GAP_MAX = 24;
 const READ_SKEW_MS = 5 * 60 * 1000;
 export type WatchfulArming = 'armed' | 'disarmed' | 'paused' | 'test' | 'unknown';
 
@@ -157,15 +162,6 @@ function takeSeps(text: string, index: number): number {
   return at;
 }
 
-/** is, was, of, no, number, or num. One word, not a repeated pattern. */
-function takeConnector(text: string, index: number): number | null {
-  for (const word of ['number', 'num', 'nbr', 'was', 'is', 'of', 'no']) {
-    const end = wordAt(text, index, word);
-    if (end !== null) return end;
-  }
-  return null;
-}
-
 function takeValue(text: string, index: number): number | null {
   let end = index;
   while (end < text.length && /[A-Za-z0-9-]/.test(text[end])) end += 1;
@@ -175,14 +171,10 @@ function takeValue(text: string, index: number): number | null {
   return end;
 }
 
-/** Label, then at most 12 separators, one connector word, and 12 more separators, then the value. */
+/** Apply SERIAL_GAP once. The match is not retried against a shorter gap. */
 function takeGapValue(text: string, index: number): {start: number; end: number} | null {
-  let at = takeSeps(text, index);
-  if ((text[at] === 'N' || text[at] === 'n') && (text[at + 1] === '\u00ba' || text[at + 1] === '\u00b0')) {
-    at = takeSeps(text, at + 2);
-  }
-  const connector = takeConnector(text, at);
-  if (connector !== null) at = takeSeps(text, connector);
+  const gap = SERIAL_GAP.exec(text.slice(index));
+  const at = index + (gap?.[0].length ?? 0);
   const valueEnd = takeValue(text, at);
   if (valueEnd === null) return null;
   return {start: at, end: valueEnd};
@@ -418,6 +410,7 @@ export function loadWatchfulExport(csv: string, fetchedAt?: string | null, now =
     const seenRaw = seenCol >= 0 ? read(seenCol) : '';
     const seenAt = seenRaw ? Date.parse(seenRaw) : NaN;
     if (seenRaw && !Number.isFinite(seenAt)) throw new WatchfulLoadError('A reading time is not a timestamp. The file was not loaded.');
+    if (Number.isFinite(seenAt) && seenAt > now + READ_SKEW_MS) throw new WatchfulLoadError('A reading time is in the future. The file was not loaded.');
     parsed.push({
       order: rowIndex,
       seenAt: Number.isFinite(seenAt) ? seenAt : null,
