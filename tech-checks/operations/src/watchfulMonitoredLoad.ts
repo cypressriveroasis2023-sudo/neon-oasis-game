@@ -48,12 +48,11 @@ const MAC_GROUPS = /\b[0-9a-f]{4}(?:[.:-][0-9a-f]{4}){2}\b/gi;
 const MAC_BARE = /\b[0-9a-f]{12}\b/gi;
 const PROJECT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /**
- * One bounded gap, equivalent to (?:was\b|of\b|is\b|N[º°]|[^A-Za-z0-9]){0,24}.
- * Each alternative consumes at least one character and the repeat stops at 24,
- * so a long run of spaces cannot backtrack.
+ * One forward gap. Each alternative consumes at least one character and the
+ * repeat stops at 256, so a long run of spaces cannot backtrack.
  */
-const SERIAL_GAP = /^(?:was\b|of\b|is\b|N[º°]|[^A-Za-z0-9]){0,24}/i;
-const SERIAL_GAP_MAX = 24;
+const SERIAL_GAP = /^(?:was\b|of\b|is\b|N[º°]|[^A-Za-z0-9]){0,256}/i;
+const SERIAL_GAP_MAX = 256;
 const READ_SKEW_MS = 5 * 60 * 1000;
 export type WatchfulArming = 'armed' | 'disarmed' | 'paused' | 'test' | 'unknown';
 
@@ -171,12 +170,15 @@ function takeValue(text: string, index: number): number | null {
   return end;
 }
 
-/** Apply SERIAL_GAP once. The match is not retried against a shorter gap. */
+/** Apply SERIAL_GAP once. The match is not retried against a shorter gap. A four-digit year after "of" is not a serial. */
 function takeGapValue(text: string, index: number): {start: number; end: number} | null {
   const gap = SERIAL_GAP.exec(text.slice(index));
-  const at = index + (gap?.[0].length ?? 0);
+  const gapText = gap?.[0] ?? '';
+  const at = index + gapText.length;
   const valueEnd = takeValue(text, at);
   if (valueEnd === null) return null;
+  const token = text.slice(at, valueEnd);
+  if (/^\d{4}$/.test(token) && /\bof\b[^A-Za-z0-9]*$/i.test(gapText)) return null;
   return {start: at, end: valueEnd};
 }
 
@@ -260,11 +262,17 @@ function redactLabeledSerial(text: string): {text: string; stripped: boolean} {
     index += 1;
   }
   if (!cuts.length) return {text, stripped: false};
-  let next = text;
-  for (const cut of cuts.sort((left, right) => right.start - left.start)) {
-    next = next.slice(0, cut.start) + next.slice(cut.end);
+  const ordered = cuts.sort((left, right) => left.start - right.start);
+  const parts: string[] = [];
+  let cursor = 0;
+  for (const cut of ordered) {
+    if (cut.end <= cursor) continue;
+    const start = Math.max(cut.start, cursor);
+    if (start > cursor) parts.push(text.slice(cursor, start));
+    cursor = cut.end;
   }
-  return {text: next, stripped: true};
+  parts.push(text.slice(cursor));
+  return {text: parts.join(''), stripped: true};
 }
 
 /** A project id is a UUID, stored lowercase. Anything else, including a name, is null. */

@@ -101,3 +101,19 @@ test('the read-time columns are additive and rollback keeps the row with a null 
   await db.exec(rollback);
   await db.close();
 });
+
+test('the future-read trigger function sets an empty search path', async () => {
+  const db = new PGlite();
+  await db.exec('create role anon; create role authenticated; create role service_role;');
+  await db.exec(sql);
+  await db.exec(readSql);
+  const fn = await db.query(`
+    select proconfig
+    from pg_proc
+    where proname = 'watchful_monitored_units_reject_future_fetch'
+  `);
+  assert.deepEqual(fn.rows[0].proconfig, ['search_path=""']);
+  await db.exec(readRollback);
+  await db.exec(rollback);
+  await db.close();
+});

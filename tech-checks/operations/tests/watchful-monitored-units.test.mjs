@@ -164,6 +164,33 @@ test('a long separator after a serial label stays within 50 ms', () => {
   }
 });
 
+test('a wider linear gap still redacts a serial after a long separator', () => {
+  const value = 'AB12CD34';
+  const forms = [
+    `Serial:${' '.repeat(40)}${value}`,
+    `Serial${' '.repeat(25)}${value}`,
+    `S/N${' - '.repeat(9)}${value}`,
+    `Serial${' ->'.repeat(8)}${value}`,
+  ];
+  for (const input of forms) {
+    const cleaned = stripWatchfulIp(input);
+    assert.equal(cleaned.text.includes(value), false, input);
+  }
+  assert.equal(stripWatchfulIp('serial of 2026 cameras').text, 'serial of 2026 cameras');
+  assert.equal(stripWatchfulIp('serial of ZZ12CD34').text, 'serial of');
+});
+
+test('many labels in a large cell are redacted in one pass', () => {
+  const piece = 'serial ZZ12CD34 ';
+  const cell = piece.repeat(Math.ceil(1_200_000 / piece.length));
+  assert.ok(cell.length >= 1_200_000);
+  const started = performance.now();
+  const cleaned = stripWatchfulIp(cell);
+  const elapsed = performance.now() - started;
+  assert.ok(elapsed < 1000, `1.2 MB cell took ${elapsed.toFixed(0)} ms`);
+  assert.equal(cleaned.text.includes('ZZ12CD34'), false);
+});
+
 test('MAC values are redacted with colon, hyphen, dot, or no separator', () => {
   for (const token of ['aa:bb:cc:dd:ee:ff', 'aa-bb-cc-dd-ee-ff', 'aabb.ccdd.eeff', 'aabb:ccdd:eeff', 'aabb-ccdd-eeff', 'aabbccddeeff']) {
     const cleaned = stripWatchfulIp(`Fixture Site ${token} gate`);
