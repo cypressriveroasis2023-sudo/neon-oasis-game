@@ -383,13 +383,15 @@ for (const flagged of [false, true]) test(`a healthy durable TV ${flagged ? 'wit
   };
   const readsIdle = () => openReads === 0 ? Promise.resolve() : new Promise(done => idleWaiters.push(done));
   const settled = async () => {
-    for (let turn = 0; turn < 6; turn++) {
+    let idleTurns = 0;
+    for (let turn = 0; turn < 8 && idleTurns < 2; turn++) {
       await page.evaluate(() => {});
-      if (openReads === 0) {
+      if (openReads > 0) {
+        idleTurns = 0;
+        await readsIdle();
+        // The page clears its 30s abort timer only after it applies the response.
         await page.evaluate(() => {});
-        if (openReads === 0) return;
-      }
-      await readsIdle();
+      } else idleTurns += 1;
     }
     if (openReads > 0) await readsIdle();
   };
@@ -472,14 +474,18 @@ for (const flagged of [false, true]) test(`a healthy durable TV ${flagged ? 'wit
     expect(savedGets).toBeGreaterThanOrEqual(20);
     holdAt = publishedMs();
     let steps = 0;
+    let flushes = 0;
     while (steps < 20 && await warning.count() === 0) {
       await advance(20_000, false);
       steps += 1;
-      if (await warning.count() === 0 && await pageNow() - holdAt > 12 * 60 * 1000)
+      if (flushes < 2 && await warning.count() === 0 && await pageNow() - holdAt > 12 * 60 * 1000) {
         await flushBoardTick();
+        flushes += 1;
+      }
     }
     await expect(warning).toBeVisible({timeout: 10_000});
     await expect(warning).toContainText('UPDATES DELAYED');
+    expect(await pageNow() - holdAt).toBeLessThanOrEqual(13.5 * 60 * 1000);
   }
 });
 
