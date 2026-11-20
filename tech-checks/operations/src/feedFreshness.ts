@@ -107,6 +107,25 @@ export function victronFeedFresh(sync: {lastSuccessAt?: string | null; error?: s
   return ageFeed(sync.lastSuccessAt ?? null, now, 'victron').state === 'fresh';
 }
 
+/** Ages the dashboard actually reads. A missing unit list is Unknown, not absent. */
+export function dashboardFeedAges(mhelpReceivedAt: number | string | null | undefined, mhelpPresent: boolean, cameraRefreshedAt: string | null | undefined, camerasPresent: boolean, now: number): FeedAge[] {
+  const ages: FeedAge[] = [mhelpPresent ? ageFeed(mhelpReceivedAt, now, 'mhelp') : ageFeed(null, now, 'mhelp')];
+  if (camerasPresent) ages.push(ageFeed(cameraRefreshedAt ?? null, now, 'cameras'));
+  return ages;
+}
+
+/** Online, offline and unknown follow the worst present feed.
+ * Field, shop and total stay numbers unless the screen is the unit-list census and that list is missing. */
+export function fleetStatCount(quick: string, count: string | number, ages: readonly FeedAge[], now: number, censusFromUnitList: boolean): string | number {
+  const mhelp = ages.find(age => age.id === 'mhelp');
+  if ((!mhelp || mhelp.reason === 'missing') && censusFromUnitList && ['field', 'shop', 'total'].includes(quick)) return '?';
+  const present = ages.filter(age => age.reason !== 'missing');
+  if (['online', 'offline', 'unknown'].includes(quick) && present.length > 0 && worstFeed(present).state !== 'fresh') {
+    return presentValue(String(count), String(count), present, now).text;
+  }
+  return count;
+}
+
 /** Live text when every input is fresh. Otherwise '?' and the last-known line. */
 export function presentValue(
   liveText: string,

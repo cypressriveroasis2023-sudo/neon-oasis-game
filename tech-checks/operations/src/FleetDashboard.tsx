@@ -33,7 +33,7 @@ import MhelpConnectionAlert from './MhelpConnectionAlert';
 import SourceAttentionBanner from './SourceAttentionBanner';
 import SourceHealthStrip from './SourceHealthStrip';
 import {fleetSourceFacts} from './fleetSourceFacts';
-import {ageFeed, presentValue, updatesDelayedLine, worstFeed} from './feedFreshness';
+import {dashboardFeedAges, fleetStatCount, presentValue, updatesDelayedLine, worstFeed} from './feedFreshness';
 import {gateDashboardPower} from './fleetPowerGate';
 import PhoneTechLanding from './PhoneTechLanding';
 import {phoneBoardCounts, phoneTechnicianTodos} from './phoneTechLanding';
@@ -295,21 +295,19 @@ function FleetDashboardLive({countsOnly=false,readingKey,initialPresentation,ope
  // shown under its own saved time.
  const savedOnly=!map&&!boardData&&savedReading?savedReading:null,savedOnlyLabel=savedOnly?'Saved reading '+cameraTime(new Date(savedOnly.checkedAt).toISOString(),Date.now()):'';
  const healthScopeNote=savedOnly?savedOnlyLabel+' · Field camera units at that time · not current':boardCurrent?(wholeSourceHeadline?'Field Product IDs':'Field camera units · Shop / root and inactive equipment excluded from outage counts'):boardStale?'Last completed reading '+boardReadingTime+' · not current':'Health update needed · no completed reading to show';
- const feedAges=[...(mhelpPhysical?[ageFeed(mhelpPhysical.receivedAt,boardNow,'mhelp')]:[]),...(cameras.data?[ageFeed(cameras.data.refreshedAt??null,boardNow,'cameras')]:[])];
- const placementStale=feedAges.some(age=>age.id==='mhelp'&&age.state!=='fresh');
- const figureStale=feedAges.length>0&&worstFeed(feedAges).state!=='fresh';
- const delayedFeed=feedAges.find(age=>age.state!=='fresh')??null;
+ const feedAges=dashboardFeedAges(mhelpPhysical?.receivedAt??null,Boolean(mhelpPhysical),cameras.data?.refreshedAt??null,Boolean(cameras.data),boardNow);
+ const presentAges=feedAges.filter(age=>age.reason!=='missing');
+ const placementStale=Boolean(mhelpPhysical)&&feedAges.some(age=>age.id==='mhelp'&&age.state!=='fresh');
+ const figureStale=presentAges.length>0&&worstFeed(presentAges).state!=='fresh';
+ const delayedFeed=presentAges.find(age=>age.state!=='fresh')??null;
  const delayedLine=delayedFeed?.id?updatesDelayedLine(delayedFeed.id,delayedFeed.readAt):null;
  const counted=(quick:string,count:unknown):string|number=>{
   const value=savedOnly&&quick!=='verify'?count:map&&!(recorded.error&&(quick==='verify'||quick==='field'&&!wholeSourceHeadline))?count:'—';
   return typeof value==='string'||typeof value==='number'?value:'—';
  };
- const statCount=(quick:string,count:unknown):string|number=>{
-  if(['online','offline','unknown'].includes(quick)&&figureStale)return presentValue(String(count??''),String(count??''),feedAges,boardNow).text;
-  return counted(quick,count);
- };
+ const statCount=(quick:string,count:unknown):string|number=>fleetStatCount(quick,counted(quick,count),feedAges,boardNow,wholeSourceHeadline);
  const statNote=(quick:string,count:unknown,note:unknown):string=>{
-  if(['online','offline','unknown'].includes(quick)&&figureStale)return presentValue(String(count??''),String(count??''),feedAges,boardNow).note??'';
+  if(statCount(quick,count)==='?')return presentValue(String(count??''),String(count??''),presentAges.length?presentAges:feedAges,boardNow).note??'';
   return String(note??'');
  };
  // With no connection evidence this read, online and offline are not measured:

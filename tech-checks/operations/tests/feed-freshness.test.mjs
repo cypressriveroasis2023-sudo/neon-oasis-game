@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {ageFeed, allFeedsUnknown, FEED_UNKNOWN_MS, presentValue, updatesDelayedLine, worstFeed} from '../src/feedFreshness.ts';
+import {ageFeed, allFeedsUnknown, dashboardFeedAges, FEED_UNKNOWN_MS, fleetStatCount, presentValue, updatesDelayedLine, worstFeed} from '../src/feedFreshness.ts';
 import {buildExactProductConnections, readExactProductConnections, SOURCE_FRESH_MS} from '../src/exactProductConnection.ts';
 import {cosPowerVerdict} from '../src/cosPowerAlarms.ts';
 import {technicianTodos} from '../src/technicianTodos.ts';
@@ -11,6 +11,8 @@ import {gateDashboardPower} from '../src/fleetPowerGate.ts';
 import {INHAND_LIVE_STATUS_SOURCE} from '../src/inhandRouterStatus.ts';
 import {buildFleetCommandCenter} from '../src/fleetCommandCenterModel.ts';
 import FleetBatterySummary from '../src/FleetBatterySummary.tsx';
+import FleetCountReadout from '../src/FleetCountReadout.tsx';
+import VrmReadOnlyDashboard from '../src/VrmReadOnlyDashboard.tsx';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
@@ -224,4 +226,54 @@ test('buildExact refuses a tracker older than 20 minutes', () => {
   const accepted = {contract: 'COS_MHELP_UPLOAD_INVENTORY_V1', countBasis: 'mhelp_product_records_not_unique_physical_units', sourceSha256: sha, receivedAt: current, summary: {totalRecords: 2, fieldRecords: 1, shopRecords: 1, unflaggedFieldRecords: 1, unflaggedShopRecords: 1, doNotUseRecords: 0, missingRecords: 0}, records};
   const tracker = {contract: 'COS_VERIFIED_2027_PRODUCT_IPS_V1', workbookId: '1eV9dx7z1deyA5w9iaVNpP0D5_otkfF-dLiC5wuAlbtA', expectedMhelpSourceSha256: sha, verifiedAt: current, records: records.map(row => ({productId: row.productId, recordId: row.recordId, placement: row.placement, publicIp: null}))};
   assert.equal(buildExactProductConnections(accepted, tracker, [], now), null);
+});
+
+test('the dashboard gate is fresh at 20:00 and Unknown one millisecond later', () => {
+  const now = Date.parse('2026-11-03T17:00:00.000Z');
+  const edge = new Date(now - 20 * 60 * 1000).toISOString();
+  const over = new Date(now - 20 * 60 * 1000 - 1).toISOString();
+  const sync = {state: 'current', lastSuccessAt: new Date(now).toISOString(), lastAttemptAt: new Date(now).toISOString(), error: null};
+  const row = observedAt => ({family: 'HELIOS', power: {measurements: [{metric: 'battery_soc', value: 80, unit: '%', observedAt, source: 'battery', instance: 0}]}, batteryState: 'online', batteryPercent: 80, batteryReadings: [], batteryReadIssue: null});
+  assert.equal(gateDashboardPower([row(edge)], sync, now)[0].batteryState, 'online');
+  assert.equal(gateDashboardPower([row(over)], sync, now)[0].batteryState, 'unknown');
+  const attemptOnly = {state: 'current', lastSuccessAt: over, lastAttemptAt: new Date(now).toISOString(), error: null};
+  assert.equal(gateDashboardPower([row(edge)], attemptOnly, now)[0].batteryState, 'unknown');
+});
+
+test('all stale shows Unknown through fleetStatCount and FleetCountReadout', () => {
+  const now = Date.parse('2026-11-03T17:00:00.000Z');
+  const old = now - 21 * 60 * 1000;
+  const ages = dashboardFeedAges(old, true, new Date(old).toISOString(), true, now);
+  for (const quick of ['online', 'offline', 'unknown']) assert.equal(fleetStatCount(quick, 4, ages, now, false), '?', quick);
+  const html = renderToStaticMarkup(React.createElement(FleetCountReadout, {units: {online: 4, offline: 1, unknown: 2}, cameras: {online: 1, offline: 0, unknown: 0}, placementReadAt: old}));
+  assert.match(html, />\?<\/b>/);
+  assert.match(html, /as of /);
+});
+
+test('a missing camera time and a missing unit list are Unknown on the dashboard path', () => {
+  const now = Date.parse('2026-11-03T17:00:00.000Z');
+  const ages = dashboardFeedAges(null, false, undefined, true, now);
+  assert.equal(ages.find(age => age.id === 'cameras').reason, 'missing');
+  assert.equal(ages.find(age => age.id === 'cameras').state, 'unknown');
+  assert.equal(ages.find(age => age.id === 'mhelp').reason, 'missing');
+  assert.equal(fleetStatCount('field', 7, ages, now, true), '?');
+  assert.equal(fleetStatCount('shop', 1, ages, now, true), '?');
+  assert.equal(fleetStatCount('total', 8, ages, now, true), '?');
+  assert.equal(fleetStatCount('online', 1, ages, now, false), 1);
+});
+
+test('the Victron VRM page is fresh at 20:00 and stale one millisecond later', () => {
+  const now = Date.parse('2026-11-03T17:00:00.000Z');
+  const unit = {installationId: 1001, name: 'HELIOS 001', portalUrl: 'https://vrm.victronenergy.com/installation/1001/dashboard', embedUrl: null};
+  const reading = observedAt => ({installationId: 1001, name: 'HELIOS 001', errorCode: null, lastAttemptAt: new Date(now).toISOString(), measurements: [{metric: 'battery_soc', value: 70, unit: '%', observedAt, instance: 0, source: 'battery'}]});
+  const edge = new Date(now - 20 * 60 * 1000).toISOString();
+  const over = new Date(now - 20 * 60 * 1000 - 1).toISOString();
+  const freshHtml = renderToStaticMarkup(React.createElement(VrmReadOnlyDashboard, {unit, rows: [reading(edge)], now}));
+  assert.match(freshHtml, /Readings older than 20 minutes are marked stale/);
+  assert.equal(freshHtml.includes('>Stale<') || freshHtml.includes('Stale ·'), false);
+  assert.match(freshHtml, /Recent saved readings/);
+  const staleHtml = renderToStaticMarkup(React.createElement(VrmReadOnlyDashboard, {unit, rows: [reading(over)], now}));
+  assert.match(staleHtml, /Stale ·/);
+  assert.match(staleHtml, /Saved readings · some are stale/);
+  assert.match(staleHtml, /Last telemetry check:/);
 });
