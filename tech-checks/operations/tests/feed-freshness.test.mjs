@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import UpdatesDelayedLine from '../src/UpdatesDelayedLine.tsx';
+import FleetUnitHealth from '../src/FleetUnitHealth.tsx';
+import FleetVictronSummary from '../src/FleetVictronSummary.tsx';
+import {stalePinClass} from '../src/fleetStalePins.ts';
 import {ageFeed, allFeedsUnknown, dashboardFeedAges, FEED_UNKNOWN_MS, fleetStatCount, presentValue, updatesDelayedLine, worstFeed} from '../src/feedFreshness.ts';
 import {buildExactProductConnections, readExactProductConnections, SOURCE_FRESH_MS} from '../src/exactProductConnection.ts';
 import {cosPowerVerdict} from '../src/cosPowerAlarms.ts';
@@ -276,4 +280,40 @@ test('the Victron VRM page is fresh at 20:00 and stale one millisecond later', (
   assert.match(staleHtml, /Stale ·/);
   assert.match(staleHtml, /Saved readings · some are stale/);
   assert.match(staleHtml, /Last telemetry check:/);
+});
+
+test('a stale unit list greys the map pins and renders the delayed line', () => {
+  const now = Date.parse('2026-11-03T17:00:00.000Z');
+  const old = now - 46 * 60 * 1000;
+  const line = renderToStaticMarkup(React.createElement(UpdatesDelayedLine, {line: updatesDelayedLine('mhelp', old)}));
+  assert.match(line, /Updates delayed · unit list from /);
+  assert.equal(renderToStaticMarkup(React.createElement(UpdatesDelayedLine, {line: null})), '');
+  const ages = dashboardFeedAges(old, true, new Date(now).toISOString(), true, now);
+  assert.equal(fleetStatCount('online', 4, ages, now, false), '?');
+  const staleMap = renderToStaticMarkup(React.createElement('div', {className: 'cos-fleet-map-panel'+stalePinClass(true)}));
+  assert.match(staleMap, /cos-pins-stale/);
+  assert.equal(renderToStaticMarkup(React.createElement('div', {className: 'cos-fleet-map-panel'+stalePinClass(false)})).includes('cos-pins-stale'), false);
+  const mapSource = readFileSync(new URL('../src/FleetDashboardMap.tsx', import.meta.url), 'utf8');
+  assert.match(mapSource, /stalePinClass\(pinsStale\)/);
+  assert.match(readFileSync(new URL('../src/FleetDashboard.tsx', import.meta.url), 'utf8'), /pinsStale=\{placementStale\}/);
+  const css = readFileSync(new URL('../src/fleetStalePins.css', import.meta.url), 'utf8');
+  assert.match(css, /\.cos-pins-stale \.leaflet-marker-icon,\.cos-pins-stale \.cos-dashboard-marker\{filter:grayscale\(1\);opacity:\.72\}/);
+});
+
+test('unit health and Victron Recent go stale at 20 minutes', () => {
+  const now = Date.parse('2026-11-03T17:00:00.000Z');
+  const edge = new Date(now - 20 * 60 * 1000).toISOString();
+  const over = new Date(now - 20 * 60 * 1000 - 1).toISOString();
+  const unit = {id: '00000000-0000-4000-8000-000000000001', unitNumber: 'Helios 1', modelName: 'Helios', placement: 'FIELD', status: 'field'};
+  const installation = {installationId: 1001, name: 'HELIOS 001', portalUrl: 'https://vrm.victronenergy.com/installation/1001/dashboard', embedUrl: null};
+  const powerFor = observedAt => ({items: [installation], power: [{installationId: 1001, name: 'HELIOS 001', errorCode: null, lastAttemptAt: new Date(now).toISOString(), measurements: [{metric: 'solar_power', value: 10, unit: 'W', observedAt, source: 'system', instance: 0}]}], sync: {state: 'current', lastSuccessAt: new Date(now).toISOString(), error: null}});
+  const health = row => renderToStaticMarkup(React.createElement(FleetUnitHealth, {row, now}));
+  const victron = row => renderToStaticMarkup(React.createElement(FleetVictronSummary, {row, now}));
+  const freshRow = fleetDashboardRows([unit], null, [], powerFor(edge), now)[0];
+  const staleRow = fleetDashboardRows([unit], null, [], powerFor(over), now)[0];
+  assert.match(health(freshRow), /Recent observation/);
+  assert.match(health(staleRow), /Stale \/ unverified/);
+  assert.equal(health(staleRow).includes('Recent observation'), false);
+  assert.match(victron(freshRow), /· Recent ·/);
+  assert.match(victron(staleRow), /Stale \/ unverified/);
 });
