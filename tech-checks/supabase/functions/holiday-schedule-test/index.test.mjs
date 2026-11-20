@@ -28,18 +28,25 @@ function sealedRequest(method, body) {
 }
 
 test('entrypoint ships no camera client, guard, secret read, or database write', () => {
-  assert.equal(readdirSync(here).includes('guard.ts'), false);
-  assert.equal(readdirSync(here).includes('guard.js'), false);
+  assert.deepEqual(readdirSync(here).sort(), ['index.test.mjs', 'index.ts']);
   assert.doesNotMatch(source, /^\s*import\s/m);
+  assert.doesNotMatch(source, /\bimport\s*\(/);
+  assert.doesNotMatch(source, /^\s*export\s+(?:type\s+)?(?:\*\s+as\s+[A-Za-z_$][\w$]*|\*|\{[^}]*\}|[A-Za-z_$][\w$]*)\s+from\b/m);
   assert.doesNotMatch(source, /\bfetch\b/);
+  assert.doesNotMatch(source, /\bXMLHttpRequest\b/);
+  assert.doesNotMatch(source, /\bWebSocket\b/);
   assert.doesNotMatch(source, /Deno\.env/);
+  assert.doesNotMatch(source, /Deno\.connectTls/);
+  assert.doesNotMatch(source, /Deno\.connect\b/);
+  assert.doesNotMatch(source, /Deno\.Command/);
   assert.doesNotMatch(source, /process\.env/);
   assert.doesNotMatch(source, /createClient/);
+  assert.doesNotMatch(source, /supabase/i);
   assert.doesNotMatch(source, /\bALLOWED\b/);
   assert.match(source, /Deno\.serve\(handleHolidayScheduleTest\)/);
 });
 
-test('GET, POST and PUT return 410 for any body, including a confirm phrase, and never call fetch', async () => {
+test('every method returns 410, including a confirm phrase, and never calls fetch', async () => {
   assert.equal(typeof globalThis.Deno, 'undefined');
   const calls = [];
   const original = globalThis.fetch;
@@ -61,18 +68,31 @@ test('GET, POST and PUT return 410 for any body, including a confirm phrase, and
       ['PUT', SYNTHETIC_CONFIRM],
       ['PUT', JSON.stringify({confirm: SYNTHETIC_CONFIRM, path: PLAN_PATH, host: 'camera.example.invalid'})],
       ['PUT', JSON.stringify({method: 'PUT', url: `https://camera.example.invalid${PLAN_PATH}`})],
+      ['OPTIONS', undefined],
+      ['OPTIONS', ''],
+      ['OPTIONS', SYNTHETIC_CONFIRM],
+      ['HEAD', undefined],
+      ['PATCH', undefined],
+      ['PATCH', ''],
+      ['PATCH', SYNTHETIC_CONFIRM],
+      ['PATCH', JSON.stringify({confirm: SYNTHETIC_CONFIRM})],
+      ['DELETE', undefined],
+      ['DELETE', ''],
+      ['DELETE', SYNTHETIC_CONFIRM],
+      ['DELETE', JSON.stringify({confirm: SYNTHETIC_CONFIRM, path: PLAN_PATH, host: 'camera.example.invalid'})],
     ];
     for (const [method, body] of cases) {
       const request = method === 'GET' && body !== undefined
         ? {method, body, url: 'https://example.invalid/functions/v1/holiday-schedule-test'}
         : sealedRequest(method, body);
       const response = await handleHolidayScheduleTest(request);
-      const text = await response.text();
       assert.equal(response.status, 410, method);
+      assert.deepEqual(calls, []);
+      if (method === 'HEAD') continue;
+      const text = await response.text();
       assert.equal(response.headers.get('content-type'), 'application/json; charset=utf-8');
       assert.equal(text, JSON.stringify(DISABLED));
       assert.deepEqual(JSON.parse(text), DISABLED);
-      assert.deepEqual(calls, []);
     }
   } finally {
     globalThis.fetch = original;
