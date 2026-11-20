@@ -1,0 +1,29 @@
+html,body,#root{margin:0;background:#070b12;color:#e8eef6;font-family:Inter,ui-sans-serif,system-ui,sans-serif}
+.late-board{box-sizing:border-box;min-height:100vh;padding:28px 32px 24px;display:grid;grid-template-columns:minmax(0,1.4fr) 320px;grid-template-rows:auto auto 1fr;gap:16px}
+.late-board header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.late-board h1{margin:0;font-size:28px;font-weight:650}
+.late-boxes{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.late-box{background:#121a24;border:1px solid #2a3644;border-radius:16px;padding:16px 18px;min-height:118px}
+.late-box span{display:block;color:#9aa8b8;font-size:13px}
+.late-box strong{display:block;margin:8px 0 6px;font-size:40px;letter-spacing:-.04em}
+.late-live strong{font-size:22px;color:#f4f7fb}
+.late-box small{display:block;color:#8b97a8;font-size:13px}
+.late-stale{background:#101820}
+.late-map{position:relative;min-height:420px;border-radius:18px;background:radial-gradient(circle at 40% 45%,#16324a,#0c1520 70%);border:1px solid #243140;overflow:hidden}
+.late-map i{position:absolute;width:8px;height:8px;margin:-4px;border-radius:50%;background:#8b97a8;box-shadow:0 0 0 3px rgba(139,151,168,.25)}
+.late-map p{position:absolute;left:16px;bottom:14px;margin:0;color:#c5d0dc;font-size:13px}
+.late-rows{background:#121a24;border:1px solid #2a3644;border-radius:16px;padding:16px}
+.late-rows h2{margin:0 0 8px;font-size:16px}
+.late-rows ul{list-style:none;margin:12px 0 0;padding:0}
+.late-rows li{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:10px 0;border-top:1px solid #243140}
+.late-rows b{font-size:14px}
+.late-rows span,.late-rows time{color:#9aa8b8;font-size:12px}
+@media(max-width:700px){
+  .late-board{padding:16px;grid-template-columns:1fr;grid-template-rows:auto auto auto auto}
+  .late-board header{align-items:flex-start;flex-direction:column}
+  .late-boxes{grid-template-columns:1fr 1fr}
+  .late-box{min-height:96px;padding:12px}
+  .late-box strong{font-size:32px}
+  .late-live strong{font-size:16px}
+  .late-map{min-height:240px}
+}

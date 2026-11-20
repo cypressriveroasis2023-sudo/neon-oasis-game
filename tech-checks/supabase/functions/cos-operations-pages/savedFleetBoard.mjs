@@ -1030,7 +1030,8 @@ var CAMERA_FRESH_MS2 = 20 * 60 * 1e3;
 var EXACT_PRODUCT_CONNECTION_CONTRACT = "COS_EXACT_PRODUCT_CONNECTIONS_V2";
 var ID = /^[1-9][0-9]{0,14}$/;
 var HASH = /^[a-f0-9]{64}$/;
-var SOURCE_FRESH_MS = 30 * 60 * 1e3;
+var SOURCE_FRESH_MS = 20 * 60 * 1e3;
+var TRACKER_RECEIPT_MS = 30 * 60 * 1e3;
 var object4 = (v) => Boolean(v && typeof v === "object" && !Array.isArray(v));
 var safeTime = (v, now, windowMs) => {
   if (typeof v !== "string") return null;
@@ -1046,8 +1047,10 @@ var unknown = (productId, reason) => ({
   reason
 });
 var deviceId = (v) => typeof v === "number" && Number.isSafeInteger(v) && v > 0 ? String(v) : typeof v === "string" && ID.test(v) ? v : null;
-function readExactProductConnections(value, sourceSha256, expectedFieldIds, now = Date.now()) {
-  if (!object4(value) || value.contract !== EXACT_PRODUCT_CONNECTION_CONTRACT || value.sourceSha256 !== sourceSha256 || !HASH.test(sourceSha256) || !safeTime(value.trackerVerifiedAt, now, SOURCE_FRESH_MS) || !Array.isArray(value.items) || value.items.length < expectedFieldIds.length || value.items.length > 1e4) return null;
+function readExactProductConnections(value, sourceSha256, expectedFieldIds, now = Date.now(), mode = "receipt") {
+  const trackerKept = object4(value) && safeTime(value.trackerVerifiedAt, now, mode === "lastGood" ? Number.POSITIVE_INFINITY : TRACKER_RECEIPT_MS);
+  const trackerLive = Boolean(object4(value) && safeTime(value.trackerVerifiedAt, now, SOURCE_FRESH_MS));
+  if (!object4(value) || value.contract !== EXACT_PRODUCT_CONNECTION_CONTRACT || value.sourceSha256 !== sourceSha256 || !HASH.test(sourceSha256) || !trackerKept || !Array.isArray(value.items) || value.items.length < expectedFieldIds.length || value.items.length > 1e4) return null;
   const expected = new Set(expectedFieldIds);
   if (expected.size !== expectedFieldIds.length) return null;
   const result = /* @__PURE__ */ new Map(), seen = /* @__PURE__ */ new Set();
@@ -1057,7 +1060,7 @@ function readExactProductConnections(value, sourceSha256, expectedFieldIds, now 
     const observed = raw.status === "unknown" ? null : cameraTimestamp(raw.checkedAt, now);
     if (raw.status !== "unknown" && (!raw.resourceId || !observed?.at)) return null;
     seen.add(raw.productId);
-    if (expected.has(raw.productId)) result.set(raw.productId, observed && !observed.fresh ? unknown(raw.productId, "The saved connection check has expired; awaiting the next automatic check.") : raw);
+    if (expected.has(raw.productId)) result.set(raw.productId, mode === "lastGood" || !trackerLive || observed && !observed.fresh ? unknown(raw.productId, !trackerLive || mode === "lastGood" ? "The tracker read is not current. The last list is kept with its time." : "The saved connection check has expired; awaiting the next automatic check.") : raw);
   }
   return result.size === expected.size ? result : null;
 }
@@ -1371,10 +1374,31 @@ function cameraFieldProducts(map, health, now, readSucceeded = true) {
   return buildFleetCommandCenter(upload, field, readSucceeded, rows, null, null, now, health.refreshedAt || null);
 }
 
+// src/feedFreshness.ts
+var FEED_UNKNOWN_MS = 20 * 60 * 1e3;
+var FUTURE_SLACK_MS = 6e4;
+function readInstant(value) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value !== "string" || value.length === 0) return null;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+function ageFeed(readAt, now, id) {
+  const at = readInstant(readAt);
+  if (at === null) return { id, state: "unknown", reason: "missing", readAt: null };
+  if (at > now + FUTURE_SLACK_MS) return { id, state: "unknown", reason: "future", readAt: at };
+  if (now - at > FEED_UNKNOWN_MS) return { id, state: "unknown", reason: "stale", readAt: at };
+  return { id, state: "fresh", reason: "fresh", readAt: at };
+}
+
 // durable-board/project.ts
+function feedStamp(id, value, at) {
+  const age = ageFeed(typeof value === "string" || typeof value === "number" ? value : null, at, id);
+  return { readAt: age.readAt === null ? null : new Date(age.readAt).toISOString(), fresh: age.state === "fresh", reason: age.reason };
+}
 function completedBoard(health, map, connections, previous, at = Date.now()) {
   const upload = map?.uploadInventory, ids = upload?.records?.filter((r) => r.placement === "FIELD").map((r) => r.productId);
-  if (!upload || !ids?.length || !readExactProductConnections(connections, upload.sourceSha256, ids, at)) throw Error("connection_source_incomplete");
+  if (!upload || !ids?.length || !(readExactProductConnections(connections, upload.sourceSha256, ids, at) || readExactProductConnections(connections, upload.sourceSha256, ids, at, "lastGood"))) throw Error("connection_source_incomplete");
   prepareImmutableIdentityEnvelope(health);
   const reconciled = reconcileFleetSnapshot(health, { ...map, productConnections: connections, productConnectionsState: "ready" }, at);
   const { fleetFieldUnits, ...storedHealth } = reconciled.health;
@@ -1382,7 +1406,7 @@ function completedBoard(health, map, connections, previous, at = Date.now()) {
   prepareImmutableIdentityEnvelope(pair.health);
   const board = cameraFieldProducts(pair.fieldMap, pair.health, at, true);
   if (!board || !board.healthVerified) throw Error("inventory_source_incomplete");
-  return { contract: "COS_SAVED_FLEET_BOARD_V1", fleet: pair, counts: board.counts, units: board.items.map((p) => ({ productId: p.productId, unitNumber: p.unitNumber, status: p.status, checkedAt: p.linked?.evidence?.observedAt || null, reason: p.linked?.evidence?.reason || p.linked?.reviewReason || null })), inventory: { total: board.total, field: board.field, shop: board.shop } };
+  return { contract: "COS_SAVED_FLEET_BOARD_V1", fleet: pair, counts: board.counts, units: board.items.map((p) => ({ productId: p.productId, unitNumber: p.unitNumber, status: p.status, checkedAt: p.linked?.evidence?.observedAt || null, reason: p.linked?.evidence?.reason || p.linked?.reviewReason || null })), inventory: { total: board.total, field: board.field, shop: board.shop }, feeds: { mhelp: feedStamp("mhelp", upload.receivedAt ?? upload.lastApiReadAt, at), tracker: feedStamp("tracker", connections?.trackerVerifiedAt, at), cameras: feedStamp("cameras", health?.refreshedAt ?? at, at) } };
 }
 export {
   COMMIT_REQUEST_MAX_MS,

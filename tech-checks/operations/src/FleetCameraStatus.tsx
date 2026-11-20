@@ -192,9 +192,9 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
  const todos=useMemo(()=>technicianTodos({
   cameras:units.map(unit=>({unit:unit.unit,placement:unit.placement,state:unit.state,offline:unit.offline||0,online:unit.online||0,unknown:unit.unknown||0})),
   routers:routerTodos,
-  power:[...victron.entries()].map(([unit,power])=>{const picked=powerSamples(power.measurements);return {unit,placement:units.find(row=>row.unit===unit)?.placement,verdict:cosPowerVerdict({now,settings:powerSettings,voltage:picked.voltage,soc:picked.soc,newestObservedAt:picked.newestObservedAt,victronLowVoltage:picked.victronLowVoltage})};}),
+  power:[...victron.entries()].map(([unit,power])=>{const picked=powerSamples(power.measurements);const victronFeedReadAt=vrm?.sync?.error?null:(typeof vrm?.sync?.lastSuccessAt==='string'?vrm.sync.lastSuccessAt:typeof vrm?.sync?.lastAttemptAt==='string'?vrm.sync.lastAttemptAt:null);return {unit,placement:units.find(row=>row.unit===unit)?.placement,victronFeedReadAt,verdict:cosPowerVerdict({now,settings:powerSettings,voltage:picked.voltage,soc:picked.soc,newestObservedAt:picked.newestObservedAt,victronLowVoltage:picked.victronLowVoltage,victronFeedReadAt})};}),
   addresses:(addressReviews||[]).map(review=>({unit:review.unitNumber,productId:review.productId,placement:'FIELD',address:review.address})),
- }),[units,routerTodos,victron,now,powerSettings,addressReviews]);
+ }),[units,routerTodos,victron,vrm,now,powerSettings,addressReviews]);
  const shown=useMemo(()=>report?groupedUnits(units,group,query,stateFilter,family):[],[report,units,group,query,stateFilter,family]);
  // Counted off the same units the list shows, so a brand tile and the rows
  // under it can never disagree.

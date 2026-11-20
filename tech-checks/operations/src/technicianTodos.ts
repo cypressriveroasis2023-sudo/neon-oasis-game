@@ -1,4 +1,5 @@
 import type {CosPowerVerdict} from './cosPowerAlarms';
+import {ageFeed} from './feedFreshness';
 import {parseAddress} from '../../supabase/functions/camera-field-geocode/censusAddress';
 import {simCancelTodo} from './simCancelChecklist';
 import {cameraProvesRouterUp} from './sharedFleetCounts';
@@ -51,7 +52,8 @@ const fieldUnit = (placement?: string) => placement === 'FIELD';
 export function technicianTodos(input: {
   cameras?: TodoCamera[];
   routers?: TodoRouter[];
-  power?: { unit: string; placement?: string; verdict: CosPowerVerdict }[];
+  power?: { unit: string; placement?: string; verdict: CosPowerVerdict; victronFeedReadAt?: string | null }[];
+  now?: number;
   addresses?: TodoAddress[];
   simCancels?: { unit: string; productId: string; done?: boolean }[];
 }): TechnicianTodo[] {
@@ -91,7 +93,9 @@ export function technicianTodos(input: {
       const which = [power.verdict.voltage === 'alarm' ? 'voltage' : '', power.verdict.soc === 'alarm' ? 'charge' : ''].filter(Boolean).join(' and ');
       todos.push({id: 'battery:'+power.unit, kind: 'battery_alarm', unit: power.unit, group: 'offline', severity: 'alarm', action: 'Open unit', detail: 'COS '+which+' alarm. Victron\'s own alarm is a separate check.'});
     }
-    if (power.verdict.silent === 'alarm') {
+    const feedKnown = 'victronFeedReadAt' in power;
+    const feedFresh = !feedKnown || ageFeed(power.victronFeedReadAt, input.now ?? Date.now(), 'victron').state === 'fresh';
+    if (power.verdict.silent === 'alarm' && feedFresh) {
       todos.push({id: 'silent:'+power.unit, kind: 'power_silent', unit: power.unit, group: 'offline', severity: 'alarm', action: 'Open unit', detail: 'Power readings have been silent longer than the configured window.'});
     }
   }
