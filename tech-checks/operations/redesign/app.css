@@ -146,10 +146,7 @@ td{white-space:nowrap}
 .ph .flag{top:8px;bottom:auto;right:6px}
 .ph .kpi .h{max-width:62%}
 
-/* Self-hosted faces so the approved Inter and Inter Tight metrics render without a network call. */
-@font-face{font-family:Inter;font-style:normal;font-weight:500 800;font-display:swap;src:url(fonts/inter-latin.woff2) format("woff2")}
-@font-face{font-family:"Inter Tight";font-style:normal;font-weight:500 800;font-display:swap;src:url(fonts/inter-tight-latin.woff2) format("woff2")}
-/* Anchors carry the same classes as the mockup divs. Restate the mockup colors at the higher selector so the browser link color does not show. */
+/* Anchors carry the same classes as the mockup divs. Restate the mockup colors at the higher selector so the browser link color does not show. The type stack stays the mockup's Inter and Inter Tight, with no other face. */
 .side>nav{display:flex;flex-direction:column;gap:4px;min-width:0}
 a.nav,a.tab,a.prow{text-decoration:none}
 a.nav{color:var(--tx2)}

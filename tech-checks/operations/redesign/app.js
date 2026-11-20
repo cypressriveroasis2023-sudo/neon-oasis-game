@@ -4,8 +4,8 @@ let S=q.get('s')||'fleet';
 const D=q.get('d')||(matchMedia('(max-width:700px)').matches?'phone':'desktop');
 const ST=q.get('st')||(S==='fleet'?'ok':'late');
 function shellHref(screen){
-  if(screen==='boards')return '/#daily-board';
-  if(screen==='tv')return '/?tvBoard=1#daily-board';
+  if(screen==='boards')return '../dist/index.html#daily-board';
+  if(screen==='tv')return '../../index.html?tvBoard=1';
   const params=new URLSearchParams(location.search);
   params.set('s',screen);
   if(!params.get('d'))params.set('d',D);
@@ -194,8 +194,8 @@ async function officeSession(){
   return data;
 }
 function paint(){
-  if(S==='boards'){location.replace('/#daily-board');return;}
-  if(S==='tv'){location.replace('/?tvBoard=1#daily-board');return;}
+  if(S==='boards'){location.replace('../dist/index.html#daily-board');return;}
+  if(S==='tv'){location.replace('../../index.html?tvBoard=1');return;}
   if(!['fleet','problems','units','unit','team','details','more'].includes(S))S='fleet';
   if(phone)document.documentElement.classList.add('phm');
   document.documentElement.dataset.shell='office';
