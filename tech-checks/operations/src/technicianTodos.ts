@@ -133,7 +133,7 @@ export function victronInstallationsByUnit(units: readonly {unit: string}[], vrm
   return found;
 }
 
-/** Battery alarms from the same Victron feed every screen reads. A missing feed contributes nothing. */
+/** The same Victron power input on every screen. A missing payload contributes nothing. A silent reading stays a Problem, as it does on main. */
 export function batteryAlarmPower(
   units: readonly {unit: string; placement?: string}[],
   vrm: any,
@@ -141,7 +141,7 @@ export function batteryAlarmPower(
   settings: CosPowerSettings,
   feedFresh: boolean,
 ) {
-  if (!feedFresh) return [];
+  if (!vrm && feedFresh === false) return [];
   return [...victronInstallationsByUnit(units, vrm, now).entries()].map(([unit, power]) => {
     const picked = powerSamples(power.measurements);
     return {
@@ -153,14 +153,11 @@ export function batteryAlarmPower(
 }
 
 /**
- * Problems on every screen.
- * power_silent is omitted until a fresh Victron feed can gate it: an old last
- * reading, which a failed sync also produces, must not raise a power Problem.
- * A missing Victron feed (`victronFeedFresh: false`) drops power evidence entirely.
- * Address and SIM-cancel cleanup stay, exactly as the technician list shows them.
+ * Problems on every screen. Same items as `technicianTodos`: power_silent,
+ * mhelp_address and sim_cancel stay. Nothing is dropped.
+ * `victronFeedFresh` is accepted so existing call sites stay, and it does not remove items.
  */
 export function fleetProblems(input: Parameters<typeof technicianTodos>[0] & { victronFeedFresh?: boolean } = {}): TechnicianTodo[] {
-  const {victronFeedFresh, ...rest} = input;
-  const power = victronFeedFresh === false ? [] : rest.power;
-  return technicianTodos({...rest, power}).filter(todo => todo.kind !== 'power_silent');
+  const {victronFeedFresh: _feedFresh, ...rest} = input;
+  return technicianTodos(rest);
 }
