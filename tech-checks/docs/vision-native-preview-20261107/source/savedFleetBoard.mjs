@@ -1030,7 +1030,8 @@ var CAMERA_FRESH_MS2 = 20 * 60 * 1e3;
 var EXACT_PRODUCT_CONNECTION_CONTRACT = "COS_EXACT_PRODUCT_CONNECTIONS_V2";
 var ID = /^[1-9][0-9]{0,14}$/;
 var HASH = /^[a-f0-9]{64}$/;
-var SOURCE_FRESH_MS = 30 * 60 * 1e3;
+var SOURCE_FRESH_MS = 20 * 60 * 1e3;
+var TRACKER_RECEIPT_MS = 30 * 60 * 1e3;
 var object4 = (v) => Boolean(v && typeof v === "object" && !Array.isArray(v));
 var safeTime = (v, now, windowMs) => {
   if (typeof v !== "string") return null;
@@ -1047,7 +1048,9 @@ var unknown = (productId, reason) => ({
 });
 var deviceId = (v) => typeof v === "number" && Number.isSafeInteger(v) && v > 0 ? String(v) : typeof v === "string" && ID.test(v) ? v : null;
 function readExactProductConnections(value, sourceSha256, expectedFieldIds, now = Date.now()) {
-  if (!object4(value) || value.contract !== EXACT_PRODUCT_CONNECTION_CONTRACT || value.sourceSha256 !== sourceSha256 || !HASH.test(sourceSha256) || !safeTime(value.trackerVerifiedAt, now, SOURCE_FRESH_MS) || !Array.isArray(value.items) || value.items.length < expectedFieldIds.length || value.items.length > 1e4) return null;
+  const trackerKept = object4(value) && safeTime(value.trackerVerifiedAt, now, TRACKER_RECEIPT_MS);
+  const trackerLive = Boolean(object4(value) && safeTime(value.trackerVerifiedAt, now, SOURCE_FRESH_MS));
+  if (!object4(value) || value.contract !== EXACT_PRODUCT_CONNECTION_CONTRACT || value.sourceSha256 !== sourceSha256 || !HASH.test(sourceSha256) || !trackerKept || !Array.isArray(value.items) || value.items.length < expectedFieldIds.length || value.items.length > 1e4) return null;
   const expected = new Set(expectedFieldIds);
   if (expected.size !== expectedFieldIds.length) return null;
   const result = /* @__PURE__ */ new Map(), seen = /* @__PURE__ */ new Set();
@@ -1057,7 +1060,7 @@ function readExactProductConnections(value, sourceSha256, expectedFieldIds, now 
     const observed = raw.status === "unknown" ? null : cameraTimestamp(raw.checkedAt, now);
     if (raw.status !== "unknown" && (!raw.resourceId || !observed?.at)) return null;
     seen.add(raw.productId);
-    if (expected.has(raw.productId)) result.set(raw.productId, observed && !observed.fresh ? unknown(raw.productId, "The saved connection check has expired; awaiting the next automatic check.") : raw);
+    if (expected.has(raw.productId)) result.set(raw.productId, !trackerLive || observed && !observed.fresh ? unknown(raw.productId, !trackerLive ? "The tracker read is not current." : "The saved connection check has expired; awaiting the next automatic check.") : raw);
   }
   return result.size === expected.size ? result : null;
 }
@@ -1263,6 +1266,38 @@ function mhelpProviderFleet(upload, health, healthReadSucceeded, now = Date.now(
   return { total: authority.field, healthVerified: usable, receivedAt: authority.receivedAt, stale: authority.stale, groups };
 }
 
+// src/feedFreshness.ts
+var FEED_UNKNOWN_MS = 20 * 60 * 1e3;
+var FUTURE_SLACK_MS = 6e4;
+function readInstant(value) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value !== "string" || value.length === 0) return null;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+function ageFeed(readAt, now, id) {
+  const at = readInstant(readAt);
+  if (at === null) return { id, state: "unknown", reason: "missing", readAt: null };
+  if (at > now + FUTURE_SLACK_MS) return { id, state: "unknown", reason: "future", readAt: at };
+  if (now - at > FEED_UNKNOWN_MS) return { id, state: "unknown", reason: "stale", readAt: at };
+  return { id, state: "fresh", reason: "fresh", readAt: at };
+}
+function powerSampleStamp(observedAt, now) {
+  const at = readInstant(observedAt);
+  if (at === null || at > now) return { at: null, fresh: false };
+  return { at: new Date(at).toISOString(), fresh: now - at <= FEED_UNKNOWN_MS };
+}
+function powerSampleFresh(observedAt, now) {
+  return powerSampleStamp(observedAt, now).fresh;
+}
+function victronFeedFresh(sync, now) {
+  if (!sync) return true;
+  if (sync.error || sync.errorCode) return false;
+  if (sync.state && sync.state !== "current") return false;
+  if (!sync.lastSuccessAt && sync.state !== "current") return true;
+  return ageFeed(sync.lastSuccessAt ?? null, now, "victron").state === "fresh";
+}
+
 // src/fleetCommandCenterModel.ts
 function buildFleetCommandCenter(upload, fieldHealth, healthReadSucceeded, rows, addressMap, vrm, now = Date.now(), cameraCheckedAt = null) {
   const authority = readMhelpInventoryAuthority(upload, now);
@@ -1326,10 +1361,10 @@ function buildFleetCommandCenter(upload, fieldHealth, healthReadSucceeded, rows,
     const row = unitRows.length === 1 ? unitRows[0] : null;
     const power = row?.power;
     const available = config?.items.filter((i) => i.installationId === power?.installationId && i.name === power?.name) || [];
-    const recent = power?.measurements.some((m) => powerTimestamp(m.observedAt, now).fresh) === true;
+    const recent = power?.measurements.some((m) => powerSampleFresh(m.observedAt, now)) === true && victronFeedFresh(config?.sync, now);
     const unique = Boolean(power && available.length === 1 && !seenInstallations.has(power.installationId));
     if (unique && power) seenInstallations.add(power.installationId);
-    const status = unique && recent && !power?.errorCode && config?.sync.state === "current" ? "online" : "unverified";
+    const status = unique && recent && !power?.errorCode ? "online" : "unverified";
     vrmCounts[status]++;
     const reason = status === "online" ? "Fresh, uniquely linked Victron telemetry. A low battery is an alert, not an offline camera." : !p.linked?.unitId ? "This mHelp Product ID has no currently usable verified COS equipment association for Victron telemetry. Review the Product ID / COS link." : !power ? "The verified COS unit has no unique matching Victron installation record. Check the approved installation ID." : !unique ? "The Victron installation association is duplicated or cannot be confirmed against the current installation roster." : Boolean(power.errorCode) ? "The saved Victron power read contains an error. Recheck the provider connection." : config?.sync.state !== "current" ? "The Victron fleet sync is not current. Await a successful refresh before verifying power." : !recent ? "The saved Victron measurement is stale or missing. No current power status is inferred." : "Victron power status is not yet verified.";
     return { ...p, status, reason };
@@ -1372,6 +1407,10 @@ function cameraFieldProducts(map, health, now, readSucceeded = true) {
 }
 
 // durable-board/project.ts
+function feedStamp(id, value, at) {
+  const age = ageFeed(typeof value === "string" || typeof value === "number" ? value : null, at, id);
+  return { readAt: age.readAt === null ? null : new Date(age.readAt).toISOString(), fresh: age.state === "fresh", reason: age.reason };
+}
 function completedBoard(health, map, connections, previous, at = Date.now()) {
   const upload = map?.uploadInventory, ids = upload?.records?.filter((r) => r.placement === "FIELD").map((r) => r.productId);
   if (!upload || !ids?.length || !readExactProductConnections(connections, upload.sourceSha256, ids, at)) throw Error("connection_source_incomplete");
@@ -1382,7 +1421,7 @@ function completedBoard(health, map, connections, previous, at = Date.now()) {
   prepareImmutableIdentityEnvelope(pair.health);
   const board = cameraFieldProducts(pair.fieldMap, pair.health, at, true);
   if (!board || !board.healthVerified) throw Error("inventory_source_incomplete");
-  return { contract: "COS_SAVED_FLEET_BOARD_V1", fleet: pair, counts: board.counts, units: board.items.map((p) => ({ productId: p.productId, unitNumber: p.unitNumber, status: p.status, checkedAt: p.linked?.evidence?.observedAt || null, reason: p.linked?.evidence?.reason || p.linked?.reviewReason || null })), inventory: { total: board.total, field: board.field, shop: board.shop } };
+  return { contract: "COS_SAVED_FLEET_BOARD_V1", fleet: pair, counts: board.counts, units: board.items.map((p) => ({ productId: p.productId, unitNumber: p.unitNumber, status: p.status, checkedAt: p.linked?.evidence?.observedAt || null, reason: p.linked?.evidence?.reason || p.linked?.reviewReason || null })), inventory: { total: board.total, field: board.field, shop: board.shop }, feeds: { mhelp: feedStamp("mhelp", upload.receivedAt ?? upload.lastApiReadAt, at), tracker: feedStamp("tracker", connections?.trackerVerifiedAt, at), cameras: feedStamp("cameras", health?.refreshedAt, at) } };
 }
 export {
   COMMIT_REQUEST_MAX_MS,

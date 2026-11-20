@@ -2,7 +2,7 @@ import {readMhelpInventoryAuthority} from './mhelpInventoryAuthority';
 import {mhelpProviderFleet,type ProviderProduct,type ProviderCounts,type FieldProvider} from './mhelpProviderFleet';
 import {recordedAddressText} from './fleetDisplayAddress';
 import {canonicalCameraUnit} from './fieldCameraHealth';
-import {cameraTimestamp,powerTimestamp} from './cameraEvidence';
+import {powerSampleFresh, victronFeedFresh} from './feedFreshness';
 import {readVrmFleetConfig} from '../../supabase/functions/cos-operations-pages/vrm';
 import type {FieldProduct} from './mhelpFieldHealth';
 import type {FleetDashboardRow} from './fleetDashboardModel';
@@ -112,10 +112,10 @@ export function buildFleetCommandCenter(
     const row=unitRows.length===1?unitRows[0]:null;
     const power=row?.power;
     const available=config?.items.filter(i=>i.installationId===power?.installationId&&i.name===power?.name)||[];
-    const recent=power?.measurements.some(m=>powerTimestamp(m.observedAt,now).fresh)===true;
+    const recent=power?.measurements.some(m=>powerSampleFresh(m.observedAt,now))===true&&victronFeedFresh(config?.sync,now);
     const unique=Boolean(power&&available.length===1&&!seenInstallations.has(power.installationId));
     if(unique&&power)seenInstallations.add(power.installationId);
-    const status:FleetCommandStatus=unique&&recent&&!power?.errorCode&&config?.sync.state==='current'?'online':'unverified';
+    const status:FleetCommandStatus=unique&&recent&&!power?.errorCode?'online':'unverified';
     vrmCounts[status]++;
     const reason=status==='online'?'Fresh, uniquely linked Victron telemetry. A low battery is an alert, not an offline camera.':
       !p.linked?.unitId?'This mHelp Product ID has no currently usable verified COS equipment association for Victron telemetry. Review the Product ID / COS link.':

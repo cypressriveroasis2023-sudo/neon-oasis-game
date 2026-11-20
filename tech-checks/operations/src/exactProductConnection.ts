@@ -19,7 +19,11 @@ export type TrackerConnectionHold=typeof TRACKER_CONNECTION_HOLDS[number];
 export const TRACKER_IP_WORKBOOK='1eV9dx7z1deyA5w9iaVNpP0D5_otkfF-dLiC5wuAlbtA';
 const ID=/^[1-9][0-9]{0,14}$/;
 const HASH=/^[a-f0-9]{64}$/;
-const SOURCE_FRESH_MS=30*60*1000;
+/** Live tracker window. A tracker older than this is Unknown, never a live online or offline. */
+export const SOURCE_FRESH_MS=20*60*1000;
+/** The saved receipt stays readable as last-good Unknown until this bound, so one
+ * expiring check does not drop the others. Past it, the proof is not adopted. */
+const TRACKER_RECEIPT_MS=30*60*1000;
 const object=(v:unknown):v is Record<string,any>=>Boolean(v&&typeof v==='object'&&!Array.isArray(v));
 const safeTime=(v:unknown,now:number,windowMs:number):string|null=>{
  if(typeof v!=='string')return null;
@@ -224,8 +228,10 @@ export function buildTrackerIpReachability(acceptedMhelp:unknown,tracker:unknown
  * independently retrieved and authenticated tracker/endpoint sources.
  */
 export function readExactProductConnections(value:unknown,sourceSha256:string,expectedFieldIds:readonly string[],now=Date.now()):Map<string,ExactProductConnection>|null{
+ const trackerKept=object(value)&&safeTime(value.trackerVerifiedAt,now,TRACKER_RECEIPT_MS);
+ const trackerLive=Boolean(object(value)&&safeTime(value.trackerVerifiedAt,now,SOURCE_FRESH_MS));
  if(!object(value)||value.contract!==EXACT_PRODUCT_CONNECTION_CONTRACT||value.sourceSha256!==sourceSha256||!HASH.test(sourceSha256)
-  ||!safeTime(value.trackerVerifiedAt,now,SOURCE_FRESH_MS)||!Array.isArray(value.items)||value.items.length<expectedFieldIds.length||value.items.length>10000)return null;
+  ||!trackerKept||!Array.isArray(value.items)||value.items.length<expectedFieldIds.length||value.items.length>10000)return null;
  const expected=new Set(expectedFieldIds);
  if(expected.size!==expectedFieldIds.length)return null;
  const result=new Map<string,ExactProductConnection>(),seen=new Set<string>();
@@ -242,8 +248,8 @@ export function readExactProductConnections(value:unknown,sourceSha256:string,ex
   seen.add(raw.productId);
   // A result can expire while the response is in flight or on screen. Age
   // belongs to that Product ID; it must not invalidate other fresh cameras.
-  if(expected.has(raw.productId))result.set(raw.productId,observed&&!observed.fresh
-   ?unknown(raw.productId,'The saved connection check has expired; awaiting the next automatic check.')
+  if(expected.has(raw.productId))result.set(raw.productId,!trackerLive||(observed&&!observed.fresh)
+   ?unknown(raw.productId,!trackerLive?'The tracker read is not current.':'The saved connection check has expired; awaiting the next automatic check.')
    :raw as ExactProductConnection);
  }
  return result.size===expected.size?result:null;

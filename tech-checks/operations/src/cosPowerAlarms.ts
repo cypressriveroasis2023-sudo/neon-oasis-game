@@ -1,5 +1,6 @@
 /** COS thresholds are separate from Victron's own alarm bits.
  * Nothing here invents a voltage or a charge percentage. */
+import {ageFeed} from './feedFreshness';
 
 export type CosPowerSettings = {
   lowVoltageV: number | null;
@@ -47,6 +48,8 @@ export function cosPowerVerdict(input: {
   soc?: PowerSample | null;
   newestObservedAt?: string | null;
   victronLowVoltage?: PowerSample | null;
+  /** Our Victron read. When present, a silent alarm requires that read to be fresh. */
+  victronFeedReadAt?: string | null;
 }): CosPowerVerdict {
   const {now, settings} = input;
   const newest = input.newestObservedAt ? Date.parse(input.newestObservedAt) : NaN;
@@ -55,6 +58,7 @@ export function cosPowerVerdict(input: {
     if (!Number.isFinite(newest) || newest > now + 60_000) silent = 'unknown';
     else silent = now - newest > settings.silentHours * 60 * 60 * 1000 ? 'alarm' : 'clear';
   }
+  if ('victronFeedReadAt' in input && silent === 'alarm' && ageFeed(input.victronFeedReadAt, now, 'victron').state !== 'fresh') silent = 'unknown';
   const victronTime = at(input.victronLowVoltage ?? null, now);
   const victronLowVoltage: CosPowerVerdict['victronLowVoltage'] =
     victronTime === null || !input.victronLowVoltage || now - victronTime > OBSERVATION_FRESH_MS

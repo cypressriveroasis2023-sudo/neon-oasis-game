@@ -16,7 +16,7 @@ export type MhelpFacts = {
   failed?: boolean;
   errorCode?: string | null;
   live?: boolean;
-  /** Caller already applied that source's own window (45 minutes live, 24 hours file). */
+  /** Caller already applied that source's own window (20 minutes on our read). */
   reportedStale?: boolean;
 };
 
@@ -30,11 +30,11 @@ export type SourceFacts = {
   tracker?: { verifiedAt?: string | null; failed?: boolean } | null;
 };
 
-const MHELP_FRESH_MS = 45 * 60 * 1000;
+const MHELP_FRESH_MS = 20 * 60 * 1000;
 const BOARD_CURRENT_MS = 20 * 60 * 1000;
-const STAR_FRESH_MS = 45 * 60 * 1000;
+const STAR_FRESH_MS = 20 * 60 * 1000;
 const VICTRON_FRESH_MS = 20 * 60 * 1000;
-const TRACKER_FRESH_MS = 30 * 60 * 1000;
+const TRACKER_FRESH_MS = 20 * 60 * 1000;
 
 function elapsed(value: string | number | null | undefined, now: number): number | null {
   const at = typeof value === 'number' ? value : typeof value === 'string' ? Date.parse(value) : NaN;
@@ -127,7 +127,7 @@ export function sourceHealth(facts: SourceFacts): SourceAttention[] {
     rows.push(item('tracker', 'Tracker sheet',
       failed ? 'failed' : unknown ? 'unknown' : stale ? 'stale' : 'current',
       facts.tracker.verifiedAt ?? null,
-      failed || stale || unknown ? 'The tracker read is not current. Connection totals stay unknown. This is not an outage.' : 'No action. The tracker read is inside 30 minutes.'));
+      failed || stale || unknown ? 'The tracker read is not current. Connection totals stay unknown. This is not an outage.' : 'No action. The tracker read is inside 20 minutes.'));
   }
   return rows;
 }
