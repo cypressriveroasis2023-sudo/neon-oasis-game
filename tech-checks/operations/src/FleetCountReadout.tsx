@@ -22,9 +22,9 @@ export default function FleetCountReadout({units, cameras, pending = false, unit
   const row = (title: string, label: string, counts: CountTriple | null) => <section className={'cos-shared-count-block'+(stale?' cos-feed-stale':'')} aria-label={label}>
     <h3>{title}</h3>
     <p className='cos-camera-counts cos-phone-counts' role='group' aria-label={label}>
-      <span><b className={stale?'cos-stale-figure':undefined}>{figure(counts,'online')}</b>online</span>
-      <span><b className={stale?'cos-stale-figure':undefined}>{figure(counts,'offline')}</b>offline</span>
-      <span><b className={stale?'cos-stale-figure':undefined}>{figure(counts,'unknown')}</b>unknown</span>
+      <span><b className={stale?'cos-stale-figure':undefined} style={stale?{color:'#8b97a8'}:undefined}>{figure(counts,'online')}</b>online</span>
+      <span><b className={stale?'cos-stale-figure':undefined} style={stale?{color:'#8b97a8'}:undefined}>{figure(counts,'offline')}</b>offline</span>
+      <span><b className={stale?'cos-stale-figure':undefined} style={stale?{color:'#8b97a8'}:undefined}>{figure(counts,'unknown')}</b>unknown</span>
     </p>
     {stale&&counts&&<small className='cos-fleet-stat-explanation'>{lastKnownLine(known(counts), placementReadAt)}</small>}
   </section>;

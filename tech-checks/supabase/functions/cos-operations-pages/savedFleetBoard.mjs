@@ -244,6 +244,10 @@ async function savedFleetBoard({ rpc, payloadText, read, force = false, waitUnti
 var CAMERA_FRESH_MS = 20 * 60 * 1e3;
 var POWER_FRESH_MS = 45 * 60 * 1e3;
 var normalized = (value) => typeof value === "string" ? value.trim().replace(/\s+/g, " ").toUpperCase() : "";
+function powerTimestamp(value, now = Date.now()) {
+  const stamp2 = cameraTimestamp(value, now);
+  return stamp2.at === null ? stamp2 : { at: stamp2.at, fresh: now - Date.parse(stamp2.at) <= POWER_FRESH_MS };
+}
 function cameraTimestamp(value, now = Date.now()) {
   if (typeof value !== "string") return { at: null, fresh: false };
   const p = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.\d{1,6})?(?:Z|[+-]\d{2}(?::?\d{2})?)$/.exec(value);
@@ -796,38 +800,6 @@ function readVrmFleetConfig(value) {
   } };
 }
 
-// src/feedFreshness.ts
-var FEED_UNKNOWN_MS = 20 * 60 * 1e3;
-var FUTURE_SLACK_MS = 6e4;
-function readInstant(value) {
-  if (typeof value === "number") return Number.isFinite(value) ? value : null;
-  if (typeof value !== "string" || value.length === 0) return null;
-  const parsed = Date.parse(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-function ageFeed(readAt, now, id) {
-  const at = readInstant(readAt);
-  if (at === null) return { id, state: "unknown", reason: "missing", readAt: null };
-  if (at > now + FUTURE_SLACK_MS) return { id, state: "unknown", reason: "future", readAt: at };
-  if (now - at > FEED_UNKNOWN_MS) return { id, state: "unknown", reason: "stale", readAt: at };
-  return { id, state: "fresh", reason: "fresh", readAt: at };
-}
-function powerSampleStamp(observedAt, now) {
-  const at = readInstant(observedAt);
-  if (at === null || at > now) return { at: null, fresh: false };
-  return { at: new Date(at).toISOString(), fresh: now - at <= FEED_UNKNOWN_MS };
-}
-function powerSampleFresh(observedAt, now) {
-  return powerSampleStamp(observedAt, now).fresh;
-}
-function victronFeedFresh(sync, now) {
-  if (!sync) return true;
-  if (sync.error || sync.errorCode) return false;
-  if (sync.state && sync.state !== "current") return false;
-  if (!sync.lastSuccessAt && sync.state !== "current") return true;
-  return ageFeed(sync.lastSuccessAt ?? null, now, "victron").state === "fresh";
-}
-
 // src/inhandRouterStatus.ts
 var INHAND_ROUTER_FRESHNESS_MS = 75 * 60 * 1e3;
 var INHAND_LIVE_STATUS_SOURCE = "InHand live pull";
@@ -923,26 +895,19 @@ function fleetDashboardRows(units, health, routers, vrm, now = Date.now()) {
     const batteryReadIssue = key?.startsWith("HELIOS|") ? p?.errorCode || vrm?.sync?.error || vrm?.sync?.state === "error" ? "Latest Victron read unavailable" : vrm?.sync?.state === "stale" ? "Victron sync is stale" : null : null;
     if (key?.startsWith("HELIOS|")) {
       batteryState = "unknown";
-      const feedFresh = victronFeedFresh(vrm?.sync, now);
-      batteryReadings = (p?.measurements || []).filter((m) => m.metric === "battery_soc").map((m) => {
-        const stamp2 = powerSampleStamp(m.observedAt, now);
-        return { source: "Victron \xB7 " + m.source + " " + m.instance, percent: m.value, observedAt: stamp2.at, fresh: feedFresh && stamp2.fresh };
-      });
-      if (p && !batteryReadIssue && feedFresh) {
-        const recent = p.measurements.filter((m) => powerSampleFresh(m.observedAt, now)), soc = recent.filter((m) => m.metric === "battery_soc");
+      batteryReadings = (p?.measurements || []).filter((m) => m.metric === "battery_soc").map((m) => ({ source: "Victron \xB7 " + m.source + " " + m.instance, percent: m.value, observedAt: powerTimestamp(m.observedAt, now).at, fresh: powerTimestamp(m.observedAt, now).fresh }));
+      if (p && !batteryReadIssue) {
+        const recent = p.measurements.filter((m) => powerTimestamp(m.observedAt, now).fresh), soc = recent.filter((m) => m.metric === "battery_soc");
         batteryPercent = soc.length ? Math.min(...soc.map((m) => m.value)) : null;
         batteryState = recent.some((m) => m.unit === "state" && m.value > 0) || batteryPercent !== null && batteryPercent < 20 ? "offline" : batteryPercent !== null ? "online" : "unknown";
       }
     } else if (key?.startsWith("RECON2|")) {
       const batteryRows = camera.identity === "matched" ? camera.rows.filter((r) => r.evidence?.source === "Reconeyez" && r.batteryEvidence) : [];
       const readings = batteryRows.map((r) => r.batteryEvidence).filter(Boolean);
-      batteryReadings = batteryRows.filter((r) => r.batteryEvidence.percent !== null).map((r) => {
-        const stamp2 = powerSampleStamp(r.batteryEvidence.percentObservedAt, now);
-        return { source: "Reconeyez \xB7 " + r.name, percent: r.batteryEvidence.percent, observedAt: stamp2.at, fresh: stamp2.fresh };
-      });
-      const values = readings.filter((b) => b?.percent !== null && powerSampleFresh(b?.percentObservedAt, now)).map((b) => b.percent);
+      batteryReadings = batteryRows.filter((r) => r.batteryEvidence.percent !== null).map((r) => ({ source: "Reconeyez \xB7 " + r.name, percent: r.batteryEvidence.percent, observedAt: powerTimestamp(r.batteryEvidence.percentObservedAt, now).at, fresh: powerTimestamp(r.batteryEvidence.percentObservedAt, now).fresh }));
+      const values = readings.filter((b) => b?.percent !== null && cameraTimestamp(b?.percentObservedAt, now).fresh).map((b) => b.percent);
       batteryPercent = values.length ? Math.min(...values) : null;
-      batteryState = combine(readings.map((b) => powerSampleFresh(b?.statusObservedAt, now) && b?.status ? b.status === "normal" ? "online" : "offline" : powerSampleFresh(b?.percentObservedAt, now) && b?.percent !== null ? b.percent < 20 ? "offline" : "online" : "unknown"));
+      batteryState = combine(readings.map((b) => powerTimestamp(b?.statusObservedAt, now).fresh && b?.status ? b.status === "normal" ? "online" : "offline" : powerTimestamp(b?.percentObservedAt, now).fresh && b?.percent !== null ? b.percent < 20 ? "offline" : "online" : "unknown"));
     }
     const locationVerified = isCurrentFieldPin(unit), locationNeedsReview = placement === "field" && !locationVerified;
     const review = [...placement === "unknown" ? ["Placement is unresolved. Check tracker and current mHelpDesk assignment."] : [], ...camera.state === "unknown" ? [camera.reason] : [], ...locationNeedsReview ? [locationExplanation(unit)] : [], ...unit.mhelpLocationReviewReason ? [String(unit.mhelpLocationReviewReason)] : []];
@@ -1299,6 +1264,38 @@ function mhelpProviderFleet(upload, health, healthReadSucceeded, now = Date.now(
   }
   if (groups.reduce((total, group) => total + group.count, 0) !== authority.field) throw Error("Field provider totals do not reconcile to mHelp Product IDs.");
   return { total: authority.field, healthVerified: usable, receivedAt: authority.receivedAt, stale: authority.stale, groups };
+}
+
+// src/feedFreshness.ts
+var FEED_UNKNOWN_MS = 20 * 60 * 1e3;
+var FUTURE_SLACK_MS = 6e4;
+function readInstant(value) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value !== "string" || value.length === 0) return null;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+function ageFeed(readAt, now, id) {
+  const at = readInstant(readAt);
+  if (at === null) return { id, state: "unknown", reason: "missing", readAt: null };
+  if (at > now + FUTURE_SLACK_MS) return { id, state: "unknown", reason: "future", readAt: at };
+  if (now - at > FEED_UNKNOWN_MS) return { id, state: "unknown", reason: "stale", readAt: at };
+  return { id, state: "fresh", reason: "fresh", readAt: at };
+}
+function powerSampleStamp(observedAt, now) {
+  const at = readInstant(observedAt);
+  if (at === null || at > now) return { at: null, fresh: false };
+  return { at: new Date(at).toISOString(), fresh: now - at <= FEED_UNKNOWN_MS };
+}
+function powerSampleFresh(observedAt, now) {
+  return powerSampleStamp(observedAt, now).fresh;
+}
+function victronFeedFresh(sync, now) {
+  if (!sync) return true;
+  if (sync.error || sync.errorCode) return false;
+  if (sync.state && sync.state !== "current") return false;
+  if (!sync.lastSuccessAt && sync.state !== "current") return true;
+  return ageFeed(sync.lastSuccessAt ?? null, now, "victron").state === "fresh";
 }
 
 // src/fleetCommandCenterModel.ts
