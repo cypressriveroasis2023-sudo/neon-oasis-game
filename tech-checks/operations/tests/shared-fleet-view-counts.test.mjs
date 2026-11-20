@@ -55,8 +55,8 @@ test('one synthetic fixture gives identical numbers on every view', () => {
   for (const name of names) assert.deepEqual(seen[name], seen.fleet, name);
   assert.deepEqual(seen.fleet.units, {online: 1, offline: 1, unknown: 2});
   assert.equal(seen.fleet.problemCount, seen.fleet.problems.length);
-  assert.equal(seen.fleet.problems.length, 5);
-  assert.deepEqual(seen.fleet.problems.map(problem => problem.kind), ['camera_offline', 'router_offline', 'battery_alarm', 'power_silent', 'mhelp_address']);
+  assert.equal(seen.fleet.problems.length, 4);
+  assert.deepEqual(seen.fleet.problems.map(problem => problem.kind), ['camera_offline', 'router_offline', 'battery_alarm', 'mhelp_address']);
 });
 
 test('cameras is never a dash on one view and a number on another', () => {
@@ -114,7 +114,7 @@ test('the Problems count equals the list length', () => {
   assert.equal(counts.problemCount, counts.problems.length);
   assert.equal(counts.problems.length, problems.length);
   assert.equal(counts.problems.some(problem => problem.kind === 'mhelp_address'), true);
-  assert.equal(counts.problems.some(problem => problem.kind === 'power_silent'), true);
+  assert.equal(counts.problems.some(problem => problem.kind === 'power_silent'), false);
   assert.equal(counts.problems.some(problem => problem.kind === 'sim_cancel'), false);
 });
 
@@ -129,12 +129,12 @@ test('a missing Victron feed raises no power Problem', () => {
   assert.equal(direct.some(problem => problem.kind === 'power_silent'), true);
   const missing = fleetProblems({power: [{unit: 'Helios 8', placement: 'FIELD', verdict}], victronFeedFresh: false});
   assert.deepEqual(missing, []);
-  const present = fleetProblems({power: [{unit: 'Helios 8', placement: 'FIELD', verdict}], victronFeedFresh: true});
-  assert.equal(present.some(problem => problem.kind === 'power_silent'), true);
-  assert.equal(present.some(problem => problem.kind === 'battery_alarm'), false);
+  const ungated = fleetProblems({power: [{unit: 'Helios 8', placement: 'FIELD', verdict}], victronFeedFresh: true});
+  assert.equal(ungated.some(problem => problem.kind === 'power_silent'), false);
+  assert.equal(ungated.some(problem => problem.kind === 'battery_alarm'), false);
 });
 
-test('a stalled Victron feed raises no power Problem and an old reading stays power_silent', () => {
+test('a stalled or old Victron read raises no power Problem', () => {
   const old = new Date(now - 5 * 60 * 60 * 1000).toISOString();
   const settings = {lowVoltageV: 12, lowSocPercent: 20, silentHours: 1};
   const units = [{unit: 'HELIOS 001', placement: 'FIELD'}];
@@ -150,9 +150,44 @@ test('a stalled Victron feed raises no power Problem and an old reading stays po
   assert.equal(fleetProblems({power: stalled, victronFeedFresh: false}).some(problem => problem.kind === 'power_silent' || problem.kind === 'battery_alarm'), false);
   const aged = batteryAlarmPower(units, payload, now, settings, true);
   assert.equal(aged.some(row => row.verdict.silent === 'alarm'), true);
+  assert.equal(aged.some(row => row.verdict.voltage === 'unknown'), true);
   const listed = fleetProblems({power: aged, victronFeedFresh: true});
-  assert.equal(listed.some(problem => problem.kind === 'power_silent'), true);
-  assert.equal(listed.some(problem => problem.kind === 'battery_alarm'), false);
+  assert.equal(listed.some(problem => problem.kind === 'power_silent' || problem.kind === 'battery_alarm'), false);
+});
+
+test('a 20:00 Victron reading can raise battery_alarm and a 20:01 reading is Unknown with no Problem', () => {
+  const settings = {lowVoltageV: 12, lowSocPercent: 20, silentHours: 1};
+  const at = age => new Date(now - age).toISOString();
+  const verdictAt = age => cosPowerVerdict({
+    now,
+    settings,
+    voltage: {value: 10, observedAt: at(age)},
+    soc: {value: 10, observedAt: at(age)},
+    newestObservedAt: at(age),
+  });
+  const exact = 20 * 60 * 1000;
+  const freshVerdict = verdictAt(exact);
+  assert.equal(freshVerdict.voltage, 'alarm');
+  assert.equal(freshVerdict.soc, 'alarm');
+  const freshList = fleetProblems({
+    power: [{unit: 'Helios 8', placement: 'FIELD', verdict: freshVerdict}],
+    victronFeedFresh: true,
+  });
+  assert.equal(freshList.some(problem => problem.kind === 'battery_alarm'), true);
+  assert.equal(freshList.some(problem => problem.kind === 'power_silent'), false);
+  const staleVerdict = verdictAt(exact + 1000);
+  assert.equal(staleVerdict.voltage, 'unknown');
+  assert.equal(staleVerdict.soc, 'unknown');
+  const staleList = fleetProblems({
+    power: [{unit: 'Helios 8', placement: 'FIELD', verdict: staleVerdict}],
+    victronFeedFresh: true,
+  });
+  assert.equal(staleList.some(problem => problem.kind === 'battery_alarm' || problem.kind === 'power_silent'), false);
+  const shopList = fleetProblems({
+    power: [{unit: 'Sniper 44', placement: 'SHOP', verdict: freshVerdict}],
+    victronFeedFresh: true,
+  });
+  assert.deepEqual(shopList, []);
 });
 
 test('the five screens call the shared count', () => {
@@ -168,7 +203,7 @@ test('the five screens call the shared count', () => {
   assert.match(equipment, /agreedCounts\.units\.online/);
 });
 
-test('a battery alarm and power_silent stay with address and SIM cancel', () => {
+test('a battery alarm stays and power_silent stays out while cleanup stays', () => {
   const alarm = {voltage: 'alarm', soc: 'clear', silent: 'alarm', victronLowVoltage: 'clear'};
   const list = fleetProblems({
     power: [{unit: 'Helios 8', placement: 'FIELD', verdict: alarm}],
@@ -177,6 +212,6 @@ test('a battery alarm and power_silent stay with address and SIM cancel', () => 
     victronFeedFresh: true,
   });
   const snapshot = selectFleetCounts([unit('Helios 8', 'field', online(fresh))], now, list);
-  assert.deepEqual(snapshot.problems.map(problem => problem.kind), ['battery_alarm', 'power_silent', 'sim_cancel', 'mhelp_address']);
-  assert.equal(snapshot.problems.length, 4);
+  assert.deepEqual(snapshot.problems.map(problem => problem.kind), ['battery_alarm', 'sim_cancel', 'mhelp_address']);
+  assert.equal(snapshot.problems.length, 3);
 });
