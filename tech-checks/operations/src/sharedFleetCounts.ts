@@ -67,9 +67,9 @@ export function isSniper4100(name: string): boolean {
   return folded === 'sniper 4 100' || folded.replace(/ /g, '') === 'sniper4100';
 }
 
-/** power_silent stays out until a fresh Victron feed can gate it. Address and SIM-cancel cleanup stay. */
+/** Every technician item stays, including power_silent, address and SIM cancel. */
 export function fieldProblemList(problems: readonly TechnicianTodo[] = []): TechnicianTodo[] {
-  return problems.filter(problem => problem.kind !== 'power_silent');
+  return [...problems];
 }
 
 const emptyTriple = (): CountTriple => ({ online: 0, offline: 0, unknown: 0 });
