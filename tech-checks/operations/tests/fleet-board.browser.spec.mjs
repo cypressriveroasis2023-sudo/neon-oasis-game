@@ -452,8 +452,9 @@ for (const flagged of [false, true]) test(`a healthy durable TV ${flagged ? 'wit
     holdAt = publishedMs();
     let steps = 0;
     while (await warning.count() === 0) {
+      if (steps >= 15) throw new Error('A frozen Watchful read did not show UPDATES DELAYED within 5 minutes.');
       await advance(20_000, false);
-      if (++steps > 40) throw new Error('A frozen Watchful read did not show UPDATES DELAYED.');
+      steps += 1;
     }
     await expect(warning).toContainText('UPDATES DELAYED');
   }
