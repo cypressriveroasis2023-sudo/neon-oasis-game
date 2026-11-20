@@ -20,7 +20,7 @@ export default function FleetEquipmentTotals({upload,data,now,onView,onOpen,onVe
   <p className='cos-monitored-count'>Monitored units {shared.fresh&&shared.armedUnits!==null?shared.armedUnits:'Unknown'} · Cameras {shared.fresh&&shared.armedUnits!==null&&shared.armedCameras?shared.armedCameras.up+' up, '+shared.armedCameras.down+' down':'Unknown'}{shared.oldestObservedAt?' · Observed '+formatObservedCt(shared.oldestObservedAt):''}</p>
   {shared.fresh&&shared.notArmed?<p className='cos-not-armed'>In Watchful, not armed today · {shared.notArmed}</p>:null}
   {shared.fresh&&shared.armingUnknown?<p className='cos-arming-unknown'>Arming unknown · {shared.armingUnknown} · {shared.armingUnknownDown??0} down</p>:null}
-  {shared.fresh&&shared.unknownUnits?<p className='cos-read-unknown'>Unknown · {shared.unknownUnits}</p>:null}
+  {shared.fresh&&shared.unknownUnits?<p className='cos-read-unknown'>Read time unknown · {shared.unknownUnits}</p>:null}
   {shared.monitoredOnImmix.length>0&&<p className='cos-immix-monitored'>{shared.monitoredOnImmix[0].groupLabel} · {shared.monitoredOnImmix.length} · {(shared.immixUp||shared.immixDown)?`${shared.immixUp??0} up, ${shared.immixDown??0} down${shared.immixUnknown?`, ${shared.immixUnknown} Unknown`:''}`:`${shared.immixUnknown??shared.monitoredOnImmix.length} Unknown`}</p>}
   {shared.amberFlags.map(flag=><p className='cos-monitored-amber' key={flag.name}>{flag.flag}</p>)}
   {shared.matchExceptions.map(flag=><p className='cos-monitored-exception' key={flag.name}>{flag.name}: {flag.reason}</p>)}
