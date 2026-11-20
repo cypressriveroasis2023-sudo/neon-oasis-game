@@ -4,7 +4,7 @@
   "files": [
     {
       "path": "FleetDashboard.tsx",
-      "candidateBlob": "14d54aba4245da119d4698d05025dbb296b2804c",
+      "candidateBlob": "415bcc9e72333f7da8c2e9245c90f9289bbcb6fe",
       "baselineBlob": "0f1427aad67d9f5652038e4d861ec2c8a2590c54",
       "replacements": [
         {
@@ -70,6 +70,31 @@
         {
           "from": "&<FleetEquipmentTotals onDeviceLinks={()=>ta",
           "to": "&<FleetEquipmentTotals agreedCounts={cameraCounts} onDeviceLinks={()=>ta",
+          "count": 1
+        },
+        {
+          "from": "import {censusFromCommandProducts,fieldProblemList,fleetCountsFromCameraFeed,fleetDashboardCounts,recorderLinksFromHealth,routerOfflineFact,selectFleetCounts} from './sharedFleetCounts';\nimport {fleetProblems} from './technicianTodos';\n",
+          "to": "import {censusFromCommandProducts,fleetCountsFromCameraFeed,fleetDashboardCounts,recorderLinksFromHealth,routerOfflineFact,selectFleetCounts} from './sharedFleetCounts';\nimport {batteryAlarmPower,fleetProblems} from './technicianTodos';\nimport {readPowerAlarmSettings} from './cosPowerAlarms';\n",
+          "count": 1
+        },
+        {
+          "from": " const rowTodos=fieldProblemList(phoneTechnicianTodos(rows.map(row=>{const facts=(row.routers||[]).map(router=>routerOfflineFact(router,snapshotNow)).filter(fact=>fact.offline);const routerObservedAt=facts.reduce<number|null>((latest,fact)=>fact.at!==null&&(latest===null||fact.at>latest)?fact.at:latest,null);const cameraAt=row.cameraState==='online'&&row.camera.checkedAt?Date.parse(row.camera.checkedAt):NaN;return {name:row.displayName||row.name,placement:row.placement,cameraState:row.cameraState,support:row.support,routerOffline:facts.length>0,routerObservedAt,cameraOnlineAt:Number.isFinite(cameraAt)?cameraAt:null};}),(mhelpAddresses?.reviews||[]).map((review:{unitNumber:string;productId:string;address?:string})=>({unit:review.unitNumber,productId:review.productId,placement:'FIELD',address:review.address}))));\n const phoneTodos=cameraUnits?.length?fleetProblems({cameras:cameraUnits.map(unit=>({unit:unit.unit,placement:unit.placement,state:unit.state,offline:unit.offline||0,online:unit.online||0,unknown:unit.unknown||0})),routers:rowTodos.filter(todo=>todo.kind==='router_offline').map(todo=>({unit:todo.unit,placement:'FIELD' as const,routerOffline:true as const,routerObservedAt:null,cameraOnlineAt:null})),victronFeedFresh:!sourceErrors.victron&&Boolean(vrm)&&typeof vrm?.sync?.error!=='string'}):rowTodos;\n",
+          "to": " const addressTodos=(mhelpAddresses?.reviews||[]).map((review:{unitNumber:string;productId:string;address?:string})=>({unit:review.unitNumber,productId:review.productId,placement:'FIELD' as const,address:review.address}));\n const rowTodos=phoneTechnicianTodos(rows.map(row=>{const facts=(row.routers||[]).map(router=>routerOfflineFact(router,snapshotNow)).filter(fact=>fact.offline);const routerObservedAt=facts.reduce<number|null>((latest,fact)=>fact.at!==null&&(latest===null||fact.at>latest)?fact.at:latest,null);const cameraAt=row.cameraState==='online'&&row.camera.checkedAt?Date.parse(row.camera.checkedAt):NaN;return {name:row.displayName||row.name,placement:row.placement,cameraState:row.cameraState,support:row.support,routerOffline:facts.length>0,routerObservedAt,cameraOnlineAt:Number.isFinite(cameraAt)?cameraAt:null};}),addressTodos);\n const victronFeedFresh=!sourceErrors.victron&&Boolean(vrm)&&typeof vrm?.sync?.error!=='string';\n const phoneTodos=cameraUnits?.length?fleetProblems({cameras:cameraUnits.map(unit=>({unit:unit.unit,placement:unit.placement,state:unit.state,offline:unit.offline||0,online:unit.online||0,unknown:unit.unknown||0})),routers:rowTodos.filter(todo=>todo.kind==='router_offline').map(todo=>({unit:todo.unit,placement:'FIELD' as const,routerOffline:true as const,routerObservedAt:null,cameraOnlineAt:null})),addresses:addressTodos,power:batteryAlarmPower(cameraUnits,vrm,snapshotNow,readPowerAlarmSettings(typeof localStorage==='undefined'?null:localStorage),victronFeedFresh),victronFeedFresh}):rowTodos;\n",
+          "count": 1
+        },
+        {
+          "from": " if(countsOnly)return <section className='cos-fleet-dashboard cos-fleet-board cos-fleet-counts-only' data-fleet-view='map' data-monitored={monitoredCount.fresh&&monitoredCount.armedUnits!==null?String(monitoredCount.armedUnits):'Unknown'} aria-label='COS fleet counts'>\n",
+          "to": " if(countsOnly)return <section className='cos-fleet-dashboard cos-fleet-board cos-fleet-counts-only' data-fleet-view='map' data-shared-problem-count={sharedCounts.problems.length} data-monitored={monitoredCount.fresh&&monitoredCount.armedUnits!==null?String(monitoredCount.armedUnits):'Unknown'} aria-label='COS fleet counts'>\n",
+          "count": 1
+        },
+        {
+          "from": " return <section className={'cos-fleet-dashboard cos-fleet-board cos-vision-command'+(view==='map'?' cos-fleet-simple-map':'')} data-fleet-view={view} data-monitored={monitoredCount.fresh&&monitoredCount.armedUnits!==null?String(monitoredCount.armedUnits):'Unknown'} aria-label='COS Fleet Dashboard'>\n",
+          "to": " return <section className={'cos-fleet-dashboard cos-fleet-board cos-vision-command'+(view==='map'?' cos-fleet-simple-map':'')} data-fleet-view={view} data-shared-problem-count={sharedCounts.problems.length} data-monitored={monitoredCount.fresh&&monitoredCount.armedUnits!==null?String(monitoredCount.armedUnits):'Unknown'} aria-label='COS Fleet Dashboard'>\n",
+          "count": 1
+        },
+        {
+          "from": "  {view==='map'&&<PhoneTechLanding counts={phoneCounts} todos={phoneTodos} onOpen={todo=>setFilters(current=>({...current,query:todo.unit}))}/>}\n",
+          "to": "  {view==='map'&&<PhoneTechLanding counts={phoneCounts} todos={sharedCounts.problems} onOpen={todo=>setFilters(current=>({...current,query:todo.unit}))}/>}\n",
           "count": 1
         }
       ]
