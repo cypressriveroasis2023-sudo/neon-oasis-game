@@ -153,13 +153,16 @@ export function batteryAlarmPower(
 }
 
 /**
- * Problems on every screen. power_silent, mhelp_address and sim_cancel stay,
- * the same items technicianTodos returns on main.
- * A missing Victron feed (`victronFeedFresh: false`) still contributes no power
- * evidence, because there is no payload to read.
+ * Problems on every screen.
+ * power_silent is dropped until a later change gates it by age. An old last
+ * reading, which a failed sync also produces, must not raise a power Problem.
+ * A Victron sample older than 20 minutes is Unknown in the power verdict, so it
+ * raises no battery_alarm. A sample of 20 minutes or less can. A missing or
+ * erroring feed (`victronFeedFresh: false`) drops power evidence entirely.
+ * Shop is never a Problem. Address and SIM-cancel cleanup stay.
  */
 export function fleetProblems(input: Parameters<typeof technicianTodos>[0] & { victronFeedFresh?: boolean } = {}): TechnicianTodo[] {
   const {victronFeedFresh, ...rest} = input;
   const power = victronFeedFresh === false ? [] : rest.power;
-  return technicianTodos({...rest, power});
+  return technicianTodos({...rest, power}).filter(todo => todo.kind !== 'power_silent');
 }
