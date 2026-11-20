@@ -54,7 +54,7 @@ test('the Watchful roster is private: RLS on, anon has nothing, authenticated ca
   await db.close();
 });
 
-test('the read-time columns are additive and their rollback restores the required observation time', async () => {
+test('the read-time columns are additive and rollback keeps the row with a null observation time', async () => {
   const db = new PGlite();
   await db.exec('create role anon; create role authenticated; create role service_role;');
   await db.exec(sql);
@@ -87,14 +87,14 @@ test('the read-time columns are additive and their rollback restores the require
   const kept = await db.query(`select unit_name, snapshot_at from public.watchful_monitored_units`);
   assert.equal(kept.rows.length, 1);
   assert.equal(kept.rows[0].unit_name, 'Sniper 2');
-  assert.equal(new Date(kept.rows[0].snapshot_at).toISOString(), '2026-11-19T14:30:00.000Z');
+  assert.equal(kept.rows[0].snapshot_at, null);
   const after = await db.query(`
     select column_name, is_nullable
     from information_schema.columns
     where table_schema = 'public' and table_name = 'watchful_monitored_units'
       and column_name in ('snapshot_at', 'fetched_at', 'arming', 'project_id')
   `);
-  assert.deepEqual(after.rows, [{column_name: 'snapshot_at', is_nullable: 'NO'}]);
+  assert.deepEqual(after.rows, [{column_name: 'snapshot_at', is_nullable: 'YES'}]);
   await db.exec(rollback);
   await db.close();
 });

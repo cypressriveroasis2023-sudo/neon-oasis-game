@@ -47,14 +47,8 @@ const MAC_PAIRS = /\b[0-9a-f]{2}(?:[:-][0-9a-f]{2}){5}\b/gi;
 const MAC_GROUPS = /\b[0-9a-f]{4}(?:[.:-][0-9a-f]{4}){2}\b/gi;
 const MAC_BARE = /\b[0-9a-f]{12}\b/gi;
 const PROJECT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const SERIAL_LABEL = String.raw`(?:[A-Za-z]+[\s._-]*)?(?:serial(?:[\s._-]*(?:number|num|nbr|no\.?))?|ser\.?\s*no\.?|s\.n\.?|s\/n|sn)|\u2116`;
-/** Any mix of quotes, colon, equals, arrows, dashes, brackets, Nº and whitespace. Repeated so `": "` is one gap. */
-const SERIAL_GAP = String.raw`(?:\s+|is\b|N[º°]|->|=>|[^\sA-Za-z0-9])*`;
-const SERIAL_VALUE = String.raw`(?=[A-Za-z0-9-]*\d)[A-Za-z0-9-]{4,}`;
-const LABELED_SERIAL = new RegExp(
-  `(?<![A-Za-z0-9_])(?<label>${SERIAL_LABEL})(?![A-Za-z0-9])(?<gap>${SERIAL_GAP})(?<value>${SERIAL_VALUE})`,
-  'gid',
-);
+/** One separator class, capped. No nested quantifier, so a long run cannot backtrack. */
+const SERIAL_GAP_MAX = 12;
 const READ_SKEW_MS = 5 * 60 * 1000;
 export type WatchfulArming = 'armed' | 'disarmed' | 'paused' | 'test' | 'unknown';
 
@@ -142,17 +136,136 @@ function foldForSerial(text: string): {folded: string; spans: {start: number; en
   return {folded, spans};
 }
 
+function isSerialSep(char: string): boolean {
+  return char !== undefined && !/[A-Za-z0-9]/.test(char);
+}
+
+function wordAt(text: string, index: number, word: string): number | null {
+  if (text.slice(index, index + word.length).toLowerCase() !== word) return null;
+  const after = index + word.length;
+  if (after < text.length && /[A-Za-z0-9]/.test(text[after])) return null;
+  return after;
+}
+
+function takeSeps(text: string, index: number): number {
+  let at = index;
+  let count = 0;
+  while (at < text.length && count < SERIAL_GAP_MAX && isSerialSep(text[at])) {
+    at += 1;
+    count += 1;
+  }
+  return at;
+}
+
+/** is, was, of, no, number, or num. One word, not a repeated pattern. */
+function takeConnector(text: string, index: number): number | null {
+  for (const word of ['number', 'num', 'nbr', 'was', 'is', 'of', 'no']) {
+    const end = wordAt(text, index, word);
+    if (end !== null) return end;
+  }
+  return null;
+}
+
+function takeValue(text: string, index: number): number | null {
+  let end = index;
+  while (end < text.length && /[A-Za-z0-9-]/.test(text[end])) end += 1;
+  if (end - index < 4) return null;
+  const token = text.slice(index, end);
+  if (!/\d/.test(token)) return null;
+  return end;
+}
+
+/** Label, then at most 12 separators, one connector word, and 12 more separators, then the value. */
+function takeGapValue(text: string, index: number): {start: number; end: number} | null {
+  let at = takeSeps(text, index);
+  if ((text[at] === 'N' || text[at] === 'n') && (text[at + 1] === '\u00ba' || text[at + 1] === '\u00b0')) {
+    at = takeSeps(text, at + 2);
+  }
+  const connector = takeConnector(text, at);
+  if (connector !== null) at = takeSeps(text, connector);
+  const valueEnd = takeValue(text, at);
+  if (valueEnd === null) return null;
+  return {start: at, end: valueEnd};
+}
+
+function extendSerial(text: string, index: number): number {
+  const spaced = takeSeps(text, index);
+  const from = spaced > index ? spaced : index;
+  for (const word of ['number', 'num', 'nbr', 'no']) {
+    const end = wordAt(text, from, word);
+    if (end === null) continue;
+    return text[end] === '.' ? end + 1 : end;
+  }
+  return index;
+}
+
+function serialKeyword(text: string, index: number): number | null {
+  if (text[index] === '\u2116') return index + 1;
+  if (text.slice(index, index + 6).toLowerCase() === 'serial') {
+    const after = index + 6;
+    const extended = extendSerial(text, after);
+    if (after < text.length && /[A-Za-z]/.test(text[after]) && extended === after) return null;
+    return extended;
+  }
+  if (wordAt(text, index, 'ser') !== null) {
+    let at = index + 3;
+    if (text[at] === '.') at += 1;
+    const afterSep = takeSeps(text, at);
+    if (afterSep === at && text[index + 3] !== '.') return null;
+    const no = wordAt(text, afterSep, 'no');
+    if (no === null) return null;
+    return text[no] === '.' ? no + 1 : no;
+  }
+  const lower = text[index]?.toLowerCase();
+  if (lower === 's' && text[index + 1] === '.' && text[index + 2]?.toLowerCase() === 'n') {
+    let at = index + 3;
+    if (text[at] === '.') at += 1;
+    if (at < text.length && /[A-Za-z0-9]/.test(text[at])) return null;
+    return at;
+  }
+  if (lower === 's' && text[index + 1] === '/' && text[index + 2]?.toLowerCase() === 'n') {
+    if (index + 3 < text.length && /[A-Za-z0-9]/.test(text[index + 3])) return null;
+    return index + 3;
+  }
+  if (wordAt(text, index, 'sn') !== null) return index + 2;
+  return null;
+}
+
+/** Find a serial label at a word boundary. The scan advances, so a long gap is not retried. */
+function labelEnd(text: string, index: number): number | null {
+  if (index > 0 && /[A-Za-z0-9_]/.test(text[index - 1])) return null;
+  const direct = serialKeyword(text, index);
+  if (direct !== null) return direct;
+  if (!/[A-Za-z]/.test(text[index] || '')) return null;
+  let end = index;
+  while (end < text.length && /[A-Za-z]/.test(text[end])) end += 1;
+  const word = text.slice(index, end).toLowerCase();
+  const at = word.lastIndexOf('serial');
+  if (at > 0) return extendSerial(text, index + at + 'serial'.length);
+  const seps = takeSeps(text, end);
+  if (seps === end) return null;
+  return serialKeyword(text, seps);
+}
+
 function redactLabeledSerial(text: string): {text: string; stripped: boolean} {
   const {folded, spans} = foldForSerial(text);
-  LABELED_SERIAL.lastIndex = 0;
   const cuts: {start: number; end: number}[] = [];
-  for (const match of folded.matchAll(LABELED_SERIAL)) {
-    const indices = match.indices?.groups?.value;
-    if (!indices) continue;
-    const start = spans[indices[0]]?.start;
-    const end = spans[indices[1] - 1]?.end;
-    if (start === undefined || end === undefined) continue;
-    cuts.push({start, end});
+  let index = 0;
+  while (index < folded.length) {
+    const label = labelEnd(folded, index);
+    if (label !== null) {
+      const value = takeGapValue(folded, label);
+      if (value) {
+        const start = spans[value.start]?.start;
+        const end = spans[value.end - 1]?.end;
+        if (start !== undefined && end !== undefined) cuts.push({start, end});
+        index = value.end;
+        continue;
+      }
+      index = Math.max(index + 1, label);
+      continue;
+    }
+    index += 1;
   }
   if (!cuts.length) return {text, stripped: false};
   let next = text;

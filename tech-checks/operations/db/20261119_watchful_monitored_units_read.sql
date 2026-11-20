@@ -1,7 +1,10 @@
 -- Not applied by this pull request. Do not run it against the live project from CI.
 -- Additive: our read time, arming, and project id. snapshot_at is no longer required.
 -- project_id is a uuid. fetched_at may not be in the future.
+-- One transaction. A failure leaves the table as it was.
 -- This file does not load rows.
+
+begin;
 
 alter table public.watchful_monitored_units
   add column if not exists fetched_at timestamptz,
@@ -35,3 +38,5 @@ create trigger watchful_monitored_units_fetched_at_not_future
   before insert or update of fetched_at on public.watchful_monitored_units
   for each row
   execute function public.watchful_monitored_units_reject_future_fetch();
+
+commit;
