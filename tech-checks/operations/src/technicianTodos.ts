@@ -1,5 +1,7 @@
-import type {CosPowerVerdict} from './cosPowerAlarms';
+import {cosPowerVerdict, powerSamples, type CosPowerSettings, type CosPowerVerdict} from './cosPowerAlarms';
+import {canonicalCameraUnit} from './fieldCameraHealth';
 import {parseAddress} from '../../supabase/functions/camera-field-geocode/censusAddress';
+import {safeVrmPower, type SafeVrmPower} from '../../supabase/functions/cos-operations-pages/vrmSafePower';
 import {simCancelTodo} from './simCancelChecklist';
 import {cameraProvesRouterUp} from './sharedFleetCounts';
 
@@ -114,4 +116,53 @@ export function technicianTodos(input: {
   }
   const groupOf = (todo: TechnicianTodo): TodoGroup => todo.group ?? (todo.kind === 'mhelp_address' || todo.kind === 'sim_cancel' ? 'cleanup' : 'offline');
   return todos.sort((left, right) => groupOf(left) === groupOf(right) ? 0 : groupOf(left) === 'offline' ? -1 : 1);
+}
+
+/** One Helios, one Victron installation: matched only when the name is unique on both sides. */
+export function victronInstallationsByUnit(units: readonly {unit: string}[], vrm: any, now: number): Map<string, SafeVrmPower> {
+  const found = new Map<string, SafeVrmPower>();
+  if (!vrm || !Array.isArray(vrm.items) || !Array.isArray(vrm.power)) return found;
+  let power: SafeVrmPower[];
+  try { power = safeVrmPower(vrm.power, vrm.items, now); } catch { return found; }
+  for (const unit of units) {
+    const key = canonicalCameraUnit(unit.unit);
+    if (!key?.startsWith('HELIOS|')) continue;
+    const matches = power.filter(row => canonicalCameraUnit(row.name) === key);
+    if (matches.length === 1 && units.filter(other => canonicalCameraUnit(other.unit) === key).length === 1) found.set(unit.unit, matches[0]);
+  }
+  return found;
+}
+
+/** Battery alarms from the same Victron feed every screen reads. A missing feed contributes nothing. */
+export function batteryAlarmPower(
+  units: readonly {unit: string; placement?: string}[],
+  vrm: any,
+  now: number,
+  settings: CosPowerSettings,
+  feedFresh: boolean,
+) {
+  if (!feedFresh) return [];
+  return [...victronInstallationsByUnit(units, vrm, now).entries()].map(([unit, power]) => {
+    const picked = powerSamples(power.measurements);
+    return {
+      unit,
+      placement: units.find(row => row.unit === unit)?.placement,
+      verdict: cosPowerVerdict({now, settings, voltage: picked.voltage, soc: picked.soc, newestObservedAt: picked.newestObservedAt, victronLowVoltage: picked.victronLowVoltage}),
+    };
+  });
+}
+
+/**
+ * Problems on every screen.
+ * power_silent is dropped until a later change gates it by age. An old last
+ * reading, which a failed sync also produces, must not raise a power Problem.
+ * A Victron sample older than 20 minutes is Unknown in the power verdict, so it
+ * raises no battery_alarm. A sample of 20 minutes or less can. A missing or
+ * erroring feed (`victronFeedFresh: false`) drops power evidence entirely.
+ * Shop is never a Problem. Address and SIM-cancel cleanup stay.
+ */
+export function fleetProblems(input: Parameters<typeof technicianTodos>[0] & { victronFeedFresh?: boolean } = {}): TechnicianTodo[] {
+  const {victronFeedFresh, ...rest} = input;
+  const power = victronFeedFresh === false ? [] : rest.power;
+  return technicianTodos({...rest, power}).filter(todo => todo.kind !== 'power_silent');
 }
