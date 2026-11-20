@@ -67,11 +67,9 @@ export function isSniper4100(name: string): boolean {
   return folded === 'sniper 4 100' || folded.replace(/ /g, '') === 'sniper4100';
 }
 
-const FIELD_PROBLEM_KINDS = new Set(['camera_offline', 'router_offline', 'battery_alarm']);
-
-/** power_silent stays out until a fresh Victron feed can gate it. Cleanup kinds are not Problems. */
+/** power_silent stays out until a fresh Victron feed can gate it. Address and SIM-cancel cleanup stay. */
 export function fieldProblemList(problems: readonly TechnicianTodo[] = []): TechnicianTodo[] {
-  return problems.filter(problem => FIELD_PROBLEM_KINDS.has(problem.kind));
+  return problems.filter(problem => problem.kind !== 'power_silent');
 }
 
 const emptyTriple = (): CountTriple => ({ online: 0, offline: 0, unknown: 0 });
@@ -118,7 +116,8 @@ function tallyFieldUnit(unit: CountUnit, cameras: CountTriple, unitCounts: Count
  * DO NOT USE is excluded. A DO NOT USE unit mHelp still places in Field
  * (the reviewed Sniper 318 case) is out of every total.
  * Unknown placement counts as Unknown, never as a field online or offline unit.
- * Sniper 4-100 counts as down when its reading is a fresh offline.
+ * A shop row, including Sniper 4-100, is kept out of the field totals and is never Down.
+ * Sniper 4-100 counts as down only on a fresh offline read while it is in the field.
  * Camera status, the map, the TV, the phone and equipment totals all call this.
  */
 export function selectFleetCounts(units: readonly CountUnit[], now = Date.now(), problems: readonly TechnicianTodo[] = []): FleetCountSnapshot {
@@ -129,10 +128,6 @@ export function selectFleetCounts(units: readonly CountUnit[], now = Date.now(),
   let doNotUseUnits = 0;
   let exceptionUnits = 0;
   for (const unit of units) {
-    if (isSniper4100(unit.name)) {
-      tallyFieldUnit(unit, cameras, unitCounts, unverified, now);
-      continue;
-    }
     if (unit.exception === true || (unit.doNotUse === true && unit.placement === 'field')) {
       exceptionUnits += 1;
       continue;
@@ -182,7 +177,7 @@ export function fleetCountsFromCameraFeed(
     const report = decideShopCameras(liveFeedShopRows(units, fieldMap).inputs);
     census = census.map(unit => {
       const decision = report.byUnit.get(unit.name.trim().toUpperCase());
-      if (!decision || isSniper4100(unit.name)) return unit;
+      if (!decision) return unit;
       if (decision.category === 'exception') return { ...unit, doNotUse: true, exception: true };
       if (decision.category === 'doNotUse') return { ...unit, doNotUse: true };
       if (decision.category === 'inShop') return { ...unit, placement: 'shop', cameras: [] };
@@ -209,7 +204,7 @@ function cameraFromStatus(status: string, observedAt: string | null): CountCamer
 export function censusFromCameraUnits(units: readonly UnitCameraStatus[], now = Date.now()): CountUnit[] {
   return units.map(unit => {
     const marked = unit as UnitCameraStatus & { doNotUse?: boolean; exception?: boolean };
-    const placement = isSniper4100(unit.unit) ? 'field' : unit.placement === 'SHOP' ? 'shop' : unit.placement === 'FIELD' ? 'field' : 'unknown';
+    const placement = unit.placement === 'SHOP' ? 'shop' : unit.placement === 'FIELD' ? 'field' : 'unknown';
     const listed = (unit.cameraList || []).filter(camera => !camera.removed && (placement !== 'field' || camera.atSite !== false));
     const cameras = listed.length
       ? listed.map(camera => cameraFromStatus(camera.status, unit.observedAt))
