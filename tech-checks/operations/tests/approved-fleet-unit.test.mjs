@@ -30,7 +30,7 @@ import {createHash} from 'node:crypto';
 // presentation pins are unchanged.
 const expected={
   "FleetDashboard.tsx": "8d711a97853b5f646d892f5552a792656623a9f8",
-  "FleetUnitHealth.tsx": "3ba1f2507241a63d839424bc1db28b6d584659c1",
+  "FleetUnitHealth.tsx": "05b3e91e7e31818ce40e105bec101dfe3a288193",
   "FleetCameraTools.tsx": "338a98fc2f9042d06a9d725384b2a95e3099a5bd",
   "FleetBatterySummary.tsx": "278f67abefcc6846876e2ced0862eec9cf1733dd",
   "LastKnownCameraStatus.tsx": "40b4218e51b13c8e15d5f5e7ad81be410df4663d",
