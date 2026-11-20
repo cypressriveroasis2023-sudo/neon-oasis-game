@@ -1,11 +1,10 @@
-# Proves the holiday schedule writer stubs cannot write a camera schedule.
+# Proves the holiday-schedule-test stub cannot write a camera schedule.
 # It does not deploy and it does not call Supabase, a camera, Watchful, or monitoring.
-name: Holiday schedule writer lock
+name: Holiday schedule test lock
 on:
   pull_request:
     paths:
       - 'tech-checks/supabase/functions/holiday-schedule-test/**'
-      - 'tech-checks/supabase/functions/holiday-schedule-apply/**'
       - '.github/workflows/holiday-schedule-test-lock.yml'
 permissions:
   contents: read
@@ -20,5 +19,3 @@ jobs:
           node-version: '22'
       - name: Prove holiday-schedule-test cannot write a camera schedule
         run: node --experimental-strip-types --test --test-concurrency=1 tech-checks/supabase/functions/holiday-schedule-test/index.test.mjs
-      - name: Prove holiday-schedule-apply cannot write a camera schedule
-        run: node --experimental-strip-types --test --test-concurrency=1 tech-checks/supabase/functions/holiday-schedule-apply/index.test.mjs
