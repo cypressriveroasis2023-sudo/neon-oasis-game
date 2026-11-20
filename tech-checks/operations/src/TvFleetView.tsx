@@ -40,9 +40,13 @@ const transientReadStatus=(status:number|null)=>status!==null&&[502,503,504,546]
 const savedBoardTime=(field:unknown)=>{const at=Date.parse(String((field as any)?.savedBoardReadAt||''));return Number.isFinite(at)&&at<=Date.now()?at:null;};
 const empty:Snapshot={units:[],inventory:[],health:null,routers:null,readAt:null,estimates:new Map(),fieldSource:null,addressMap:null};
 const WATCHFUL_ALERT_MS = 12 * 60 * 1000;
+// A saved board is published about every 10 minutes. The unflagged TV keeps
+// its 10-minute read. The flagged board adopts that publication on the next
+// minute so a healthy Watchful time stays inside the 12-minute alert.
+const SAVED_BOARD_ADOPT_MS = 60 * 1000;
 export default function TvFleetView({api,enabled,mode,page,width,height,refreshId,onPages,onSharedCounts,onWatchfulLate,sharedCount=null}:{api:Api;enabled:boolean;mode:'camera'|'map'|null;page:number;width:number;height:number;refreshId:number;onPages:(pages:FleetPages)=>void;onSharedCounts?:(counts:TvSharedCounts|null)=>void;onWatchfulLate?:(late:boolean)=>void;sharedCount?:StageSharedMonitoredCount|null}){
   const [data,setData]=useState<Snapshot>(empty),[error,setError]=useState(''),[clock,setClock]=useState(Date.now());
-  const generation=useRef(0),running=useRef(false),lastAttempt=useRef(0),lastRouterAttempt=useRef(0),alive=useRef(false);
+  const generation=useRef(0),running=useRef(false),lastAttempt=useRef(0),lastRouterAttempt=useRef(0),lastSavedAdopt=useRef(0),alive=useRef(false);
   // Errors are retained per source group. A pass only reports for the sources
   // it actually read, so a successful router-only read cannot clear an
   // unresolved camera warning that no camera read has resolved.
@@ -53,12 +57,12 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
   // `include` selects which saved reads this pass performs. Each side advances
   // only its own attempt clock, so a camera-only pass cannot postpone the router
   // deadline and a router-only pass cannot postpone the camera deadline.
-  const refresh=useCallback(async(force=false,proofUpdate=false,include:{camera?:boolean;routers?:boolean}={})=>{
+  const refresh=useCallback(async(force=false,proofUpdate=false,include:{camera?:boolean;routers?:boolean}={},adoptSaved=false)=>{
     const readCamera=include.camera!==false,readRouters=include.routers!==false;
     if(running.current||!alive.current||sessionBlocked.current)return;
     if(force){cancelRetry();retryAt.current=0;}
     const initialAttempt=lastAttempt.current===0;
-    running.current=true;if(!proofUpdate&&readCamera)lastAttempt.current=Date.now();if(!proofUpdate&&readRouters)lastRouterAttempt.current=Date.now();const request=generation.current;
+    running.current=true;if(!proofUpdate&&!adoptSaved&&readCamera)lastAttempt.current=Date.now();if(!proofUpdate&&readRouters)lastRouterAttempt.current=Date.now();const request=generation.current;
     try{
       const current=()=>alive.current&&request===generation.current;
       // Stage each response until this read settles. A new placement response
@@ -99,7 +103,7 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
       cancelRetry();retryAt.current=0;retryUsed.current=true;void refresh();
     };
     void refresh();
-    const tick=()=>{setClock(Date.now());if(document.hidden){cancelRetry();return;}if(retryAt.current){retryRead.current();if(retryAt.current&&!retryTimer.current)retryTimer.current=window.setTimeout(()=>retryRead.current(),Math.max(0,retryAt.current-Date.now()));}else{const cameraDue=automaticRefreshDue(lastAttempt.current,Date.now(),document.hidden,CAMERA_AUTO_REFRESH_MS),routerDue=automaticRefreshDue(lastRouterAttempt.current,Date.now(),document.hidden);if(cameraDue||routerDue)void refresh(true,false,{camera:cameraDue,routers:routerDue});}};
+    const tick=()=>{setClock(Date.now());if(document.hidden){cancelRetry();return;}if(retryAt.current){retryRead.current();if(retryAt.current&&!retryTimer.current)retryTimer.current=window.setTimeout(()=>retryRead.current(),Math.max(0,retryAt.current-Date.now()));}else{const now=Date.now(),cameraDue=automaticRefreshDue(lastAttempt.current,now,document.hidden,CAMERA_AUTO_REFRESH_MS),routerDue=automaticRefreshDue(lastRouterAttempt.current,now,document.hidden);if(cameraDue||routerDue)void refresh(true,false,{camera:cameraDue,routers:routerDue});else if(fleetBoardOnTv()&&automaticRefreshDue(lastSavedAdopt.current,now,document.hidden,SAVED_BOARD_ADOPT_MS)){lastSavedAdopt.current=now;void refresh(false,false,{camera:true,routers:false},true);}}};
     const timer=window.setInterval(tick,60000);
     const invalid=(event:Event)=>{
       const detail=(event as CustomEvent<{reason?:string;path?:string}>).detail;
@@ -201,7 +205,7 @@ export default function TvFleetView({api,enabled,mode,page,width,height,refreshI
     });
     return buildBoard(inputs,sharedCount,data.readAt?new Date(data.readAt).toISOString():null,clock);
   },[rows,sharedCount,data.readAt,clock]);
-  useEffect(()=>{onWatchfulLate?.(Boolean(data.readAt&&clock-data.readAt>WATCHFUL_ALERT_MS));},[onWatchfulLate,data.readAt,clock]);
+  useEffect(()=>{onWatchfulLate?.(fleetBoardOnTv()&&Boolean(data.readAt&&clock-data.readAt>WATCHFUL_ALERT_MS));},[onWatchfulLate,data.readAt,clock]);
   const tvBoardRef=useRef(tvBoard);tvBoardRef.current=tvBoard;
   const [mapRevision,setMapRevision]=useState(0);
   const [groupDetails,setGroupDetails]=useState<{members:CompactMapMember[];zoom?:()=>void}|null>(null);

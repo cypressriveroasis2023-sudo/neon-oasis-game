@@ -1,6 +1,8 @@
 import {test,expect} from '@playwright/test';
 import {mountFleet,field} from './fleet-dashboard-fixtures.mjs';
 import {resource,snapshot,withStatus,fresh} from './fixtures/camera-evidence-fixtures.mjs';
+import {fieldProductFixture} from './fixtures/mhelp-field-health-fixtures.mjs';
+import {completedBoard} from '../durable-board/project.ts';
 import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
@@ -352,6 +354,74 @@ test('a failed TV refresh shows UPDATES DELAYED by 120 seconds and Unknown after
   await expect(frame.locator('.cos-board-banner')).toBeVisible();
   await expect(frame.locator('[data-board-box=problems]')).toHaveAttribute('data-problem-tone', 'unknown');
   await expect(frame.locator('[data-board-box=units] strong')).toHaveText('—');
+});
+
+for (const flagged of [false, true]) test(`a healthy durable TV ${flagged ? 'with the fleet board' : 'without the flag'} stays clear for 60 minutes`, async ({page}, info) => {
+  test.skip(info.project.name !== 'desktop-1440');
+  test.setTimeout(180_000);
+  const originMs = Date.parse('2026-11-19T18:00:00.000Z');
+  const producerMs = 10 * 60 * 1000;
+  await page.clock.install({time: new Date(originMs + 9 * 60 * 1000)});
+  await page.setViewportSize({width: 1920, height: 1080});
+  const dist = fileURLToPath(new URL('../dist/', import.meta.url));
+  const harness = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/operations-host.css"><style>body{margin:0}#cosOperationsMount{height:100dvh}</style></head><body><div id="appView"><div id="view-owner"><div id="cosOperationsMount"></div><div id="cosOperationsLegacy"></div></div></div><script>window.TechCheckContext={getRole:()=>"owner",getEffectiveRole:()=>"owner",getSession:()=>({user:{id:"fixture-owner"}}),db:{auth:{onAuthStateChange:()=>{},getSession:async()=>({data:{session:{user:{id:"fixture-owner"},access_token:"synthetic-owner-session"}}})}}};</script><script type="module" src="/operations-host.js"></script></body></html>`;
+  const fixture = fieldProductFixture();
+  let simulated = originMs + 9 * 60 * 1000;
+  let holdAt = null;
+  let savedGets = 0;
+  const publishedMs = () => holdAt !== null ? holdAt : originMs + Math.floor((simulated - originMs) / producerMs) * producerMs;
+  const envelope = () => {
+    const at = publishedMs();
+    const iso = new Date(at).toISOString();
+    const stamp = (value) => JSON.parse(JSON.stringify(value).replaceAll(fixture.fresh, iso));
+    const board = completedBoard(stamp(fixture.health), stamp(fixture.field), stamp(fixture.connections), null, at);
+    return {contract: 'COS_DURABLE_FLEET_RESPONSE_V1', latest: {id: 'completed-' + at, payload: board}, refresh: {state: 'completed'}, history: []};
+  };
+  await page.route('**/*', async route => {
+    const url = new URL(route.request().url());
+    if (url.origin === origin) {
+      if (url.pathname === '/tv-stage') return route.fulfill({contentType: 'text/html', body: harness});
+      if (url.pathname === '/operations-host.js') return route.fulfill({contentType: 'application/javascript', body: await readFile(new URL('../../operations-host.js', import.meta.url), 'utf8')});
+      if (url.pathname === '/field-map-display-host.js') return route.fulfill({contentType: 'application/javascript', body: await readFile(new URL('../../field-map-display-host.js', import.meta.url), 'utf8')});
+      if (url.pathname === '/operations-host.css') return route.fulfill({contentType: 'text/css', body: await readFile(new URL('../../operations-host.css', import.meta.url), 'utf8')});
+      if (url.pathname.startsWith('/operations/dist/')) return route.fulfill({path: dist + url.pathname.slice('/operations/dist/'.length)});
+      return route.continue();
+    }
+    if (!url.href.endsWith('/functions/v1/cos-operations-pages')) return route.abort('blockedbyclient');
+    const headers = {'access-control-allow-origin': origin, 'access-control-allow-headers': 'authorization,content-type', 'access-control-allow-methods': 'POST, OPTIONS'};
+    if (route.request().method() === 'OPTIONS') return route.fulfill({status: 204, headers});
+    const request = route.request().postDataJSON();
+    const path = request.path;
+    if (path === '/api/fleet-saved-board' || path === '/api/fleet-saved-board/refresh') {
+      if (path === '/api/fleet-saved-board' && request.method === 'GET') savedGets += 1;
+      return route.fulfill({headers, json: envelope()});
+    }
+    if (request.method !== 'GET') return route.fulfill({status: 403, headers, json: {error: 'Display cannot write'}});
+    const now = new Date(simulated).toISOString();
+    if (path === '/api/tv-board/settings') return route.fulfill({headers, json: {sections: ['map'], revision: 1, updatedAt: now, rotationSeconds: 60}});
+    if (path === '/api/daily-board') return route.fulfill({headers, json: {jobs: [], tasks: [], readiness: [], asOf: now}});
+    if (path === '/api/routers') return route.fulfill({headers, json: {items: [], generatedAt: now, source: 'camera_health', gpsAvailable: false}});
+    if (path === '/api/session') return route.fulfill({headers, json: {authorized: true, legacyOwner: true, role: 'Owner', name: 'Fixture Owner', productionOwnerUserId: '11111111-1111-4111-8111-111111111111', features: {fleetAccess: true, durableFleetBoard: true}}});
+    return route.fulfill({headers, json: {items: []}});
+  });
+  await page.goto('/tv-stage?tvBoard=1' + (flagged ? '&fleetBoard=1' : ''));
+  const frame = page.frameLocator('#cosOperationsFrame');
+  const warning = frame.locator('.tech-check-tv-warning');
+  if (flagged) await expect(frame.locator('.cos-board[data-board-mode=wall]')).toBeVisible();
+  else await expect(frame.locator('.tv-fleet-summary')).toBeVisible();
+  await expect(warning).toHaveCount(0);
+  for (let minute = 0; minute < 60; minute++) {
+    simulated += 60_000;
+    await page.clock.fastForward(60_000);
+    await expect(warning).toHaveCount(0);
+  }
+  if (flagged) {
+    expect(savedGets).toBeGreaterThanOrEqual(20);
+    holdAt = originMs + Math.floor((Date.parse('2026-11-19T19:09:00.000Z') - originMs) / producerMs) * producerMs;
+    await page.clock.fastForward(4 * 60 * 1000);
+    await expect(warning).toBeVisible();
+    await expect(warning).toContainText('UPDATES DELAYED');
+  }
 });
 
 test('a desktop late read keeps problems closed', async ({page}, info) => {
