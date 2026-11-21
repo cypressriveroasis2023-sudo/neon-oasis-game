@@ -12,6 +12,7 @@ const TOKEN_URL='https://oauth2.googleapis.com/token';
 const SCOPE='https://www.googleapis.com/auth/spreadsheets.readonly';
 const OVERVIEW={id:1132540236,title:'UNIT OVERVIEW'};
 const INDEX={id:1900169011,title:'MHELP MATCH INDEX'};
+const WALL_E={id:1900162011,title:'WALL-E'};
 const failure=():never=>{throw Error('Protected 2027 Product-ID/IP evidence is unavailable or changed.');};
 export async function read2027ProductIpsFromGoogle(options:{
  getServiceAccountJson:()=>unknown;signAssertion?:SheetsAssertionSigner;fetch?:typeof fetch;
@@ -60,7 +61,23 @@ export async function read2027ProductIpsFromGoogle(options:{
   const query=new URLSearchParams();for(const name of names)query.append('ranges',name);query.set('valueRenderOption','FORMATTED_VALUE');
   const result=await read(base+'/values:batchGet?'+query,2200000,signed.access_token);
   if(!Array.isArray(result.valueRanges)||result.valueRanges.length!==7)return failure();
-  return verify2027ConnectionCensus(result.valueRanges,names,options.candidate,options.expectedMhelpSourceSha256,new Date(at()).toISOString());
+  const expectedIds=new Set(options.candidate.map(r=>r.productId));
+  const indexRows=result.valueRanges[3]?.values;
+  const hasHistoricalIds=Array.isArray(indexRows)&&indexRows.slice(1).some((r:unknown)=>Array.isArray(r)&&typeof r[1]==='string'&&!expectedIds.has(r[1]));
+  let archive:{valueRanges:unknown;rangeNames:string[]}|undefined;
+  if(hasHistoricalIds||metadata.sheets.some((s:Record<string,any>)=>s?.properties?.sheetId===WALL_E.id)){
+   const matches=metadata.sheets.filter((s:Record<string,any>)=>s?.properties?.sheetId===WALL_E.id),p=matches[0]?.properties;
+   if(matches.length!==1||p.title!==WALL_E.title||p.hidden===true||p.sheetType!=='GRID'
+    ||!Number.isSafeInteger(p.gridProperties?.rowCount)||p.gridProperties.rowCount<2||p.gridProperties.rowCount>12000
+    ||p.gridProperties.columnCount<60)return failure();
+   const w=p.gridProperties.rowCount;
+   const archiveNames=[`'WALL-E'!A1:B${w}`,`'WALL-E'!G1:G${w}`,`'WALL-E'!BE1:BH${w}`];
+   const archiveQuery=new URLSearchParams();for(const name of archiveNames)archiveQuery.append('ranges',name);
+   archiveQuery.set('valueRenderOption','FORMATTED_VALUE');
+   const archived=await read(base+'/values:batchGet?'+archiveQuery,2200000,signed.access_token);
+   archive={valueRanges:archived.valueRanges,rangeNames:archiveNames};
+  }
+  return verify2027ConnectionCensus(result.valueRanges,names,options.candidate,options.expectedMhelpSourceSha256,new Date(at()).toISOString(),archive);
  }catch{return failure();}
  finally{clearTimeout(timer);controller.abort();}
 }

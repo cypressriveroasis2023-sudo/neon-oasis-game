@@ -1,0 +1,21 @@
+{
+  "slug": "cos-operations-pages",
+  "baseVersion": 137,
+  "baseArchiveSha256": "8d1cf56a8908d9f19ce2692447b287baa4d98b3f8ff6b8f9f922bb57061f84e0",
+  "sourceCommit": "4bf6671e75e2f898118476f9ec4bada5932ac43a",
+  "overlaySha256": "bf166ac1299cbb0ea3fc98838cad8ce25ffea2cd9af0387033f463fd76e46254",
+  "expectedBefore": {
+    "serve.ts": "3e1dc7b4f2ef766776eea35bebc8a4da5c4d8a1f3d5baf182e211fff06eea66c",
+    "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420",
+    "trackerEndpointProducer.mjs": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
+    "productTcpRuntime.ts": "613fc3dc4ea79f8072b5f4aa295af870ebfc743920bb0f6f9700f3e08384b2db",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "expectedAfter": {
+    "serve.ts": "3e1dc7b4f2ef766776eea35bebc8a4da5c4d8a1f3d5baf182e211fff06eea66c",
+    "trackerEndpointRead.mjs": "593e3b46bfbf300906dac021917b556de8fe76c7104e4a9a2b27a5019347f420",
+    "trackerEndpointProducer.mjs": "8bf105fccfbd89729ced6763ca4f7e5572a98b7563bec37628b43ada52ee362c",
+    "productTcpRuntime.ts": "cb89bbd87f18b6e9286425800a5cab969d4152eef0ed67b55426044522fba854",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  }
+}

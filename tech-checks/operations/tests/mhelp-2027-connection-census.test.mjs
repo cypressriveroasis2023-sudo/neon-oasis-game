@@ -188,3 +188,76 @@ test('full 1,001-ID membership stays intact while only three assignment conflict
  assert.equal(proof.records.filter(r=>r.placement==='FIELD').length,284);
  assert.equal(current.filter(r=>r.placement==='FIELD').length,287,'current mHelp assignment is never rewritten');
 });
+
+const archiveRanges=["'WALL-E'!A1:B1000","'WALL-E'!G1:G1000","'WALL-E'!BE1:BH1000"];
+function withArchive(f=fixture(),count=1){
+ const a=[[['UNIT #','PLACEMENT']],[['IP']],[['MHELP EQUIPMENT ID','MASTER MEMBERSHIP','MHELP PLACEMENT','LIFECYCLE RESTRICTION']]];
+ for(let i=0;i<count;i++){
+  const id=String(900000+i),name='WA '+String(i+1).padStart(3,'0');
+  f.values[3].values.push(['WALL-E|'+name,id]);f.values[4].values.push([name,'Cameras OnSite']);f.values[5].values.push([filename]);
+  a[0].push([name,'SHOP']);a[1].push(['']);a[2].push([id,'ARCHIVED','SHOP','DECOMMISSIONED']);
+ }
+ const archive={rangeNames:archiveRanges,valueRanges:a.map((values,i)=>({range:archiveRanges[i],majorDimension:'ROWS',values}))};
+ return {f,archive};
+}
+const verifyArchive=({f,archive})=>verify2027ConnectionCensus(f.values,ranges,f.current,hash,at,archive);
+test('an exact archived Shop identity no longer blocks current inventory and never becomes an active product',async()=>{
+ const x=withArchive(),before=structuredClone(x),proof=await verifyArchive(x);
+ assert.equal(proof.records.length,4);assert.equal(proof.records.some(r=>r.productId==='900000'),false);
+ const result=buildExactProductConnections(x.f.accepted,proof,devices,now,new Map([['11',['101']],['13',['103']]]));
+ assert.deepEqual(result.items.map(r=>r.status),['online','unknown','offline']);
+ assert.deepEqual(x,before,'no archive, index or placement is rewritten');
+});
+test('an archived IP still holds any current product sharing that endpoint; its evidence changes the source digest',async()=>{
+ const x=withArchive(),before=await verifyArchive(x);
+ x.archive.valueRanges[1].values[1]=['8.8.8.8'];
+ const proof=await verifyArchive(x);
+ assert.notEqual(proof.trackerSourceSha256,before.trackerSourceSha256);
+ assert.deepEqual(proof.records[0].reviewReasons,['tracker_restriction']);
+ const result=buildExactProductConnections(x.f.accepted,proof,devices,now,new Map([['11',['101']],['13',['103']]]));
+ assert.equal(result.items[0].status,'unknown');assert.equal(result.items[2].status,'offline');
+ assert.doesNotMatch(JSON.stringify(result),/900000|8\.8\.8\.8/);
+});
+test('archive evidence cannot excuse an unexplained extra, missing current ID, duplicate, wrong family or shifted IP column',async()=>{
+ const mutations=[
+  x=>x.archive=undefined,
+  x=>x.archive.valueRanges[2].values[1][0]='900001',
+  x=>x.archive.valueRanges[2].values[1][1]='CURRENT MASTER',
+  x=>x.archive.valueRanges[2].values[1][3]='DO NOT USE',
+  x=>x.archive.valueRanges[0].values[1][1]='FIELD',
+  x=>x.archive.valueRanges[2].values[1][2]='FIELD',
+  x=>x.archive.valueRanges[0].values[1][0]='Other name',
+  x=>x.f.values[3].values.at(-1)[0]='RANGERS|WA 001',
+  x=>x.f.values[4].values.at(-1)[0]='Other name',
+  x=>x.f.values[1].values.pop(),
+  x=>x.archive.valueRanges[2].values.push([...x.archive.valueRanges[2].values[1]]),
+  x=>x.archive.valueRanges[1].range="'WALL-E'!H1:H1000",
+  x=>x.archive.valueRanges[2].values[0][1]='PLACEMENT',
+  x=>x.archive.valueRanges[2].values[1][0]='11',
+  x=>x.archive.valueRanges[0].values.push(['unidentified historical row','SHOP'])
+ ];
+ for(const mutate of mutations){const x=withArchive();mutate(x);await assert.rejects(verifyArchive(x),/evidence is unavailable/,String(mutate));}
+});
+test('925 current Product IDs plus 76 evidenced archived identities produce exactly 925 current records',async()=>{
+ const f=fixture(),data=f.values.map(v=>[v.values[0]]);f.current=[];
+ for(let i=1;i<=925;i++){
+  const id=String(100000+i),name='Ranger '+i,placement=i<=286?'FIELD':'SHOP',customer=placement==='FIELD'?'Synthetic Builders':'Cameras OnSite';
+  f.current.push({...f.historic[0],productId:id,unitNumber:name,placement,customer});
+  data[0].push(['RANGERS',name,placement,'UNKNOWN',customer]);data[1].push([id]);data[2].push([placement,placement]);
+  data[3].push(['RANGERS|'+name,id]);data[4].push([name,customer]);data[5].push([filename]);data[6].push([]);
+ }
+ f.values=data.map((values,i)=>({range:ranges[i],majorDimension:'ROWS',values}));
+ const x=withArchive(f,76),proof=await verifyArchive(x);
+ assert.equal(proof.records.length,925);assert.equal(proof.records.filter(r=>r.placement==='FIELD').length,286);
+ assert.equal(new Set(proof.records.map(r=>r.productId)).size,925);
+ assert.equal(x.f.values[3].values.length-1,1001);
+});
+test('archive IP ownership remains reserved even after historical rows leave the match index',async()=>{
+ const x=withArchive();
+ for(const i of [3,4,5])x.f.values[i].values.pop();
+ x.archive.valueRanges[1].values[1]=['8.8.8.8'];
+ const proof=await verifyArchive(x);
+ assert.deepEqual(proof.records[0].reviewReasons,['tracker_restriction']);
+ const result=buildExactProductConnections(x.f.accepted,proof,devices,now,new Map([['11',['101']]]));
+ assert.equal(result.items[0].status,'unknown');
+});
