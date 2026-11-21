@@ -8,7 +8,7 @@ const uuid=(v:unknown)=>typeof v==='string'&&/^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f
 const id=(v:unknown)=>typeof v==='string'&&/^[1-9][0-9]{0,14}$/.test(v);
 const safe=(v:unknown,max=600)=>typeof v==='string'&&v.length<=max&&!/[\x00-\x1f\x7f<>]/.test(v);
 const stamp=(v:unknown)=>typeof v==='string'&&/(?:Z|[+-]\d\d(?::?\d\d)?)$/.test(v)?Date.parse(v.replace(/([+-]\d\d)$/,'$1:00')):NaN;
-function checked(receipt:unknown,now:number):Row|null{
+export function validateMhelpUploadReceipt(receipt:unknown,now:number):Row|null{
  if(receipt==null)return null;
  if(!object(receipt)||!['COS_MHELP_UPLOAD_V1','COS_MHELP_API_V1'].includes(receipt.contract)||receipt.reviewed!==true||!hash(receipt.sourceSha256)||!hash(receipt.payloadSha256)
   ||!Number.isFinite(stamp(receipt.receivedAt))||stamp(receipt.receivedAt)>now||!['minute','second'].includes(receipt.receivedAtPrecision)
@@ -104,7 +104,7 @@ function retainedLocation(row:Row,r:Row,b:Row,proof:Row|undefined,customerIds:Ma
 /** Call after the API placement/location projections and before the finalizer.
  * Missing ProductIds never delete, retire, or change existing inventory rows. */
 export function projectMhelpUploadPlacement(snapshot:Row,value:unknown,audits:Row[],identity?:Row,now=Date.now(),options:{validatedLocationProofs?:Map<string,Row>}={}):{snapshot:Row;authorities:Row[]}{
- const receipt=checked(value,now);if(!receipt)return {snapshot,authorities:[]};
+ const receipt=validateMhelpUploadReceipt(value,now);if(!receipt)return {snapshot,authorities:[]};
  const live=receipt.contract==='COS_MHELP_API_V1',source=live?'mhelpdesk_api':'owner_supplied_mhelp_export';
  if(!Array.isArray(snapshot.items)||!Array.isArray(snapshot.inventoryItems)||!Array.isArray(audits))throw Error('Invalid upload placement inputs');
  const byId=new Map<string,Row>();for(const row of snapshot.inventoryItems){if(!object(row)||!uuid(row.id)||byId.has(row.id))throw Error('Invalid upload target inventory');byId.set(row.id,row);}
