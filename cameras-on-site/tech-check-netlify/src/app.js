@@ -225,7 +225,7 @@ async function enterApp(session) {
     .eq('user_id', session.user.id)
     .single();
   if (error || !profile) {
-    await db.auth.signOut();
+    await db.auth.signOut({ scope: 'local' });
     return msg(
       'loginMessage',
       'No active Cameras On Site profile was found.',
@@ -233,7 +233,7 @@ async function enterApp(session) {
     );
   }
   if (!profile.active || profile.role === 'pending') {
-    await db.auth.signOut();
+    await db.auth.signOut({ scope: 'local' });
     return msg(
       'loginMessage',
       'Your account is not active yet. Contact the Owner/Admin.',
@@ -321,7 +321,7 @@ function show(which) {
   if (which === 'owner' && typeof window.refreshOwnerIntake === 'function') window.refreshOwnerIntake();
 }
 async function logout() {
-  await db.auth.signOut();
+  await db.auth.signOut({ scope: 'local' });
   showAuth();
 }
 function togglePasswordCard() {
@@ -465,7 +465,7 @@ async function refreshData() {
   if (!state.session) return;
   const { data: currentProfile } = await db.from('profiles').select('*').eq('user_id', state.session.user.id).maybeSingle();
   if (!currentProfile || !currentProfile.active || currentProfile.archived_at || currentProfile.role === 'pending') {
-    await db.auth.signOut();
+    await db.auth.signOut({ scope: 'local' });
     return showAuth();
   }
   if (currentProfile.role !== state.profile?.role || currentProfile.full_name !== state.profile?.full_name) {

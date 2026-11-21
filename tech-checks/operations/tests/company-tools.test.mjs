@@ -29,17 +29,19 @@ import test from 'node:test';
 // Other tools retain origin/main 276c6d5e2c98c41a8ba71e78c560b04d6f9b998b hashes.
 // Includes inline bodies and external script URLs. Theme work cannot change auth,
 // data, diagnostics, rules or action handlers in the four connected tools.
+// Local sign-out moves the camera-health and it-send-repair script and markup
+// pins. Each signOut() is now signOut({ scope: 'local' }). No other bytes moved.
 const scriptHashes = {
-  "camera-health": "df0faa354d971edf8cf31278e4279ef5f1ec9f74b6447b99ef2b92f04ae35fce",
+  "camera-health": "88639be37cf649c3d1b4c2c8624606b3d8eef3cde626be46afb58a98bb1edf39",
   "camera-detail": "9d90b9fc576e1d22e1742a7445cf18a822e81e5fe28b02bff2ee31663719eb51",
   "onsite-vision": "a0c436bf9956cd07305c5583837c061c032ea12e3b8ffa44d5704a6a6ddc1dbd",
-  "it-send-repair": "d63cb02a6d28f1ac6d6631e772da6d5f24efbe075d07e596e354a12f79d34cf9"
+  "it-send-repair": "dfd014dfaf9606e01323e15ab4d115c219fb31605f0fda8ef1f12d4da68f226c"
 };
 const markupHashes = {
-  "camera-health": "6c17cc0bded1a86c9efb9550d219b3771a1ac6b42020c34d9d50fb01c363935d",
+  "camera-health": "b79a1a62473b6b94a9f6b2c7194ff2d3fea15f7b83c76808e1cbbc93de50977d",
   "camera-detail": "c4f967b25a7b6a6621dde7badd75e4f26a5cb4e77780316a07e4686561e3a9dd",
   "onsite-vision": "461a1982b7627e78929534d637f5629f3a64125aee0f16a12459d7e430c5f711",
-  "it-send-repair": "600644052c3187b8af00740732f0fb0b81266d3cf902068e3de6eeda7e123b45"
+  "it-send-repair": "e6adaec2f36451355b2bd77e61ced4d02d4279ca2ccaf057ec168a20f892b485"
 };
 const theme = readFileSync(new URL('../../company-tools-theme.css',import.meta.url),'utf8');
 for (const [name,hash] of Object.entries(scriptHashes)) {

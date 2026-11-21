@@ -609,7 +609,7 @@ async function enterApp(session) {
     10000
   );
   if (error || !profile) {
-    await db.auth.signOut();
+    await db.auth.signOut({ scope: 'local' });
     return msg(
       'loginMessage',
       'No active Cameras On Site profile was found.',
@@ -617,7 +617,7 @@ async function enterApp(session) {
     );
   }
   if (!profile.active || profile.role === 'pending') {
-    await db.auth.signOut();
+    await db.auth.signOut({ scope: 'local' });
     return msg(
       'loginMessage',
       'Your account is not active yet. Contact the Owner/Admin.',
@@ -795,7 +795,7 @@ function show(which) {
   window.dispatchEvent(new CustomEvent('techcheck:view-changed', { detail:{ view:which } }));
 }
 async function logout() {
-  await db.auth.signOut();
+  await db.auth.signOut({ scope: 'local' });
   showAuth();
 }
 function togglePasswordCard() {
@@ -1015,7 +1015,7 @@ async function refreshDataInner({ skipProfile=false, initial=false } = {}) {
       throw new Error('Account connection interrupted. Your session remains open; try refreshing data when the connection returns.');
     }
     if (!currentProfile || !currentProfile.active || currentProfile.archived_at || currentProfile.role === 'pending') {
-      await db.auth.signOut();
+      await db.auth.signOut({ scope: 'local' });
       return showAuth();
     }
     if (currentProfile.role !== state.profile?.role || currentProfile.full_name !== state.profile?.full_name) {
