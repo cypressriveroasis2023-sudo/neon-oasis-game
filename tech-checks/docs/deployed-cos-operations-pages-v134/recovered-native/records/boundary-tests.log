@@ -1,0 +1,184 @@
+TAP version 13
+# Subtest: reviewed native membership permits exact TCP positive and completed negative without producer-family admission
+ok 1 - reviewed native membership permits exact TCP positive and completed negative without producer-family admission
+  ---
+  duration_ms: 13.004122
+  type: 'test'
+  ...
+# Subtest: unlinked never supplies conclusive product status
+ok 2 - unlinked never supplies conclusive product status
+  ---
+  duration_ms: 3.032467
+  type: 'test'
+  ...
+# Subtest: stale binding never supplies conclusive product status
+ok 3 - stale binding never supplies conclusive product status
+  ---
+  duration_ms: 2.164122
+  type: 'test'
+  ...
+# Subtest: wrong resource never supplies conclusive product status
+ok 4 - wrong resource never supplies conclusive product status
+  ---
+  duration_ms: 1.951287
+  type: 'test'
+  ...
+# Subtest: unreviewed never supplies conclusive product status
+ok 5 - unreviewed never supplies conclusive product status
+  ---
+  duration_ms: 1.63572
+  type: 'test'
+  ...
+# Subtest: deactivated never supplies conclusive product status
+ok 6 - deactivated never supplies conclusive product status
+  ---
+  duration_ms: 2.654928
+  type: 'test'
+  ...
+# Subtest: disabled never supplies conclusive product status
+ok 7 - disabled never supplies conclusive product status
+  ---
+  duration_ms: 1.286744
+  type: 'test'
+  ...
+# Subtest: retired never supplies conclusive product status
+ok 8 - retired never supplies conclusive product status
+  ---
+  duration_ms: 1.421764
+  type: 'test'
+  ...
+# Subtest: missing resource epoch never supplies conclusive product status
+ok 9 - missing resource epoch never supplies conclusive product status
+  ---
+  duration_ms: 1.34459
+  type: 'test'
+  ...
+# Subtest: wrong epoch members never supplies conclusive product status
+ok 10 - wrong epoch members never supplies conclusive product status
+  ---
+  duration_ms: 1.772472
+  type: 'test'
+  ...
+# Subtest: duplicate epoch never supplies conclusive product status
+ok 11 - duplicate epoch never supplies conclusive product status
+  ---
+  duration_ms: 1.383547
+  type: 'test'
+  ...
+# Subtest: missing represented native never supplies conclusive product status
+ok 12 - missing represented native never supplies conclusive product status
+  ---
+  duration_ms: 1.289869
+  type: 'test'
+  ...
+# Subtest: Shop competing IP never supplies conclusive product status
+ok 13 - Shop competing IP never supplies conclusive product status
+  ---
+  duration_ms: 1.208939
+  type: 'test'
+  ...
+# Subtest: ambiguous endpoints never supplies conclusive product status
+ok 14 - ambiguous endpoints never supplies conclusive product status
+  ---
+  duration_ms: 1.050444
+  type: 'test'
+  ...
+# Subtest: DNU never supplies conclusive product status
+ok 15 - DNU never supplies conclusive product status
+  ---
+  duration_ms: 1.576603
+  type: 'test'
+  ...
+# Subtest: source digest mismatch and incomplete source fail rather than assign Offline
+ok 16 - source digest mismatch and incomplete source fail rather than assign Offline
+  ---
+  duration_ms: 1.749298
+  type: 'test'
+  ...
+# Subtest: membership is required by default even with otherwise valid exact endpoint
+ok 17 - membership is required by default even with otherwise valid exact endpoint
+  ---
+  duration_ms: 2.445659
+  type: 'test'
+  ...
+# Subtest: exact read-only tracker plus native representation preserves reviewed native proof with no native epoch requirement for native_provider
+ok 18 - exact read-only tracker plus native representation preserves reviewed native proof with no native epoch requirement for native_provider
+  ---
+  duration_ms: 1.977376
+  type: 'test'
+  ...
+# Subtest: tracker-only cannot certify TCP status
+ok 19 - tracker-only cannot certify TCP status
+  ---
+  duration_ms: 1.293724
+  type: 'test'
+  ...
+# Subtest: mutable tracker cannot certify TCP status
+ok 20 - mutable tracker cannot certify TCP status
+  ---
+  duration_ms: 1.531076
+  type: 'test'
+  ...
+# Subtest: renamed tracker cannot certify TCP status
+ok 21 - renamed tracker cannot certify TCP status
+  ---
+  duration_ms: 1.055482
+  type: 'test'
+  ...
+# Subtest: duplicate representation cannot certify TCP status
+ok 22 - duplicate representation cannot certify TCP status
+  ---
+  duration_ms: 1.078496
+  type: 'test'
+  ...
+# Subtest: 100 Product IDs share one bracketed read: constant RPC count; epoch drift and abort fail closed
+ok 23 - 100 Product IDs share one bracketed read: constant RPC count; epoch drift and abort fail closed
+  ---
+  duration_ms: 7.519556
+  type: 'test'
+  ...
+# Subtest: customer organization names never substitute for resource lifecycle or reviewed identity
+ok 24 - customer organization names never substitute for resource lifecycle or reviewed identity
+  ---
+  duration_ms: 18.045112
+  type: 'test'
+  ...
+# Subtest: resource epochs must cover exactly every nonempty reviewed key and member once
+ok 25 - resource epochs must cover exactly every nonempty reviewed key and member once
+  ---
+  duration_ms: 0.36444
+  type: 'test'
+  ...
+# Subtest: competing native provider membership cannot lend a resource to a Product
+ok 26 - competing native provider membership cannot lend a resource to a Product
+  ---
+  duration_ms: 1.428684
+  type: 'test'
+  ...
+# Subtest: future or expired independent identity-read clocks are rejected
+ok 27 - future or expired independent identity-read clocks are rejected
+  ---
+  duration_ms: 1.009684
+  type: 'test'
+  ...
+# Subtest: competing Product bindings cannot share a native identity through the minimal census
+ok 28 - competing Product bindings cannot share a native identity through the minimal census
+  ---
+  duration_ms: 0.973079
+  type: 'test'
+  ...
+# Subtest: four reviewed provider cameras cannot borrow a foreign tracker-IP resource outage
+ok 29 - four reviewed provider cameras cannot borrow a foreign tracker-IP resource outage
+  ---
+  duration_ms: 7.87297
+  type: 'test'
+  ...
+1..29
+# tests 29
+# suites 0
+# pass 29
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 269.163575
