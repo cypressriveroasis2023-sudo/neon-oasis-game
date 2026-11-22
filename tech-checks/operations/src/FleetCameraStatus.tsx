@@ -5,7 +5,7 @@ import {STAR_UNIT_STATUS_CONTRACT,countUnits,unitVerdict,type HandEditField,type
 import UnitStatusMap from './UnitStatusMap';
 import {savedAddressByUnit,type SavedAddressPin} from './unitStatusPins';
 import {canonicalCameraUnit} from './fieldCameraHealth';
-import {safeVrmPower,type SafeVrmPower} from '../../supabase/functions/cos-operations-pages/vrmSafePower';
+import {type SafeVrmPower} from '../../supabase/functions/cos-operations-pages/vrmSafePower';
 import {vrmPortalUrl} from '../../supabase/functions/cos-operations-pages/vrm';
 import './fleetCameraStatus.css';
 import './sourceAttention.css';
@@ -26,11 +26,11 @@ import SourceHealthStrip from './SourceHealthStrip';
 import {fleetSourceFacts} from './fleetSourceFacts';
 import {cameraSourceNotice} from './sourceAttention';
 import {CosPowerChecks} from './CosPowerAlarmPanel';
-import {cosPowerVerdict, powerSamples, readPowerAlarmSettings} from './cosPowerAlarms';
-import {technicianTodos} from './technicianTodos';
+import {readPowerAlarmSettings} from './cosPowerAlarms';
+import {batteryAlarmPower, fleetProblems, victronInstallationsByUnit} from './technicianTodos';
 import TechnicianTodoList from './TechnicianTodoList';
 import CameraStatusBoardView from './CameraStatusBoardView';
-import {routerOfflineFact, IN_SHOP_LABEL, type FleetCountSnapshot} from './sharedFleetCounts';
+import {cameraStatusCounts, routerOfflineFact, IN_SHOP_LABEL, type FleetCountSnapshot} from './sharedFleetCounts';
 import {SHOP_CAMERA_RULE, SHOP_CAMERA_ONLINE_LABEL, applyShopCameraView, cameraStatusBoard, decideShopCameras, inShopLabel, liveFeedShopRows, type ShopCameraRule} from '../shared/shopCameraStatus';
 import {presentedCameraHealth, type CameraHealthChip} from './cameraEvidence';
 
@@ -63,17 +63,7 @@ const VICTRON:[string,string][]=[['solar_power','Solar'],['load_power','Load'],[
 
 /** One Helios, one Victron installation: matched only when the name is unique on both sides. */
 export function victronByUnit(units:UnitCameraStatus[],vrm:any,now:number):Map<string,SafeVrmPower>{
- const found=new Map<string,SafeVrmPower>();
- if(!vrm||!Array.isArray(vrm.items)||!Array.isArray(vrm.power))return found;
- let power:SafeVrmPower[];
- try{power=safeVrmPower(vrm.power,vrm.items,now);}catch{return found;}
- for(const unit of units){
-  const key=canonicalCameraUnit(unit.unit);
-  if(!key?.startsWith('HELIOS|'))continue;
-  const matches=power.filter(row=>canonicalCameraUnit(row.name)===key);
-  if(matches.length===1&&units.filter(other=>canonicalCameraUnit(other.unit)===key).length===1)found.set(unit.unit,matches[0]);
- }
- return found;
+ return victronInstallationsByUnit(units,vrm,now);
 }
 function victronLine(power:SafeVrmPower):string{
  const newest=(metric:string)=>power.measurements.filter(item=>item.metric===metric).sort((a,b)=>Date.parse(b.observedAt)-Date.parse(a.observedAt))[0];
@@ -189,12 +179,15 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
    return [{unit:unit.unit,placement:unit.placement,routerOffline:true,routerObservedAt:fact.at,cameraOnlineAt:Number.isFinite(cameraAt)?cameraAt:null}];
   });
  },[routers,units,now]);
- const todos=useMemo(()=>technicianTodos({
+ const victronFeedFresh=vrmReady&&Boolean(vrm)&&typeof vrm?.sync?.error!=='string';
+ const localProblems=useMemo(()=>fleetProblems({
   cameras:units.map(unit=>({unit:unit.unit,placement:unit.placement,state:unit.state,offline:unit.offline||0,online:unit.online||0,unknown:unit.unknown||0})),
   routers:routerTodos,
-  power:[...victron.entries()].map(([unit,power])=>{const picked=powerSamples(power.measurements);return {unit,placement:units.find(row=>row.unit===unit)?.placement,verdict:cosPowerVerdict({now,settings:powerSettings,voltage:picked.voltage,soc:picked.soc,newestObservedAt:picked.newestObservedAt,victronLowVoltage:picked.victronLowVoltage})};}),
-  addresses:(addressReviews||[]).map(review=>({unit:review.unitNumber,productId:review.productId,placement:'FIELD',address:review.address})),
- }),[units,routerTodos,victron,now,powerSettings,addressReviews]);
+  addresses:(addressReviews||[]).map(review=>({unit:review.unitNumber,productId:review.productId,placement:'FIELD' as const,address:review.address})),
+  power:batteryAlarmPower(units,vrm,now,powerSettings,victronFeedFresh),
+  victronFeedFresh,
+ }),[units,routerTodos,addressReviews,vrm,now,powerSettings,victronFeedFresh]);
+ const todos=useMemo(()=>fleetCounts?fleetCounts.problems:cameraStatusCounts(null,now,localProblems).problems,[fleetCounts,now,localProblems]);
  const shown=useMemo(()=>report?groupedUnits(units,group,query,stateFilter,family):[],[report,units,group,query,stateFilter,family]);
  // Counted off the same units the list shows, so a brand tile and the rows
  // under it can never disagree.
@@ -243,7 +236,7 @@ export default function FleetCameraStatus({now=Date.now(),savedAddresses,address
  };
  const updatedAt=report?.refreshedAt||feed?.syncedAt||null;
  const sourceNotice=cameraSourceNotice(sourceFacts)||(report?.otherSourcesRead===false?'Avigilon and Reconeyez readings delayed — status may be out of date':null);
- return <section className='cos-camera-status' aria-label='Unit camera status'>
+ return <section className='cos-camera-status' aria-label='Unit camera status' data-problem-count={todos.length}>
   <header className='cos-camera-status-simple'>
    <h2 className='sr-only'>Camera status</h2>
    <CameraStatusBoardView board={board}/>
