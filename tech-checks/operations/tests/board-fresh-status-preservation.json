@@ -4,7 +4,7 @@
   "files": [
     {
       "path": "FleetDashboard.tsx",
-      "candidateBlob": "415bcc9e72333f7da8c2e9245c90f9289bbcb6fe",
+      "candidateBlob": "79a87bea5062fe269067debc86024f8077afd108",
       "baselineBlob": "0f1427aad67d9f5652038e4d861ec2c8a2590c54",
       "replacements": [
         {
@@ -95,6 +95,16 @@
         {
           "from": "  {view==='map'&&<PhoneTechLanding counts={phoneCounts} todos={phoneTodos} onOpen={todo=>setFilters(current=>({...current,query:todo.unit}))}/>}\n",
           "to": "  {view==='map'&&<PhoneTechLanding counts={phoneCounts} todos={sharedCounts.problems} onOpen={todo=>setFilters(current=>({...current,query:todo.unit}))}/>}\n",
+          "count": 1
+        },
+        {
+          "from": "import PhoneTechLanding from './PhoneTechLanding';\n",
+          "to": "import PhoneTechLanding from './PhoneTechLanding';\nimport PhoneFleetBoard from './PhoneFleetBoard';\n",
+          "count": 1
+        },
+        {
+          "from": "  <ApprovedFleetViews compact>",
+          "to": "  {view==='map'&&<PhoneFleetBoard feed={cameraUnits} recorderRows={cameras.data?.rows} now={snapshotNow} fieldMap={map||undefined} routers={routers?.items} upload={effectiveUpload} addresses={mhelpAddresses} onFeed={setCameraUnits}/>}\n  <ApprovedFleetViews compact>",
           "count": 1
         }
       ]

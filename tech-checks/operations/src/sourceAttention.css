@@ -32,6 +32,8 @@
  .cos-todo-card button{grid-column:2;justify-self:start}
 }
 .cos-phone-landing{display:none}
+/* The COS Board screen at the top of Fleet on a phone. Its own styles live inside its shadow root. */
+.cos-board-landing{display:block;width:100vw;margin:-1px 0 14px calc(50% - 50vw)}
 .cos-phone-board-info>summary{display:none}
 .cos-phone-counts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .cos-phone-counts div{padding:12px 8px;border:1px solid #334155;border-radius:10px;text-align:center}

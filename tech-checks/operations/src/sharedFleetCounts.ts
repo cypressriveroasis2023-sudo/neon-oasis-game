@@ -160,19 +160,36 @@ export function cameraStatusHeadline(units: readonly CountUnit[], now = Date.now
 }
 
 /**
- * The only camera headline. Camera status, the map, and About pass this result through.
- * A missing or failed camera-status feed is not replaced with map rows.
- * Recorder names attach only inside this call, and only by exact normalized unit name.
+ * The clock a camera feed is judged against. Fleet counts against the time of
+ * its saved board, but the camera feed is read live and can be newer than that
+ * board. A reading cannot be stale against a clock older than the reading
+ * itself, so the clock moves up to the feed's newest reading. A stamp ahead of
+ * this device's own clock is not trusted and does not move it.
  */
-export function fleetCountsFromCameraFeed(
+export function cameraFeedClock(units: readonly UnitCameraStatus[] | null, now = Date.now(), wall = Date.now()): number {
+  let clock = now;
+  for (const unit of units || []) {
+    const stamp = cameraTimestamp(unit.observedAt, wall).at;
+    const at = stamp ? Date.parse(stamp) : NaN;
+    if (Number.isFinite(at) && at > clock) clock = at;
+  }
+  return clock;
+}
+
+/**
+ * The unit list behind the camera-feed count, one entry per feed unit and in the
+ * feed's own order. The board screen reads this same list, so a tile and the
+ * headline can never disagree.
+ */
+export function cameraFeedCensus(
   units: readonly UnitCameraStatus[] | null,
   recorders: readonly RecorderLink[] = [],
   now = Date.now(),
   fieldMap?: unknown,
-  problems: readonly TechnicianTodo[] = [],
-): FleetCountSnapshot | null {
+): CountUnit[] | null {
   if (!units) return null;
-  let census = applyExactRecorderLinks(censusFromCameraUnits(units, now), recorders, now);
+  const clock = cameraFeedClock(units, now);
+  let census = applyExactRecorderLinks(censusFromCameraUnits(units, clock), recorders, clock);
   if (fieldMap !== undefined) {
     const report = decideShopCameras(liveFeedShopRows(units, fieldMap).inputs);
     census = census.map(unit => {
@@ -184,7 +201,24 @@ export function fleetCountsFromCameraFeed(
       return unit;
     });
   }
-  return selectFleetCounts(census, now, problems);
+  return census;
+}
+
+/**
+ * The only camera headline. Camera status, the map, and About pass this result through.
+ * A missing or failed camera-status feed is not replaced with map rows.
+ * Recorder names attach only inside this call, and only by exact normalized unit name.
+ */
+export function fleetCountsFromCameraFeed(
+  units: readonly UnitCameraStatus[] | null,
+  recorders: readonly RecorderLink[] = [],
+  now = Date.now(),
+  fieldMap?: unknown,
+  problems: readonly TechnicianTodo[] = [],
+): FleetCountSnapshot | null {
+  const clock = cameraFeedClock(units, now);
+  const census = cameraFeedCensus(units, recorders, clock, fieldMap);
+  return census ? selectFleetCounts(census, clock, problems) : null;
 }
 
 export function mapHeadline(units: readonly CountUnit[], now = Date.now()): ViewHeadlines {
