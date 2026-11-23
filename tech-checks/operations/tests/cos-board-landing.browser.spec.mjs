@@ -209,6 +209,55 @@ test('until the mHelp list has loaded the board says its count is only what the 
   expect(state.errors).toEqual([]);
 });
 
+test('what is fixed by hand is off the punch list and stays off', async ({page}, info) => {
+  test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');
+  const record = (id, unitNumber, category, placement, customer) => ({recordId: 'mhelp_product:' + id, productId: String(id), unitNumber, category, placement, uploadLifecycle: 'UNFLAGGED', customer});
+  const value = structuredClone(field);
+  value.uploadInventory = {
+    contract: 'COS_MHELP_UPLOAD_INVENTORY_V1', source: 'mhelpdesk_api', countBasis: 'mhelp_product_records_not_unique_physical_units', sourceSha256: 'a'.repeat(64), receivedAt: fresh, lastApiReadAt: fresh,
+    // mHelp has both Spotters in the field. Star4Live has Spotter 002 in the shop; a person moved Spotter 003 to the shop by hand.
+    records: [record(1, 'Helios 001', 'Helios Solar Tower', 'FIELD', 'Fixture Homes'), record(2, 'Spotter 002', 'Spotter', 'FIELD', 'Fixture Homes: Lot 2'), record(3, 'Spotter 003', 'Spotter', 'FIELD', 'Fixture Homes: Lot 3')],
+    summary: {totalRecords: 3, fieldRecords: 3, shopRecords: 0, unflaggedFieldRecords: 3, doNotUseRecords: 0, missingRecords: 0},
+  };
+  const byHand = {placement: {value: 'SHOP', by: 'Fixture Owner', role: 'owner', at: fresh, reason: null, providerValue: 'FIELD', providerAgrees: false}};
+  const rows = [
+    units[0],
+    {...units[1], placement: 'SHOP', site: null},
+    {...units[2], placement: 'SHOP', site: null, providerPlacement: 'FIELD', providerSite: 'Fixture yard', providerPublicIp: null, handEdits: byHand},
+  ];
+  const {app, state} = await mountFleet(page, false, {cameraStatus: reportOf(rows), field: value});
+  const host = app.locator('.cos-board-host');
+  await expect(host).toBeVisible();
+  // mHelp wins over Star4Live for Spotter 002, so it is in the field and down. The hand fix wins for Spotter 003, so it is in the shop.
+  await expect.poll(() => tiles(host)).toEqual({Down: '1', 'Camera issues': '0', Unknown: '0', Up: '1'});
+  expect(await minis(host)).toEqual(['2in the field', '1in the shop', '1online in shop', '0not in mHelp']);
+  await inBoard(host, root => root.getElementById('tabPunch').click());
+  const chips = () => inBoard(host, root => [...root.querySelectorAll('#punchChips .chip')].map(chip => chip.textContent));
+  // Only the unit nobody has settled is open. The one set by hand is under its own heading, with what mHelp still says.
+  await expect.poll(chips).toEqual(['Placed differently · 1', 'Field, no camera feed · 0', 'Field feed, not in mHelp · 0', 'Names differ · 0', 'Shop, no camera feed · 0', 'Shop feed, not in mHelp · 0', 'Fixed by hand · 1']);
+  expect(await inBoard(host, root => [root.querySelector('#punchTop .big').textContent, ...[...root.querySelectorAll('#punchList .prow .name')].map(name => name.textContent)])).toEqual(['1 place where the camera systems disagree with mHelp', 'Spotter 002']);
+  await inBoard(host, root => [...root.querySelectorAll('#punchChips .chip')].find(chip => chip.textContent.startsWith('Fixed by hand')).click());
+  expect(await inBoard(host, root => [root.getElementById('punchCount').textContent, ...[...root.querySelectorAll('#punchList .prow')].map(row => row.textContent)])).toEqual([
+    'Set by hand in COS, so these are off the list and stay off. mHelp still shows them differently: make the same change there when you can.',
+    'Spotter 003mHelp: Field at Fixture Homes: Lot 3COS, by hand: Shop']);
+  expect(state.errors).toEqual([]);
+});
+
+test('a corrected IP is saved, and the save says that Up or Down still comes from Star4Live', async ({page}, info) => {
+  test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');
+  const {host, state, server} = await phoneBoard(page);
+  await openUnit(host, 'Spotter 002');
+  await pressFix(host, 'Correct IP');
+  await typeAndSave(host, 'fixInput', '203.0.113.77');
+  await expect.poll(() => server.sent.length).toBe(1);
+  expect(server.sent[0]).toMatchObject({unitKey: 'SPOTTER 002', field: 'public_ip', value: '203.0.113.77'});
+  await expect.poll(() => toastText(host)).toBe("Saved. Spotter 002 still shows Down: Up or Down comes from Star4Live's own reading of its cameras, so it clears when Star4Live sees them online.");
+  // The unit is still down, and the corrected IP is kept on its card as a hand fix.
+  await expect.poll(() => tiles(host)).toEqual({Down: '1', 'Camera issues': '1', Unknown: '1', Up: '1'});
+  expect(await fixButtons(host)).toContain('Undo hand edits');
+  expect(state.errors).toEqual([]);
+});
+
 test('a hand fix on the board is saved through the Camera status route and shows who made it', async ({page}, info) => {
   test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');
   const {app, state, host, server} = await phoneBoard(page);
@@ -602,19 +651,22 @@ test('a spot with units in more than one state is a ring with its own count of d
   expect(state.errors).toEqual([]);
 });
 
-test('on a desk the board has the whole screen: no frame, the list and the live map side by side, and a count tile filters both', async ({page}, info) => {
+test('on a desk the board is one screen: a slim bar, the counts in a row, the list and the live map side by side, and a count tile filters both', async ({page}, info) => {
   const {app, host, state} = await phoneBoard(page, placed);
   const layout = () => inBoard(host, root => {
     const box = id => { const r = root.getElementById(id).getBoundingClientRect(); return {x: r.x, y: r.y, w: r.width, h: r.height, right: r.right, bottom: r.bottom}; };
     return {wide: root.getElementById('cosb').classList.contains('wide'), side: !root.getElementById('boardSide').hidden, mapIn: root.getElementById('mapBlock').parentNode.id,
-      main: box('boardMain'), map: box('mapWrap'), board: box('cosb'), tall: innerHeight, across: innerWidth,
+      main: box('boardList'), map: box('mapWrap'), board: box('cosb'), tall: innerHeight, across: innerWidth,
+      tabsInBar: Boolean(root.querySelector('.tabs').closest('.top')), page: document.documentElement.scrollHeight,
+      countTops: [...new Set([...root.querySelectorAll('.tile, .mini')].map(item => Math.round(item.getBoundingClientRect().top)))].length,
+      listScrolls: getComputedStyle(root.getElementById('boardList')).overflowY, rowTall: Math.round(root.querySelector('#list .row').getBoundingClientRect().height),
       shown: ['mapChips', 'mapNote', 'mapList'].filter(id => root.getElementById(id).getClientRects().length > 0),
       pins: [...root.querySelectorAll('#mapPins .pin')].map(pin => pin.getAttribute('aria-label')).sort()};
   });
   const tile = label => inBoard(host, (root, wanted) => [...root.querySelectorAll('.tile')].find(item => item.querySelector('.lab').textContent === wanted).click(), label);
   if (info.project.name !== 'desktop-1440') {
     // A phone or a small window keeps the map on its own tab, and the list keeps the full width.
-    expect(await layout()).toMatchObject({wide: false, side: false, mapIn: 'viewMap', pins: []});
+    expect(await layout()).toMatchObject({wide: false, side: false, mapIn: 'viewMap', pins: [], tabsInBar: false});
     return;
   }
   await expect.poll(async () => (await layout()).pins.length).toBeGreaterThan(0);
@@ -626,12 +678,21 @@ test('on a desk the board has the whole screen: no frame, the list and the live 
   expect(Math.abs(first.board.x - menu)).toBeLessThanOrEqual(1);
   expect(first.board.y).toBeLessThanOrEqual(1);
   expect(Math.abs(first.board.right - first.across)).toBeLessThanOrEqual(1);
-  // Side by side: the list on the left, the map beside it, all of the map on screen.
+  // One screen: the board is exactly as tall as the window and the page itself has nothing to scroll.
+  expect(Math.abs(first.board.h - first.tall)).toBeLessThanOrEqual(1);
+  expect(first.page).toBeLessThanOrEqual(first.tall + 1);
+  // The tabs sit in the top bar, and every count is in one row under it.
+  expect(first).toMatchObject({tabsInBar: true, countTops: 1});
+  // Side by side: the list on the left with room of its own, the map beside it, all of the map on screen in its own shape.
   expect(first.main.right).toBeLessThanOrEqual(first.map.x);
-  expect(first.main.w).toBeGreaterThanOrEqual(460);
-  expect(first.map.w).toBeGreaterThan(first.main.w);
+  expect(first.main.w).toBeGreaterThanOrEqual(480);
   expect(first.map.h).toBeGreaterThanOrEqual(420);
   expect(first.map.bottom).toBeLessThanOrEqual(first.tall + 1);
+  expect(Math.abs(first.map.w / first.map.h - 649.5 / 660)).toBeLessThan(0.02);
+  // The list scrolls inside its own pane, which ends at the bottom of the window, and a unit is one line in it.
+  expect(first.listScrolls).toBe('auto');
+  expect(first.main.bottom).toBeLessThanOrEqual(first.tall + 1);
+  expect(first.rowTall).toBeLessThan(50);
   // The board opens on what is down, and so does the map beside it.
   expect(first.pins).toEqual(['2 units here: 2 Down', 'Spotter 103, Down']);
   await tile('Up');
