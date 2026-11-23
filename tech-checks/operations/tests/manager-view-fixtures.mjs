@@ -12,7 +12,7 @@ const repo = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
 const edge = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-operations-pages';
 const types = {'.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2', '.json': 'application/json'};
 
-const unit = (name, extra = {}) => ({
+export const unit = (name, extra = {}) => ({
   unit: name, placement: 'FIELD', site: 'Fixture yard', siteNamePending: false, state: 'GREEN',
   cameras: 1, online: 1, offline: 0, unknown: 0, down: [], onlineInShop: false, publicIp: null, observedAt: fresh,
   cameraList: [{name: name + ' / Cam 1', status: 'online', atSite: true}], source: 'star4live', ...extra,
@@ -24,11 +24,12 @@ const feedUnits = [
   unit('SPOTTER 004', {state: 'UNKNOWN', online: 0, unknown: 1, observedAt: '2026-10-01T00:00:00Z', cameraList: [{name: 'SPOTTER 004 / Cam 1', status: 'offline', atSite: true}]}),
   unit('SNIPER 101', {placement: 'SHOP', site: null, source: 'ip_check'}),
 ];
-const report = {
-  contract: 'COS_STAR_UNIT_STATUS_V1', units: feedUnits, counts: countUnits(feedUnits),
+export const reportOf = rows => ({
+  contract: 'COS_STAR_UNIT_STATUS_V1', units: rows, counts: countUnits(rows),
   feed: {provider: 'star4live', syncedAt: fresh, status: 'ok', enabled: true, fresh: true, ageMs: 1000},
   handEditsRead: true, otherSourcesRead: true, canEdit: true, refreshedAt: fresh, source: 'Star4Live',
-};
+});
+const report = reportOf(feedUnits);
 
 export const AVERY = '00000000-0000-4000-8000-00000000a001', RILEY = '00000000-0000-4000-8000-00000000a002', TEST = '00000000-0000-4000-8000-00000000a003';
 export const HANDOFF = '00000000-0000-4000-8000-00000000b001', OPEN_HANDOFF = '00000000-0000-4000-8000-00000000b002';
@@ -110,7 +111,7 @@ const hostPage = fixture => readFileSync(resolve(repo, 'tech-checks/index.html')
     show('owner');
   </script><script type="module" src="./operations-host.js"></script></body>`);
 
-export async function mount(page, fixture = {manager: manager()}) {
+export async function mount(page, fixture = {manager: manager()}, feed = report) {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.clock.setFixedTime(new Date(now));
@@ -125,7 +126,7 @@ export async function mount(page, fixture = {manager: manager()}) {
     }
     if (url.origin === 'https://photos.fixture.test') return route.fulfill({contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="#9cc4ff"/></svg>'});
     const headers = {'access-control-allow-origin': origin, 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'authorization, content-type'};
-    if (url.pathname.endsWith('/functions/v1/cos-unit-camera-status')) return route.request().method() === 'OPTIONS' ? route.fulfill({status: 204, headers}) : route.fulfill({headers, json: report});
+    if (url.pathname.endsWith('/functions/v1/cos-unit-camera-status')) return route.request().method() === 'OPTIONS' ? route.fulfill({status: 204, headers}) : route.fulfill({headers, json: feed});
     if (url.href !== edge) return route.abort('blockedbyclient');
     if (route.request().method() === 'OPTIONS') return route.fulfill({status: 204, headers});
     const request = route.request().postDataJSON();

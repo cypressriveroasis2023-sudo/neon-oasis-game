@@ -192,7 +192,7 @@ test('the door only wraps the Tech Check page, and the manager view is drawn by 
   // A save needs a real change, and a SIM that is not being replaced is sent blank so it is left as it is.
   assert.match(app, /async function mgSave\(t\)\{ const e=MG\.edit; if\(!e \|\| MG\.busy \|\| !mgReal\(t,e\) \|\| mgBad\(t,e\)\) return;/);
   assert.match(app, /kit\.sims\[String\(s\.slot\)\] = now!==s\.number \? now : "";/);
-  const manager = app.slice(app.indexOf('/* ---------- manager view ----------'), app.indexOf('/* ---------- start ---------- */'));
+  const manager = app.slice(app.indexOf('/* ---------- manager view ----------'), app.indexOf('/* ---------- wide screens ----------'));
   assert.ok(manager.length > 5000);
   assert.doesNotMatch(manager, /fetch\(|localStorage|innerHTML|document\.|window\./);
 });

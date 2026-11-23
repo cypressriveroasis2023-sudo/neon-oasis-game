@@ -12,6 +12,15 @@ import {mountCosBoard} from './cosBoard/boardApp';
 import {loadBoardFonts} from './cosBoard/boardFonts';
 import {managerHost, managerKnown, managerPhoto, readManager, rememberManager, saveTruck, takeBoardView, type TruckKit} from './managerBridge';
 
+/**
+ * Tells the page around the frame that the board is, or is no longer, the TV display, so it gives the frame the
+ * whole window and takes it back afterwards. It is the message the older TV display sends.
+ */
+function showTv(on: boolean) {
+  if (window.parent === window || window.location.origin === 'null') return;
+  window.parent.postMessage({type: 'COS_TV_BOARD_DISPLAY_MODE', active: on}, window.location.origin);
+}
+
 export type CosBoardLandingProps = {
   /** The camera feed the shared count reads. Until it arrives the board shows its own "loading" line. */
   feed: UnitCameraStatus[] | null;
@@ -53,7 +62,7 @@ function checked(value: unknown): Reading {
  * split of the Fleet headline and never a second count.
  */
 export default function CosBoardLanding({feed, recorderRows, now, fieldMap, routers, upload, addresses, onFeed, onReady, onNone}: CosBoardLandingProps) {
-  const host = useRef<HTMLDivElement>(null), board = useRef<Board | null>(null);
+  const host = useRef<HTMLDivElement>(null), board = useRef<Board | null>(null), tvOn = useRef(false), tvKeep = useRef(0);
   const deliver = useRef(onFeed);
   deliver.current = onFeed;
   const held = useRef(feed);
@@ -149,8 +158,16 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
         known: (shown: boolean) => rememberManager(shown),
         wasKnown: () => managerKnown(),
       } : undefined,
-      // Tech Check sends the owner here, to the manager view.
+      // Tech Check sends the owner here to the manager view, and Boards sends anyone here to the TV board.
       startView: takeBoardView(),
+      // The TV board is the board itself, drawn large. The app around the frame is told so it clears its own chrome,
+      // and the session is held through a silent re-login the way the older TV display held it.
+      onTv: (on: boolean) => {
+        tvOn.current = on; showTv(on);
+        // The older map on this page hands the window back when it loads, whenever that is. While the TV is up it is asked for again.
+        window.clearInterval(tvKeep.current);
+        if (on) tvKeep.current = window.setInterval(() => { if (tvOn.current) showTv(true); }, 3000);
+      },
     });
     board.current = mounted;
     // The board's own browser test reads the screen through this handle.
@@ -158,7 +175,7 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
     // Fleet keeps only the units from its own read. Read once more to learn whether this person may make hand fixes.
     void reread.current();
     ready.current?.();
-    return () => { board.current = null; mounted.destroy(); };
+    return () => { board.current = null; mounted.destroy(); window.clearInterval(tvKeep.current); if (tvOn.current) { tvOn.current = false; showTv(false); } };
   }, []);
   useEffect(() => { if (data) board.current?.update(data); }, [data]);
   // COS has a bar across the bottom of a phone. Tell the board how much room it takes, so its messages sit above it.

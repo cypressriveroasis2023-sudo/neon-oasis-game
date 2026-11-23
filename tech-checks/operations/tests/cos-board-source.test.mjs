@@ -63,6 +63,36 @@ test('on a desk the board takes the whole screen, with one map that keeps the dr
   assert.doesNotMatch(style, /container-type|contain:/);
 });
 
+test('the TV board is the board itself drawn large, switched on and off, with no count of its own', () => {
+  // One tally, drawn two ways: the TV takes the views and the counts the board has just worked out.
+  assert.match(app, /for\(const v of vs\) c\[v\.status\]\+\+;\n  if\(TV\.on\)\{ drawTv\(vs, c\); return; \}/);
+  assert.match(app, /const tile=\(key,cls\)=>h\("div",\{class:"tile "\+cls\+\(c\[key\]\?"":" zero"\)\},h\("span",\{class:"num",text:c\[key\]\}\),h\("span",\{class:"lab",text:LABEL\[key\]\}\)\);/);
+  // It lists what needs someone: down first, then camera issues. Never a unit in the shop, never an unknown one as down.
+  assert.match(app, /TV\.rows=\[\.\.\.vs\.filter\(v=>v\.status==="down"\)\.sort\(byName\), \.\.\.vs\.filter\(v=>v\.status==="issues"\)\.sort\(byName\)\];/);
+  // The one map moves onto the TV screen and back to where it was.
+  assert.match(app, /\$\("tvMap"\)\.append\(\$\("mapWrap"\)\);/);
+  assert.match(app, /\$\("mapBlock"\)\.insertBefore\(\$\("mapWrap"\), \$\("mapNote"\)\);/);
+  assert.equal(app.split('id=\\"mapSvg\\"').length - 1, 1);
+  // Leaving is always possible: a button, a second button on a small screen, and Escape.
+  assert.match(app, /\$\("tvExit"\)\.addEventListener\("click",tvLeave\); \$\("tvExitTop"\)\.addEventListener\("click",tvLeave\);/);
+  assert.match(app, /if\(ev\.key==="Escape"\) tvLeave\(\);/);
+  assert.match(app, /if\(hooks && typeof hooks\.onTv==="function"\) hooks\.onTv\(false\);/);
+  // It stands over the whole frame without making the page a positioning box for anything else.
+  assert.match(style, /\.cosb\.tv\{position:fixed;inset:0;z-index:2147482000;overflow:hidden;/);
+  const landing = read('../src/CosBoardLanding.tsx'), door = read('../src/BoardsDoor.tsx'), daily = read('../src/DailyBoard.tsx');
+  // The app tells the page around the frame with the message the older TV display sends, on this origin only, and takes it back when the board goes.
+  assert.match(landing, /window\.parent\.postMessage\(\{type: 'COS_TV_BOARD_DISPLAY_MODE', active: on\}, window\.location\.origin\);/);
+  assert.match(landing, /if \(tvOn\.current\) \{ tvOn\.current = false; showTv\(false\); \}/);
+  // Boards opens it only on a device that shows the board. Any other keeps the Daily Board page and its older TV display.
+  assert.match(door, /const \[leaving\] = useState\(boardShownHere\);/);
+  assert.match(door, /return leaving \? <p className='cos-manager-door' role='status'>Opening the TV board…<\/p> : <>\{children\}<\/>;/);
+  assert.match(read('../src/FleetBoard.tsx'), /export const boardShownHere = \(\): boolean => recall\(\) && !switchedOff\(\);/);
+  assert.equal(daily.split('<BoardsDoor>').length - 1, 2);
+  assert.equal(daily.split('</BoardsDoor>').length - 1, 2);
+  assert.match(daily, /  if\(tv\)return <BoardsDoor><TechCheckTvBoard /);
+  assert.match(daily, /  return <BoardsDoor><section className='cos-daily-board' aria-label='COS Daily Board'>/);
+});
+
 test('Fleet hands the board the same feed, clock and field map as its headline', () => {
   const fleet = read('../src/FleetDashboard.tsx');
   assert.ok(fleet.includes('fleetCountsFromCameraFeed(cameraUnits,recorderLinksFromHealth(cameras.data?.rows),snapshotNow,map||undefined,phoneTodos)'));
