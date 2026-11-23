@@ -43,7 +43,8 @@ test('Fleet hands the board the same feed, clock and field map as its headline',
   const fleet = read('../src/FleetDashboard.tsx');
   assert.ok(fleet.includes('fleetCountsFromCameraFeed(cameraUnits,recorderLinksFromHealth(cameras.data?.rows),snapshotNow,map||undefined,phoneTodos)'));
   assert.ok(fleet.includes('<PhoneFleetBoard feed={cameraUnits} recorderRows={cameras.data?.rows} now={snapshotNow} fieldMap={map||undefined} '));
-  assert.ok(fleet.includes("{view==='map'&&<PhoneFleetBoard "));
+  // Fleet and Camera Health are the two ways into this screen, and both open on the board.
+  assert.ok(fleet.includes("{(view==='map'||view==='fleet')&&<PhoneFleetBoard "));
   assert.ok(fleet.indexOf('<PhoneFleetBoard ') < fleet.indexOf('<ApprovedFleetViews compact>'));
   const landing = read('../src/CosBoardLanding.tsx');
   assert.match(landing, /if \(!feed\) return null;\s+const clock = cameraFeedClock\(feed, now\);\s+const census = cameraFeedCensus\(feed, recorderLinksFromHealth\(recorderRows\), clock, fieldMap\) \|\| \[\];\s+return boardData\(\{feed, census, now: clock, /);

@@ -138,6 +138,20 @@ test('Fleet opens on the board, counted by the shared count', async ({page}, inf
   expect(state.errors).toEqual([]);
 });
 
+for (const it of [false, true]) test('Camera Health opens on the same board, for ' + (it ? 'an IT tech' : 'the owner'), async ({page}) => {
+  // Camera Health is the other way into this screen. It used to open the older Fleet health view.
+  const {app, state} = await mountFleet(page, it, {hash: '#camera-health', cameraStatus: report});
+  const host = app.locator('.cos-board-host');
+  await expect(host).toBeVisible();
+  await expect.poll(() => tiles(host)).toEqual({Down: '1', 'Camera issues': '1', Unknown: '1', Up: '1'});
+  await expect(app.locator('.cos-board-landing')).toHaveAttribute('data-board', 'on');
+  await expect(app.locator('.cos-fleet-content')).toBeHidden();
+  await expect(app.locator('nav.cos-fleet-tabs')).toBeHidden();
+  await expect(app.getByRole('navigation', {name: 'Fleet dashboard views', exact: true})).toHaveCount(0);
+  await expect(app.locator('.cos-board-landing button')).toHaveCount(0);
+  expect(state.errors).toEqual([]);
+});
+
 test('Refresh on the board reads the camera feed again and Fleet follows', async ({page}, info) => {
   test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');
   const {app, state, host, server} = await phoneBoard(page);
@@ -482,7 +496,8 @@ test('the map cannot be dragged out of its box, and a swipe up or down on the wh
   for (const [dx, dy] of [[0, -2000], [0, 2000], [-2000, 0], [2000, 0]]) inside(await drag(dx, dy));
   // Zoomed all the way out, the whole drawing fits top to bottom, so an up-or-down swipe is the page's to scroll.
   await inBoard(host, root => { for (let press = 0; press < 8; press++) root.getElementById('zout').click(); });
-  await expect.poll(async () => (await read()).touch).toBe('pan-y');
+  // The finger rule changes at once; the drawing itself is redrawn on the next frame, so wait for both.
+  await expect.poll(async () => { const view = await read(); return view.touch === 'pan-y' && H * view.z <= view.h + 0.5; }).toBe(true);
   const far = await read();
   expect(H * far.z).toBeLessThanOrEqual(far.h + 0.5);
   inside(far);
