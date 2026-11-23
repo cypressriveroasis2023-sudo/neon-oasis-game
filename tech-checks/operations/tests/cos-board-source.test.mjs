@@ -48,8 +48,15 @@ test('Fleet hands the board the same feed, clock and field map as its headline',
   const landing = read('../src/CosBoardLanding.tsx');
   assert.match(landing, /const clock = cameraFeedClock\(feed, now\);\s+const census = cameraFeedCensus\(feed, recorderLinksFromHealth\(recorderRows\), clock, fieldMap\) \|\| \[\];\s+return boardData\(\{feed, census, now: clock, /);
   // With no feed there is nothing true to draw: Fleet shows as before.
-  const phone = read('../src/PhoneFleetBoard.tsx');
-  assert.match(phone, /if \(!phone \|\| !feed\) return null;/);
+  assert.match(read('../src/PhoneFleetBoard.tsx'), /export \{default\} from '\.\/FleetBoard';/);
+  const board = read('../src/FleetBoard.tsx');
+  assert.match(board, /if \(!feed\) return null;/);
   // A board that cannot be shown steps aside. It must never take the Fleet screen down with it.
-  assert.match(phone, /<ViewErrorBoundary fallback=\{\(\) => null\}>\s*<div className='cos-board-landing'><Suspense fallback=\{null\}><CosBoardLanding /);
+  assert.match(board, /<ViewErrorBoundary fallback=\{\(\) => null\}>\s*<div className='cos-board-landing' /);
+  // The older Fleet view is folded away only once the board is on screen, and only behind a button that brings it back.
+  assert.match(board, /data-older-view=\{ready && !older \? 'closed' : 'open'\}/);
+  assert.match(board, /\{ready && <button type='button' className='cos-board-older' aria-expanded=\{older\} onClick=\{toggle\}>/);
+  const css = read('../src/sourceAttention.css');
+  assert.ok(css.includes("#root#root .cos-fleet-dashboard:has(>.cos-board-landing[data-older-view='closed'])>.cos-fleet-content,"));
+  assert.equal(css.split("data-older-view='closed'").length - 1, 2);
 });

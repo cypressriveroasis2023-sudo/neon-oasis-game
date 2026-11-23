@@ -25,6 +25,8 @@ const REVISION = '11111111-2222-4333-8444-555555555555';
 
 // The board draws inside a closed shadow root, so page-wide lookups elsewhere in COS never match it. These tests read it through the host's own handle.
 const inBoard = (host, fn, value) => host.evaluate((element, [source, input]) => (0, eval)('(' + source + ')')(element.cosBoardRoot, input), [fn.toString(), value]);
+// The older Fleet readout. It is read by its own markup because it may be folded away under the board.
+const readout = app => app.locator(".cos-phone-landing p[aria-label='Camera units online, offline and unknown'] b");
 const tiles = host => inBoard(host, root => Object.fromEntries([...root.querySelectorAll('.tile')].map(tile => [tile.querySelector('.lab').textContent, tile.querySelector('.num').textContent])));
 const minis = host => inBoard(host, root => [...root.querySelectorAll('.mini')].map(mini => mini.textContent));
 const panel = host => inBoard(host, root => root.getElementById('panel').textContent);
@@ -85,28 +87,48 @@ async function phoneBoard(page, start = units, flags = {}) {
   return {app, state, host, server};
 }
 
-test('the phone Fleet screen opens on the board, counted by the shared count', async ({page}, info) => {
+test('Fleet opens on the board, counted by the shared count', async ({page}, info) => {
+  const phone = info.project.name === 'mobile-390';
   const {app, state} = await mountFleet(page, false, {cameraStatus: report});
   const host = app.locator('.cos-board-host');
-  if (info.project.name !== 'mobile-390') {
-    await expect(app.locator('.cos-fleet-dashboard')).toHaveAttribute('data-shared-problem-count', /^\d+$/);
-    await expect(host).toHaveCount(0);
-    expect(state.errors).toEqual([]);
-    return;
-  }
   await expect(host).toBeVisible();
   await expect.poll(() => tiles(host)).toEqual({Down: '1', 'Camera issues': '1', Unknown: '1', Up: '1'});
   expect(await minis(host)).toEqual(['4in the field', '1in the shop', '0online in shop']);
-  // The Fleet readout underneath is the same count: Up is online, Down plus Camera issues is offline.
-  const landing = app.getByRole('region', {name: 'Phone technician landing'});
-  await expect(landing.getByRole('group', {name: 'Camera units online, offline and unknown'}).locator('b')).toHaveText(['1', '2', '1']);
-  // The board spans the phone and sits above everything else on Fleet.
-  const board = await app.locator('.cos-board-landing').boundingBox(), old = await landing.boundingBox();
-  expect(Math.round(board.x)).toBe(0);
-  expect(Math.round(board.width)).toBe(390);
-  expect(board.y + board.height).toBeLessThanOrEqual(old.y);
   // The board's five tabs, as on the board itself.
   expect(await inBoard(host, root => [...root.querySelectorAll('.tab')].filter(tab => !tab.hidden).map(tab => tab.textContent))).toEqual(['Board', 'Map', 'Tech check', 'Punch list', 'Changes']);
+  // On a phone the board is the Fleet screen: it spans the phone and the older view is folded away, never removed.
+  // On a wider screen there is room for both, so the older view stays open underneath.
+  const board = app.locator('.cos-board-landing'), older = app.locator('.cos-fleet-content'), toggle = app.locator('.cos-board-older');
+  const landing = app.getByRole('region', {name: 'Phone technician landing'});
+  const box = await board.boundingBox();
+  if (phone) {
+    expect(Math.round(box.x)).toBe(0);
+    expect(Math.round(box.width)).toBe(390);
+    await expect(board).toHaveAttribute('data-older-view', 'closed');
+    await expect(older).toBeHidden();
+    await expect(app.locator('.cos-fleet-map-jump')).toBeHidden();
+    await expect(toggle).toHaveText('Show the older Fleet view');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    // The other Fleet views stay one tap away.
+    await expect(app.getByRole('navigation', {name: 'Fleet dashboard views', exact: true})).toBeVisible();
+    await toggle.click();
+    await expect(toggle).toHaveText('Hide the older Fleet view');
+    await expect(landing).toBeVisible();
+  } else {
+    await expect(board).toHaveAttribute('data-older-view', 'open');
+    await expect(toggle).toHaveText('Hide the older Fleet view');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  }
+  await expect(older).toBeVisible();
+  // The older Fleet readout underneath is the same count: Up is online, Down plus Camera issues is offline.
+  await expect(readout(app)).toHaveText(['1', '2', '1']);
+  const below = await older.boundingBox(), above = await board.boundingBox();
+  expect(above.y + above.height).toBeLessThanOrEqual(below.y + 1);
+  if (!phone) {
+    await toggle.click();
+    await expect(board).toHaveAttribute('data-older-view', 'closed');
+    await expect(older).toBeHidden();
+  }
   // It opens on what is down. A shop unit is never listed as down.
   expect(await inBoard(host, root => [root.getElementById('count').textContent, ...[...root.querySelectorAll('#list .row .name')].map(name => name.textContent)])).toEqual(['1 field units down', 'Spotter 002']);
   // A unit page: diagnosis, cameras, and the IP held back until asked for.
@@ -137,8 +159,7 @@ test('Refresh on the board reads the camera feed again and Fleet follows', async
   server.units = server.units.map(row => row.unit === 'SPOTTER 002' ? unit('SPOTTER 002') : row);
   await inBoard(host, root => root.getElementById('refresh').click());
   await expect.poll(() => tiles(host)).toEqual({Down: '0', 'Camera issues': '1', Unknown: '1', Up: '2'});
-  const landing = app.getByRole('region', {name: 'Phone technician landing'});
-  await expect(landing.getByRole('group', {name: 'Camera units online, offline and unknown'}).locator('b')).toHaveText(['2', '1', '1']);
+  await expect(readout(app)).toHaveText(['2', '1', '1']);
   await expect.poll(() => toastText(host)).toContain('New reading: Star4Live');
   expect(server.sent).toEqual([]);
   expect(state.errors).toEqual([]);
@@ -159,8 +180,7 @@ test('a hand fix on the board is saved through the Camera status route and shows
   // A unit in the shop is never down, on the board and in the Fleet count alike.
   await expect.poll(() => tiles(host)).toEqual({Down: '0', 'Camera issues': '1', Unknown: '1', Up: '1'});
   expect(await minis(host)).toEqual(['3in the field', '2in the shop', '0online in shop']);
-  const landing = app.getByRole('region', {name: 'Phone technician landing'});
-  await expect(landing.getByRole('group', {name: 'Camera units online, offline and unknown'}).locator('b')).toHaveText(['1', '1', '1']);
+  await expect(readout(app)).toHaveText(['1', '1', '1']);
   // The unit page says it was set by hand, by whom, and offers the way back.
   const sheet = await panel(host);
   expect(sheet).toContain('Shop · set by hand');

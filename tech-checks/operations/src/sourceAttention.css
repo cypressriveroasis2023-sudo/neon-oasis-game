@@ -32,8 +32,16 @@
  .cos-todo-card button{grid-column:2;justify-self:start}
 }
 .cos-phone-landing{display:none}
-/* The COS Board screen at the top of Fleet on a phone. Its own styles live inside its shadow root. */
-.cos-board-landing{display:block;width:100vw;margin:-1px 0 14px calc(50% - 50vw)}
+/* The COS Board screen at the top of Fleet. Its own styles live inside its shadow root. */
+.cos-board-landing{display:block;margin:0 0 14px}
+.cos-board-older{display:block;width:100%;min-height:44px;margin:10px 0 0;text-align:center;font-weight:600}
+@media(max-width:700px){
+ .cos-board-landing{width:100vw;margin:-1px 0 14px calc(50% - 50vw)}
+ .cos-board-older{width:calc(100% - 32px);margin:12px 16px 0}
+}
+/* On a phone the board is the Fleet screen. The older view is folded away behind one button, never removed. */
+#root#root .cos-fleet-dashboard:has(>.cos-board-landing[data-older-view='closed'])>.cos-fleet-content,
+#root#root .cos-fleet-dashboard:has(>.cos-board-landing[data-older-view='closed'])>.cos-fleet-map-jump{display:none}
 .cos-phone-board-info>summary{display:none}
 .cos-phone-counts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .cos-phone-counts div{padding:12px 8px;border:1px solid #334155;border-radius:10px;text-align:center}
