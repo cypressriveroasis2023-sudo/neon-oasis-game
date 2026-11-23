@@ -43,5 +43,8 @@ test('Fleet hands the board the same feed, clock and field map as its headline',
   const landing = read('../src/CosBoardLanding.tsx');
   assert.match(landing, /const clock = cameraFeedClock\(feed, now\);\s+const census = cameraFeedCensus\(feed, recorderLinksFromHealth\(recorderRows\), clock, fieldMap\) \|\| \[\];\s+return boardData\(\{feed, census, now: clock, /);
   // With no feed there is nothing true to draw: Fleet shows as before.
-  assert.match(read('../src/PhoneFleetBoard.tsx'), /if \(!phone \|\| !feed\) return null;/);
+  const phone = read('../src/PhoneFleetBoard.tsx');
+  assert.match(phone, /if \(!phone \|\| !feed\) return null;/);
+  // A board that cannot be shown steps aside. It must never take the Fleet screen down with it.
+  assert.match(phone, /<ViewErrorBoundary fallback=\{\(\) => null\}>\s*<div className='cos-board-landing'><Suspense fallback=\{null\}><CosBoardLanding /);
 });

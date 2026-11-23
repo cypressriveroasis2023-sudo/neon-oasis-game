@@ -57,7 +57,8 @@ export type BoardMhelp = {
 };
 
 export type BoardData = {
-  meta: {gen: number; v: number};
+  /** gen and v are times in seconds. rl says whether Fleet has read the routers yet. */
+  meta: {gen: number; v: number; rl: boolean};
   units: BoardUnit[];
   cameras: Record<string, BoardCamera[]>;
   mhelp: BoardMhelp | null;
@@ -225,7 +226,7 @@ export function boardData({feed, census, now, routers, upload, addresses}: Board
       ri: '', rp: '',
     };
   });
-  return {meta: {gen: Math.round(now / 1000), v: newestStar}, units, cameras, mhelp: boardMhelp(upload, addresses)};
+  return {meta: {gen: Math.round(now / 1000), v: newestStar, rl: Array.isArray(routers)}, units, cameras, mhelp: boardMhelp(upload, addresses)};
 }
 
 /** The board's tiles when it counts by the camera systems. Checked against the shared count in the tests. */

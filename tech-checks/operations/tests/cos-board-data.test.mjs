@@ -138,6 +138,10 @@ test('a router reading is reference only: an old one is Unknown, never Offline',
   assert.deepEqual([byName['SPOTTER 001'].rs, byName['SPOTTER 001'].rm], ['of', 'IR615']);
   assert.deepEqual([byName['SPOTTER 003'].rs, byName['SPOTTER 003'].rr], ['un', 'of']);
   assert.deepEqual([byName['SPOTTER 002'].rs, byName['SPOTTER 002'].rr, byName['SPOTTER 002'].ri], ['', '', '']);
+  // Until Fleet has read the routers the board says so, instead of saying a unit has none.
+  assert.equal(board(feed, {routers}).meta.rl, true);
+  assert.equal(board(feed, {routers: null}).meta.rl, false);
+  assert.equal(board(feed).meta.rl, false);
 });
 
 test('the mHelp list keeps stands in the count and off the board', () => {
