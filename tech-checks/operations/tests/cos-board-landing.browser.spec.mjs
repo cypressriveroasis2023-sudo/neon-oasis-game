@@ -450,30 +450,42 @@ test('a device with the board switched off keeps the older Fleet screen', async 
   expect(state.errors).toEqual([]);
 });
 
-test('the map cannot be dragged out of its box, and a swipe up or down on the whole map scrolls the page', async ({page}) => {
+// Units with a place on the map: two towns far apart, one spot with a mix of states, one spot where both units are down.
+const at = (latitude, longitude) => ({location: {latitude, longitude, matchedAddress: null, source: 'hand'}});
+const down = name => ({state: 'RED', online: 0, offline: 1, cameraList: [{name: name + ' / Cam 1', status: 'offline', atSite: true}]});
+const placed = [
+  unit('SPOTTER 101', {...at(29.76, -95.37)}),
+  unit('SPOTTER 102', {...at(29.76, -95.37)}),
+  unit('SPOTTER 103', {...at(29.76, -95.37), ...down('SPOTTER 103')}),
+  unit('SPOTTER 201', {...at(30.27, -97.74), ...down('SPOTTER 201')}),
+  unit('SPOTTER 202', {...at(30.27, -97.74), ...down('SPOTTER 202')}),
+  unit('SPOTTER 301', {...at(32.78, -96.80)}),
+  unit('SPOTTER 401', {...at(27.80, -97.40)}),
+];
+const mapView = host => inBoard(host, root => {
+  const svg = root.getElementById('mapSvg'), box = root.getElementById('mapWrap').getBoundingClientRect();
+  const [, tx, ty, z] = /translate\(([-\d.]+),([-\d.]+)\) scale\(([\d.]+)\)/.exec(root.getElementById('mapBase').getAttribute('transform') || '') || [];
+  return {x: box.x, y: box.y, w: box.width, h: box.height, tx: +tx, ty: +ty, z: +z, touch: svg.style.touchAction};
+});
+const MAP_W = 649.5, MAP_H = 660;   // the drawn map, in its own units
+// The drawing covers its box on every side. No part of the box is ever left empty.
+const covers = view => {
+  expect(view.tx).toBeLessThanOrEqual(0.5);
+  expect(view.ty).toBeLessThanOrEqual(0.5);
+  expect(view.tx + MAP_W * view.z).toBeGreaterThanOrEqual(view.w - 0.5);
+  expect(view.ty + MAP_H * view.z).toBeGreaterThanOrEqual(view.h - 0.5);
+};
+
+test('the map always fills its box and cannot be dragged out of it, and on a phone a swipe on the whole map scrolls the page', async ({page}, info) => {
+  const phone = info.project.name === 'mobile-390';
   const {app, state} = await mountFleet(page, false, {cameraStatus: report});
   const host = app.locator('.cos-board-host');
   await expect(host).toBeVisible();
   await expect.poll(() => tiles(host)).toEqual({Down: '1', 'Camera issues': '1', Unknown: '1', Up: '1'});
   await inBoard(host, root => root.getElementById('tabMap').click());
-  // The drawing, where it sits in its box, and whether a finger moves it or the page.
-  const read = () => inBoard(host, root => {
-    const svg = root.getElementById('mapSvg'), box = root.getElementById('mapWrap').getBoundingClientRect();
-    const [, tx, ty, z] = /translate\(([-\d.]+),([-\d.]+)\) scale\(([\d.]+)\)/.exec(root.getElementById('mapBase').getAttribute('transform') || '') || [];
-    return {x: box.x, y: box.y, w: box.width, h: box.height, tx: +tx, ty: +ty, z: +z, touch: svg.style.touchAction};
-  });
+  const read = () => mapView(host);
   await expect.poll(async () => (await read()).z).toBeGreaterThan(0);
-  const W = 649.5, H = 660;   // the drawn map, in its own units
-  const inside = view => {
-    const left = view.tx, right = view.tx + W * view.z, top = view.ty, bottom = view.ty + H * view.z;
-    // Along each side the drawing either fills the box edge to edge or sits whole and centred in it. It is never part-way out.
-    for (const [from, to, size] of [[left, right, view.w], [top, bottom, view.h]]) {
-      if (to - from >= size - 1) { expect(from).toBeLessThanOrEqual(1); expect(to).toBeGreaterThanOrEqual(size - 1); }
-      else expect(Math.abs((from + to) / 2 - size / 2)).toBeLessThanOrEqual(1.5);
-    }
-  };
   const drag = async (dx, dy) => {
-    const view = await read(), x = view.x + view.w / 2, y = view.y + view.h / 2;
     await host.scrollIntoViewIfNeeded();
     const now = await read(), cx = now.x + now.w / 2, cy = now.y + now.h / 2;
     await page.mouse.move(cx, cy); await page.mouse.down();
@@ -482,25 +494,75 @@ test('the map cannot be dragged out of its box, and a swipe up or down on the wh
     await page.waitForTimeout(80);
     return read();
   };
-  // As it opens, the whole fleet is in view.
   const start = await read();
-  inside(start);
+  covers(start);
   // Dragged hard every way, it stays in its box.
-  for (const [dx, dy] of [[0, -900], [0, 900], [-900, 0], [900, 0]]) inside(await drag(dx, dy));
+  for (const [dx, dy] of [[0, -900], [0, 900], [-900, 0], [900, 0]]) covers(await drag(dx, dy));
   // Zoomed in there is more drawing than box, so a finger moves the map; it still cannot leave.
   await inBoard(host, root => { for (let press = 0; press < 3; press++) root.getElementById('zin').click(); });
   await expect.poll(async () => (await read()).z).toBeGreaterThan(start.z * 4);
   const close = await read();
-  expect(H * close.z).toBeGreaterThan(close.h);
+  expect(MAP_H * close.z).toBeGreaterThan(close.h);
   expect(close.touch).toBe('none');
-  for (const [dx, dy] of [[0, -2000], [0, 2000], [-2000, 0], [2000, 0]]) inside(await drag(dx, dy));
-  // Zoomed all the way out, the whole drawing fits top to bottom, so an up-or-down swipe is the page's to scroll.
-  await inBoard(host, root => { for (let press = 0; press < 8; press++) root.getElementById('zout').click(); });
-  // The finger rule changes at once; the drawing itself is redrawn on the next frame, so wait for both.
-  await expect.poll(async () => { const view = await read(); return view.touch === 'pan-y' && H * view.z <= view.h + 0.5; }).toBe(true);
+  for (const [dx, dy] of [[0, -2000], [0, 2000], [-2000, 0], [2000, 0]]) covers(await drag(dx, dy));
+  // Zoomed all the way out the drawing still covers the box: it stops at the size that just fills it.
+  await inBoard(host, root => { for (let press = 0; press < 12; press++) root.getElementById('zout').click(); });
+  // The drawing is redrawn on the next frame, so wait for it to settle at its smallest size.
+  await expect.poll(async () => { const view = await read(); return Math.min(MAP_W * view.z - view.w, MAP_H * view.z - view.h); }).toBeLessThan(0.6);
   const far = await read();
-  expect(H * far.z).toBeLessThanOrEqual(far.h + 0.5);
-  inside(far);
+  covers(far);
+  if (phone) {
+    // On a phone the box has the drawing's own shape, so the whole drawing is in view and an up-or-down swipe is the page's to scroll.
+    expect(Math.abs(far.h / far.w - MAP_H / MAP_W)).toBeLessThan(0.01);
+    expect(MAP_H * far.z).toBeLessThanOrEqual(far.h + 0.6);
+    await expect.poll(async () => (await read()).touch).toBe('pan-y');
+  }
+  expect(state.errors).toEqual([]);
+});
+
+test('on a phone the map opens on the whole drawing when the units are spread across it', async ({page}, info) => {
+  test.skip(info.project.name !== 'mobile-390', 'The whole drawing fits the phone box; a desktop box is wider than the drawing.');
+  const {app, state} = await mountFleet(page, false, {cameraStatus: reportOf(placed)});
+  const host = app.locator('.cos-board-host');
+  await expect(host).toBeVisible();
+  await inBoard(host, root => root.getElementById('tabMap').click());
+  await expect.poll(async () => (await mapView(host)).z).toBeGreaterThan(0);
+  // Fitting these units alone would zoom in by a hair and leave a drawing that eats every swipe. It opens on all of it instead.
+  await expect.poll(async () => { const view = await mapView(host); return Math.abs(view.z - view.w / MAP_W); }).toBeLessThan(0.002);
+  const view = await mapView(host);
+  covers(view);
+  expect(MAP_H * view.z).toBeLessThanOrEqual(view.h + 0.6);
+  expect(view.touch).toBe('pan-y');
+  expect(state.errors).toEqual([]);
+});
+
+test('a spot with units in more than one state is a ring with its own count of down units, never one red circle', async ({page}) => {
+  const {app, state} = await mountFleet(page, false, {cameraStatus: reportOf(placed)});
+  const host = app.locator('.cos-board-host');
+  await expect(host).toBeVisible();
+  await inBoard(host, root => root.getElementById('tabMap').click());
+  const pins = () => inBoard(host, root => [...root.querySelectorAll('#mapPins .pin')].map(pin => ({
+    label: pin.getAttribute('aria-label'), ring: pin.querySelectorAll('.arc').length, mixed: Boolean(pin.querySelector('.mixbase')),
+    total: pin.querySelector('text.mix')?.textContent ?? pin.querySelector('text:not(.badn)')?.textContent ?? '',
+    down: pin.querySelector('text.badn')?.textContent ?? '', fill: pin.querySelector('circle:not(.ring):not(.mixbase):not(.arc):not(.bad)')?.getAttribute('fill') ?? '',
+  })).sort((a, b) => a.label.localeCompare(b.label)));
+  await expect.poll(async () => (await pins()).length).toBe(4);
+  expect(await pins()).toEqual([
+    // Both units here are down, so the circle is red and says two.
+    {label: '2 units here: 2 Down', ring: 0, mixed: false, total: '2', down: '', fill: 'var(--down)'},
+    // One of three is down. The ring shows the mix, the middle says three, and the red number says one.
+    {label: '3 units here: 1 Down, 2 Up', ring: 2, mixed: true, total: '3', down: '1', fill: ''},
+    {label: 'Spotter 301, Up', ring: 0, mixed: false, total: '', down: '', fill: 'var(--up)'},
+    {label: 'Spotter 401, Up', ring: 0, mixed: false, total: '', down: '', fill: 'var(--up)'},
+  ]);
+  // The counts above the map are its key, each with the colour of its pins.
+  expect(await inBoard(host, root => [...root.querySelectorAll('#mapChips .chip')].map(chip => [chip.textContent, chip.querySelector('.dot')?.className ?? '']))).toEqual([
+    ['All 7', ''], ['Down 3', 'dot s-down'], ['Camera issues 0', 'dot s-issues'], ['Unknown 0', 'dot s-unknown'], ['Up 4', 'dot s-up'],
+  ]);
+  expect(await inBoard(host, root => root.getElementById('mapNote').textContent)).toContain('A ring is a mix, and its red number is how many are down.');
+  // Asking for the down units alone leaves only them: the mixed spot becomes one red pin.
+  await inBoard(host, root => [...root.querySelectorAll('#mapChips .chip')].find(chip => chip.textContent.startsWith('Down')).click());
+  await expect.poll(async () => (await pins()).map(pin => pin.label)).toEqual(['2 units here: 2 Down', 'Spotter 103, Down']);
   expect(state.errors).toEqual([]);
 });
 

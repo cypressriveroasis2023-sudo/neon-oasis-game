@@ -514,18 +514,21 @@ function sv(tag, attrs, ...kids){ const e=document.createElementNS(NS,tag);
   for(const kid of kids.flat()){ if(kid) e.append(kid); } return e; }
 const M = { data:null, failed:false, built:false, z:1, tx:0, ty:0, w:0, h:0, f:"all", pts:[], none:[], sel:null, drop:null, focus:null, fitted:false, raf:0, dragged:false };
 const SEV = { down:0, issues:1, unknown:2, up:3 }, PCOL = { down:"var(--down)", issues:"var(--warn)", unknown:"var(--unk)", up:"var(--up)" };
-const ZMAX = 900, clampZ = z => Math.max(M.w ? Math.min(M.w/660, M.h/670) : .3, Math.min(ZMAX, z));
+const ZMAX = 900, clampZ = z => Math.max(zMin(), Math.min(ZMAX, z));
 function sizeMap(){ const r=$("mapWrap").getBoundingClientRect(); if(r.width>50){ M.w=r.width; M.h=r.height; } }
 function centerOn(x,y,z){ M.z=clampZ(z); M.tx=M.w/2-x*M.z; M.ty=M.h/2-y*M.z; paint(); }
 function fitPts(pts,pad,zcap){ if(!pts.length||!M.w) return; let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; for(const q of pts){ x0=Math.min(x0,q.x); y0=Math.min(y0,q.y); x1=Math.max(x1,q.x); y1=Math.max(y1,q.y); }
-  pad=pad||40; const z=Math.min((M.w-2*pad)/Math.max(x1-x0,.01),(M.h-2*pad)/Math.max(y1-y0,.01),zcap||60); centerOn((x0+x1)/2,(y0+y1)/2,z); }
+  pad=pad||40; let z=Math.min((M.w-2*pad)/Math.max(x1-x0,.01),(M.h-2*pad)/Math.max(y1-y0,.01),zcap||60); if(z<zMin()*1.25) z=zMin(); centerOn((x0+x1)/2,(y0+y1)/2,z); }
 function zoomAt(px,py,f){ const nz=clampZ(M.z*f), k=nz/M.z; M.tx=px-(px-M.tx)*k; M.ty=py-(py-M.ty)*k; M.z=nz; paint(); }
 /* The drawing has edges, so it is held inside its box: it can never be dragged away to leave the box empty.
    Pins beyond the drawn map still count as part of it, so every unit can be reached.
    When all of it already fits top to bottom there is nothing to move that way, so an up-or-down swipe scrolls the page. */
 function mapEdges(){ let x0=0,y0=0,x1=M.data?M.data.w:660,y1=M.data?M.data.h:670; for(const q of M.pts){ x0=Math.min(x0,q.x-8); y0=Math.min(y0,q.y-8); x1=Math.max(x1,q.x+8); y1=Math.max(y1,q.y+8); } return [x0,y0,x1,y1]; }
+/* The drawing is never smaller than its box, so the box is never part empty. */
+function zMin(){ if(!M.w) return .3; const [x0,y0,x1,y1]=mapEdges(); return Math.max(M.w/(x1-x0), M.h/(y1-y0)); }
 function hold(){
   if(!M.w) return;
+  M.z=clampZ(M.z);
   const [x0,y0,x1,y1]=mapEdges(), cw=(x1-x0)*M.z, ch=(y1-y0)*M.z;
   M.tx = cw<=M.w ? (M.w-cw)/2-x0*M.z : Math.min(-x0*M.z, Math.max(M.w-x1*M.z, M.tx));
   M.ty = ch<=M.h ? (M.h-ch)/2-y0*M.z : Math.min(-y0*M.z, Math.max(M.h-y1*M.z, M.ty));
@@ -536,30 +539,46 @@ function buildBase(){ if(M.built||!M.data) return; const d=M.data, P=(cls,dd)=>d
 function clusters(){
   const show = M.pts.filter(q=>M.f==="all"||q.v.status===M.f).map(q=>({q,sx:q.x*M.z+M.tx,sy:q.y*M.z+M.ty})).filter(a=>a.sx>-24&&a.sy>-24&&a.sx<M.w+24&&a.sy<M.h+24);
   show.sort((a,b)=>(SEV[a.q.v.status]??2)-(SEV[b.q.v.status]??2));
-  const cl=[]; for(const a of show){ let c=cl.find(c=>Math.hypot(c.sx-a.sx,c.sy-a.sy)<26); if(!c){ c={sx:a.sx,sy:a.sy,m:[]}; cl.push(c); } c.m.push(a.q); }
+  const cl=[]; for(const a of show){ let c=cl.find(c=>Math.hypot(c.sx-a.sx,c.sy-a.sy)<(M.near||26)); if(!c){ c={sx:a.sx,sy:a.sy,m:[]}; cl.push(c); } c.m.push(a.q); }
   return cl;
 }
 function paint(){ hold(); cancelAnimationFrame(M.raf); M.raf=requestAnimationFrame(paintNow); }
 function paintNow(){
   if(!M.w) return;
   $("mapBase").setAttribute("transform","translate("+M.tx.toFixed(1)+","+M.ty.toFixed(1)+") scale("+M.z.toFixed(4)+")");
-  const L=[], boxes=[];
+  const cl=clusters(), PK=M.pk||1, LK=M.pk?1.35:1, L=[], boxes=cl.map(c=>{ const n=c.m.length, r=(n===1?10:n>99?18:n>9?16:14.5)*PK; return [c.sx-r,c.sy-r,c.sx+r,c.sy+r]; });
   if(M.data){
     const minPop = M.z<1.5 ? 900000 : M.z<3 ? 250000 : M.z<5.5 ? 60000 : 0;
     for(const [name,x,y,pop] of M.data.places){ if(pop<minPop) continue; const sx=x*M.z+M.tx, sy=y*M.z+M.ty; if(sx<-60||sy<-10||sx>M.w+10||sy>M.h+10) continue;
-      const b=[sx,sy-9,sx+name.length*7+12,sy+7]; if(boxes.some(o=>b[0]<o[2]&&b[2]>o[0]&&b[1]<o[3]&&b[3]>o[1])) continue; boxes.push(b);
-      L.push(sv("circle",{cx:sx.toFixed(1),cy:sy.toFixed(1),r:2.2,class:"pl-dot"}), sv("text",{x:(sx+6).toFixed(1),y:(sy+4).toFixed(1),class:"pl",text:name})); }
+      const tw=(name.length*7+10)*LK, up=9*LK, dn=7*LK;
+      const under=boxes.find((o,k)=>k<cl.length && sx>o[0]&&sx<o[2]&&sy>o[1]&&sy<o[3]), a=under||[sx-3,sy-3,sx+3,sy+3], cx=(a[0]+a[2])/2, cy=(a[1]+a[3])/2;
+      const spot=[[a[2]+3,cy-up,a[2]+3+tw,cy+dn,"start"],[a[0]-3-tw,cy-up,a[0]-3,cy+dn,"end"],[cx-tw/2,a[3]+2,cx+tw/2,a[3]+2+up+dn,"middle"],[cx-tw/2,a[1]-2-up-dn,cx+tw/2,a[1]-2,"middle"]].find(b=>!boxes.some(o=>o!==under && b[0]<o[2]&&b[2]>o[0]&&b[1]<o[3]&&b[3]>o[1]));
+      if(!spot) continue; boxes.push(spot.slice(0,4));
+      if(!under) L.push(sv("circle",{cx:sx.toFixed(1),cy:sy.toFixed(1),r:2.2,class:"pl-dot"}));
+      L.push(sv("text",{x:(spot[4]==="start" ? spot[0]+3 : spot[4]==="end" ? spot[2]-3 : (spot[0]+spot[2])/2).toFixed(1),y:(spot[1]+13*LK).toFixed(1),class:"pl","text-anchor":spot[4],text:name})); }
     if(M.z>=2) for(const [name,x,y] of M.data.hl){ const sx=x*M.z+M.tx, sy=y*M.z+M.ty; if(sx<0||sy<0||sx>M.w||sy>M.h) continue;
       const b=[sx-14,sy-9,sx+14,sy+6]; if(boxes.some(o=>b[0]<o[2]&&b[2]>o[0]&&b[1]<o[3]&&b[3]>o[1])) continue; boxes.push(b); L.push(sv("text",{x:sx.toFixed(1),y:(sy+3).toFixed(1),class:"hl",text:name})); }
   }
   $("mapLabels").replaceChildren(...L);
-  const G=[], cl=clusters(); M.cl=cl;
+  const G=[]; M.cl=cl;
   for(let i=cl.length-1;i>=0;i--){ const c=cl[i], n=c.m.length, st=c.m[0].v.status, focus = M.focus && c.m.some(q=>q.v.id===M.focus);
-    const label = n===1 ? c.m[0].v.name+", "+LABEL[st] : n+" units here, worst is "+LABEL[st];
-    G.push(sv("g",{class:"pin",role:"button",tabindex:"0","aria-label":label,transform:"translate("+c.sx.toFixed(1)+","+c.sy.toFixed(1)+")",onclick:ev=>{ if(M.drop) return; ev.stopPropagation(); if(!M.dragged) pick(c); },onkeydown:ev=>{ if(ev.key==="Enter"||ev.key===" "){ ev.preventDefault(); pick(c); } }},
-      focus ? sv("circle",{class:"ring",r:n===1?14:18}) : null,
-      sv("circle",{r:n===1?(st==="down"?10:8.5):13,fill:PCOL[st]||"var(--unk)"}),
-      n>1 ? sv("text",{y:4,text:String(n)}) : null)); }
+    const by={}; for(const q of c.m) by[q.v.status]=(by[q.v.status]||0)+1;
+    const kinds=["down","issues","unknown","up"].filter(k=>by[k]), mixed=kinds.length>1;
+    const label = n===1 ? c.m[0].v.name+", "+LABEL[st] : n+" units here: "+kinds.map(k=>by[k]+" "+LABEL[k]).join(", ");
+    const R=(n===1?(st==="down"?10:8.5):n>99?17:n>9?15:13.5)*PK, kids=[focus ? sv("circle",{class:"ring",r:(R+5*PK).toFixed(1)}) : null];
+    if(!mixed) kids.push(sv("circle",{r:R.toFixed(1),fill:PCOL[st]||"var(--unk)"}), n>1 ? sv("text",{y:4*PK,text:String(n)}) : null);
+    else {
+      /* Units in more than one state at one spot. The ring shows the mix, the middle says how many there are in
+         all, and the red number on its shoulder is how many are down. One down unit never paints the rest red. */
+      const RR=R-2.2*PK, C=2*Math.PI*RR, least=Math.min(6*PK, C/kinds.length*.5); let lens=kinds.map(k=>by[k]/n*C), owed=0;
+      lens=lens.map(l=>{ if(l<least){ owed+=least-l; return least; } return l; }); lens[lens.indexOf(Math.max(...lens))]-=owed;
+      kids.push(sv("circle",{class:"mixbase",r:R.toFixed(1)}));
+      let at=0; kinds.forEach((k,j)=>{ kids.push(sv("circle",{class:"arc",r:RR.toFixed(1),style:"stroke:"+PCOL[k]+";stroke-width:"+(4.4*PK).toFixed(1)+"px","stroke-dasharray":lens[j].toFixed(2)+" "+(C-lens[j]).toFixed(2),"stroke-dashoffset":(-at).toFixed(2),transform:"rotate(-90)"})); at+=lens[j]; });
+      kids.push(sv("text",{class:"mix",y:4*PK,text:String(n)}));
+      if(by.down){ const b=R*.82; kids.push(sv("circle",{class:"bad",cx:b.toFixed(1),cy:(-b).toFixed(1),r:(7.4*PK).toFixed(1)}), sv("text",{class:"badn",x:b.toFixed(1),y:(-b+3.6*PK).toFixed(1),text:String(by.down)})); }
+    }
+    if(M.pk && n===1 && st==="down") kids.push(sv("text",{class:"tvlab",x:14*PK,y:5*PK,text:c.m[0].v.name}));
+    G.push(sv("g",{class:"pin",role:"button",tabindex:"0","aria-label":label,transform:"translate("+c.sx.toFixed(1)+","+c.sy.toFixed(1)+")",onclick:ev=>{ if(M.drop) return; ev.stopPropagation(); if(!M.dragged) pick(c); },onkeydown:ev=>{ if(ev.key==="Enter"||ev.key===" "){ ev.preventDefault(); pick(c); } }}, kids)); }
   if(M.drop && M.drop.ll){ const [x,y]=toXY(M.drop.ll.lat,M.drop.ll.lng), sx=x*M.z+M.tx, sy=y*M.z+M.ty;
     G.push(sv("g",{transform:"translate("+sx.toFixed(1)+","+sy.toFixed(1)+")"},sv("path",{d:"M0,0 L-9,-18 A10,10 0 1 1 9,-18 Z",fill:"var(--brand)",stroke:"#fff","stroke-width":2}),sv("circle",{cy:-21,r:3.5,fill:"#fff"}))); }
   $("mapPins").replaceChildren(...G);
@@ -591,12 +610,12 @@ function drawMap(vs){
   for(const v of field){ const p=pinOf(v); if(p){ const [x,y]=toXY(p.lat,p.lng); pts.push({v,p,x,y}); } else none.push(v); }
   M.pts=pts; M.none=none;
   const cnt={all:pts.length}; for(const q of pts) cnt[q.v.status]=(cnt[q.v.status]||0)+1;
-  $("mapChips").replaceChildren(...[["all","All"],["down","Down"],["issues","Camera issues"],["unknown","Unknown"],["up","Up"]].map(([k,l])=>h("button",{class:"chip",type:"button","aria-pressed":String(M.f===k),onclick:()=>{ M.f=k; M.sel=null; drawMap(); }},l+" "+(cnt[k]||0))));
+  $("mapChips").replaceChildren(...[["all","All"],["down","Down"],["issues","Camera issues"],["unknown","Unknown"],["up","Up"]].map(([k,l])=>h("button",{class:"chip",type:"button","aria-pressed":String(M.f===k),onclick:()=>{ M.f=k; M.sel=null; drawMap(); }}, k==="all" ? null : h("i",{class:"dot s-"+k,"aria-hidden":"true"}), l+" "+(cnt[k]||0))));
   $("mapGo").replaceChildren(...GO.map(([l,la,lo,z])=>h("button",{class:"chip",type:"button",onclick:()=>{ M.sel=null; drawSel(); if(la==null) fitPts(M.pts.filter(q=>M.f==="all"||q.v.status===M.f),36,60); else { const [x,y]=toXY(la,lo); centerOn(x,y,z*(M.w/390)); } }},l)));
   sizeMap(); buildBase();
   if(!M.fitted && pts.length && M.w){ fitPts(pts,36,60); M.fitted=true; }
   const hand=pts.filter(q=>q.p.kind==="hand").length;
-  $("mapNote").textContent = pts.length+" field units on the map"+(hand ? ", "+hand+" from an address typed by hand" : "")+". Tap a pin to open the unit. Pins mark the site address from mHelp unless someone typed an address in COS. Shop units are not on the map."+(M.failed ? " The background map didn't load, but the pins still work." : "");
+  $("mapNote").textContent = pts.length+" field units on the map"+(hand ? ", "+hand+" from an address typed by hand" : "")+". A full colour means every unit at that spot is in that state. A ring is a mix, and its red number is how many are down. Tap a pin to open it. Pins mark the site address from mHelp unless someone typed an address in COS. Shop units are not on the map."+(M.failed ? " The background map didn't load, but the pins still work." : "");
   $("mapList").replaceChildren(...(none.length ? [h("div",{class:"count",text:none.length+" field unit"+(none.length===1?"":"s")+" with no pin yet."}), ...none.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true})).map(rowEl)] : []));
   drawMsg(); drawSel(); paint();
 }

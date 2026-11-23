@@ -114,3 +114,25 @@ test('the map is held in its box, and the message clears the bottom bar', () => 
   assert.match(app, /at===S\.before \? "No newer Star4Live reading yet\. Last read "\+when\(at\)\+"\." : "New reading: Star4Live "\+when\(at\)\+"\."/);
   assert.match(app, /S\.before = S\.meta \? S\.meta\.v : null;/);
 });
+
+test('the map covers its box, and a spot with a mix of states is a ring, not one red circle', () => {
+  const app = read('../src/cosBoard/boardApp.ts'), style = read('../src/cosBoard/boardStyle.ts');
+  // The drawing can never be smaller than its box, so no part of the box is left empty.
+  assert.match(app, /function zMin\(\)\{ if\(!M\.w\) return \.3; const \[x0,y0,x1,y1\]=mapEdges\(\); return Math\.max\(M\.w\/\(x1-x0\), M\.h\/\(y1-y0\)\); \}/);
+  assert.match(app, /clampZ = z => Math\.max\(zMin\(\), Math\.min\(ZMAX, z\)\);/);
+  assert.match(app, /function hold\(\)\{\n  if\(!M\.w\) return;\n  M\.z=clampZ\(M\.z\);/);
+  // A fit that would only zoom in by a hair shows the whole drawing instead, so a swipe on it scrolls the page.
+  assert.match(app, /if\(z<zMin\(\)\*1\.25\) z=zMin\(\);/);
+  // On a phone the box takes the drawing's own shape. The shape comes from the map file, not a guess.
+  const map = JSON.parse(read('../src/cosBoard/boardMap.json'));
+  assert.ok(style.includes('.mapwrap{height:auto;min-height:0;max-height:none;aspect-ratio:' + map.w + '/' + map.h.toFixed(1) + '}'));
+  // A circle no longer takes the colour of the worst unit in it.
+  assert.equal(app.includes('worst is'), false);
+  assert.match(app, /const kinds=\["down","issues","unknown","up"\]\.filter\(k=>by\[k\]\), mixed=kinds\.length>1;/);
+  assert.match(app, /n\+" units here: "\+kinds\.map\(k=>by\[k\]\+" "\+LABEL\[k\]\)\.join\(", "\)/);
+  // The red number is the count of down units at that spot, and only shows where there is one.
+  assert.match(app, /if\(by\.down\)\{ const b=R\*\.82; kids\.push\(sv\("circle",\{class:"bad"/);
+  assert.match(app, /sv\("text",\{class:"badn",[^}]*text:String\(by\.down\)\}\)/);
+  // Town names are placed clear of the pins, or left off.
+  assert.match(app, /boxes=cl\.map\(c=>\{ const n=c\.m\.length, r=/);
+});
