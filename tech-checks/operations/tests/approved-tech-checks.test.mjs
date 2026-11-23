@@ -5,8 +5,8 @@ import {createHash} from 'node:crypto';
 import {restoreTechCheckHost} from './approved-tech-checks-host-source.mjs';
 const read=name=>readFileSync(new URL('../src/'+name,import.meta.url),'utf8');
 const blob=text=>createHash('sha1').update('blob '+Buffer.byteLength(text)+'\0').update(text).digest('hex');
-test('complete original Tech Check workspace reconstructs after the declared wrapper only',()=>{
- const original=read('TechChecksWorkspace.tsx').replace("import ApprovedCheckManagement from './ApprovedCheckManagement';\n",'').replace('<ApprovedCheckManagement>',"<details className='cos-approved-tool-group'><summary>Manage Tech Checks</summary>").replace('</ApprovedCheckManagement>','</details>');
+test('complete original Tech Check workspace reconstructs after the declared wrappers only',()=>{
+ const original=read('TechChecksWorkspace.tsx').replace("import ApprovedCheckManagement from './ApprovedCheckManagement';\n",'').replace("import ManagerDoor from './ManagerDoor';\n",'').replace('<ManagerDoor>','').replace('</ManagerDoor>','').replace('<ApprovedCheckManagement>',"<details className='cos-approved-tool-group'><summary>Manage Tech Checks</summary>").replace('</ApprovedCheckManagement>','</details>');
  assert.equal(blob(original),'0baffbb1b1583ce06626a20638ea9759d027df75');
 });
 test('management never clones enables or invokes a check action',()=>{

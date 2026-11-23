@@ -34,9 +34,10 @@ test('the board is isolated from the rest of COS and sends nothing itself', () =
   assert.match(app, /function logBox\(\)\{ return null; \}/);
   assert.doesNotMatch(app, /drawTechForm|techCard|sendTech/);
   // Links open outside the app's own frame.
-  const links = app.match(/h\("a",\{class:"lk",href:[^}]*\}/g) || [];
-  assert.equal(links.length, 2);
-  for (const link of links) assert.match(link, /target:"_blank",rel:"noopener noreferrer"/);
+  const links = app.match(/h\("a",\{class:"(?:lk|mgshot)[^}]*\}/g) || [];
+  // Two on a unit's page, and on the manager view a handoff's signed report and each of its photos.
+  assert.equal(links.length, 4);
+  for (const link of links) assert.match(link, /href:[^,}]+,target:"_blank",rel:"noopener noreferrer"/);
 });
 
 test('Fleet hands the board the same feed, clock and field map as its headline', () => {

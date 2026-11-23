@@ -1,4 +1,5 @@
 import ApprovedCheckManagement from './ApprovedCheckManagement';
+import ManagerDoor from './ManagerDoor';
 import { openLegacy } from './api';
 
 // These destinations retain the original authenticated checks and saved evidence.
@@ -18,7 +19,7 @@ const tools = [
 ] as const;
 
 export default function TechChecksWorkspace() {
-  return <section className='panel module operations-tools cos-approved-checks' aria-label='Tech Check workspaces'>
+  return <ManagerDoor><section className='panel module operations-tools cos-approved-checks' aria-label='Tech Check workspaces'>
     <div className='panelhead'><h2>Start or continue a check</h2><span>Use your existing account</span></div>
     <div className='operations-tool-grid cos-approved-primary-checks'>
       <button onClick={()=>openLegacy('it')}><b>IT check in / out</b><span>Open your existing equipment preparation and intake workflow</span></button>
@@ -30,5 +31,5 @@ export default function TechChecksWorkspace() {
     <ApprovedCheckManagement>
       <div className='operations-tool-grid'>{tools.filter(tool=>!['handoffs','attention','history'].includes(tool.route)).map(tool=><button type='button' className='secondary' key={tool.route} onClick={()=>openLegacy(tool.route)}><b>{tool.title}</b><span>{tool.description}</span></button>)}</div>
     </ApprovedCheckManagement>
-  </section>;
+  </section></ManagerDoor>;
 }
