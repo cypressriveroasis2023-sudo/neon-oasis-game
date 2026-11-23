@@ -9,25 +9,30 @@ test('the board carries no fleet data and reads nothing itself', () => {
   // This repository is public. Unit names, customers, addresses and IPs reach the board from the signed-in feed only.
   const files = readdirSync(new URL('../src/cosBoard/', import.meta.url), {recursive: true}).map(name => String(name).replace(/\\/g, '/')).sort();
   assert.deepEqual(files, [
-    'boardApp.ts', 'boardData.ts', 'boardFonts.ts', 'boardMap.json', 'boardStyle.ts',
+    'boardApp.ts', 'boardData.ts', 'boardEdit.ts', 'boardFonts.ts', 'boardMap.json', 'boardStyle.ts',
     'fonts', 'fonts/OFL.txt', 'fonts/inter-latin-wght-normal.woff2', 'fonts/inter-tight-latin-wght-normal.woff2',
   ]);
   const map = JSON.parse(read('../src/cosBoard/boardMap.json'));
   // A plain base map of Texas and its projection numbers. No pins, units or sites.
   assert.deepEqual(Object.keys(map).sort(), ['N', 'W', 'counties', 'h', 'hl', 'hwy', 'kx', 'lakes', 'land', 'places', 'rivers', 'roads', 'states', 'urban', 'w']);
-  for (const source of [app, read('../src/cosBoard/boardData.ts'), read('../src/cosBoard/boardStyle.ts'), read('../src/cosBoard/boardFonts.ts')]) {
+  for (const source of [app, read('../src/cosBoard/boardData.ts'), read('../src/cosBoard/boardEdit.ts'), read('../src/cosBoard/boardStyle.ts'), read('../src/cosBoard/boardFonts.ts')]) {
     assert.doesNotMatch(source, /\bfetch\(|XMLHttpRequest|WebSocket|sendBeacon|EventSource|googleapis|gstatic|supabase\.co|execute_sql/i);
   }
 });
 
-test('the board is isolated from the rest of COS and only reads', () => {
+test('the board is isolated from the rest of COS and sends nothing itself', () => {
   assert.match(app, /attachShadow\(\{mode:'closed'\}\)/);
   assert.doesNotMatch(app, /document\.getElementById|document\.querySelector|window\.claude|location\.hash/);
-  // Saving a hand fix, a work log, a tech check or a change list needs storage this screen does not have.
+  // The board's own store is not here. A hand fix is handed to Fleet, which is the only place that sends.
   assert.match(app, /db:null/);
-  assert.match(app, /id=\\"tabTech\\"[^>]*hidden/);
-  assert.match(app, /id=\\"tabActivity\\"[^>]*hidden/);
-  assert.match(app, /Hand fixes are not switched on for this screen yet\./);
+  assert.match(app, /await hooks\.onEdit\(v\.k, steps\)/);
+  assert.doesNotMatch(app, /unit-camera-status|\bapi\.(?:get|post)\(|from '\.\.?\/api'/);
+  const landing = read('../src/CosBoardLanding.tsx');
+  assert.equal(landing.split("api.post('/api/unit-camera-status/edit', handFixRequest(unit, step, crypto.randomUUID()))").length - 1, 1);
+  assert.equal(landing.split('api.post(').length - 1, 1);
+  // The work log and the board's own tech check form would need that store, so they are off.
+  assert.match(app, /function logBox\(\)\{ return null; \}/);
+  assert.doesNotMatch(app, /drawTechForm|techCard|sendTech/);
   // Links open outside the app's own frame.
   const links = app.match(/h\("a",\{class:"lk",href:[^}]*\}/g) || [];
   assert.equal(links.length, 2);

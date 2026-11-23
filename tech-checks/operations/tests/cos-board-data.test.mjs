@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {cameraFeedCensus, cameraFeedClock, fleetCountsFromCameraFeed} from '../src/sharedFleetCounts.ts';
 import {boardData, boardMhelp, boardTally} from '../src/cosBoard/boardData.ts';
+import {boardEditState, handFixRequest} from '../src/cosBoard/boardEdit.ts';
 
 const now = Date.parse('2026-11-18T13:10:00Z');
 const at = minutes => new Date(now - minutes * 60 * 1000).toISOString();
@@ -106,18 +107,46 @@ test('the camera feed is judged against its own newest reading, not an older sav
 });
 
 test('hand edits, a typed address and the reading time reach the board', () => {
+  const by = (name, minutes, extra = {}) => ({by: name, role: 'it', at: at(minutes), reason: null, providerValue: null, providerAgrees: false, ...extra});
   const edited = unit('SPOTTER 020', {
-    displayName: 'Spotter 20 East', publicIp: '203.0.113.20', providerSite: 'Old site', productId: '2345678',
-    handEdits: {placement: {value: 'FIELD'}, public_ip: {value: '203.0.113.20'}, name: {value: 'Spotter 20 East'}},
+    displayName: 'Spotter 20 East', publicIp: '203.0.113.20', site: 'New site', productId: '2345678',
+    providerPlacement: 'SHOP', providerSite: null, providerPublicIp: '198.51.100.7',
+    address: ' 100 Main  St, Houston TX ', addressRevision: '11111111-2222-4333-8444-555555555555',
+    handEdits: {
+      placement: {value: 'FIELD', ...by('Teddy', 30, {providerValue: 'SHOP'})},
+      public_ip: {value: '203.0.113.20', ...by('Victor', 10, {providerValue: '198.51.100.7', reason: 'new SIM'})},
+      name: {value: 'Spotter 20 East', ...by('', 20, {at: null})},
+      site: {value: 'New site', ...by('Teddy', 30)},
+    },
     location: {latitude: 29.76, longitude: -95.36, matchedAddress: '100 MAIN ST, HOUSTON, TX, 77002', source: 'hand'},
   });
-  const data = board([edited, unit('SNIPER 021', {source: 'ip_check', observedAt: at(2)})]);
+  const other = unit('SNIPER 021', {source: 'ip_check', observedAt: at(2), handEdits: {placement: {value: 'FIELD', ...by('James', 5, {role: 'owner'})}}});
+  const data = board([edited, other]);
   const row = data.units[0];
   assert.equal(row.nm, 'Spotter 20 East');
-  assert.deepEqual(row.he.sort(), ['ip', 'name', 'place']);
+  assert.deepEqual(row.he.sort(), ['ip', 'name', 'place', 'site']);
   assert.deepEqual(row.hp, [29.76, -95.36]);
   assert.equal(row.ad, '100 MAIN ST, HOUSTON, TX, 77002');
   assert.equal(row.pid, '2345678');
+  // What the provider says stays beside what a person set by hand.
+  assert.deepEqual([row.pl, row.st, row.ip], ['field', 'New site', '203.0.113.20']);
+  assert.deepEqual([row.fp, row.fst, row.fip], ['shop', '', '198.51.100.7']);
+  assert.deepEqual([data.units[1].fp, data.units[1].fst, data.units[1].fip], ['field', 'Fixture yard', '']);
+  // The address form opens with the address exactly as typed, and the next edit names its revision.
+  assert.deepEqual([row.ta, row.ar], ['100 Main  St, Houston TX', '11111111-2222-4333-8444-555555555555']);
+  assert.deepEqual([data.units[1].ta, data.units[1].ar], ['', null]);
+  // Each hand edit in force carries who made it and when, newest first. A record with no time sorts last.
+  assert.deepEqual(row.hx.map(edit => [edit.f, edit.b, edit.by, edit.at, edit.why]), [
+    ['ip', '203.0.113.20', 'Victor', Date.parse(at(10)), 'new SIM'],
+    ['place', 'FIELD', 'Teddy', Date.parse(at(30)), ''],
+    ['site', 'New site', 'Teddy', Date.parse(at(30)), ''],
+    ['name', 'Spotter 20 East', 'Unknown', 0, ''],
+  ]);
+  assert.deepEqual(data.changes.map(edit => [edit.k, edit.f, edit.by]), [
+    ['SNIPER 021', 'place', 'James'], ['SPOTTER 020', 'ip', 'Victor'], ['SPOTTER 020', 'place', 'Teddy'], ['SPOTTER 020', 'site', 'Teddy'], ['SPOTTER 020', 'name', 'Unknown'],
+  ]);
+  assert.equal(data.changes[1].nm, 'Spotter 20 East');
+  assert.deepEqual(board().changes, []);
   // The headline reading time is Star4Live's own, not a newer IP check.
   assert.equal(data.meta.v, Math.round(Date.parse(fresh) / 1000));
   assert.equal(data.meta.gen, Math.round(now / 1000));
@@ -170,4 +199,20 @@ test('the mHelp list keeps stands in the count and off the board', () => {
   assert.equal(boardMhelp(null), null);
   assert.equal(boardMhelp({records: 'none'}), null);
   assert.equal(board(feed, {upload, addresses}).mhelp.recs.length, 3);
+});
+
+test('a hand fix is the request Camera status sends, and a doubtful save stops the next one', () => {
+  const spotter = {unit: 'SPOTTER 020', addressRevision: '11111111-2222-4333-8444-555555555555'};
+  assert.deepEqual(handFixRequest(spotter, {field: 'placement', value: 'SHOP'}, 'id-1'), {unitKey: 'SPOTTER 020', field: 'placement', requestId: 'id-1', value: 'SHOP'});
+  assert.deepEqual(handFixRequest(spotter, {field: 'name', value: null}, 'id-2'), {unitKey: 'SPOTTER 020', field: 'name', requestId: 'id-2', action: 'clear'});
+  // Only an address edit names a revision: the one it was read with, or null when no address was ever typed.
+  assert.deepEqual(handFixRequest(spotter, {field: 'address', value: '1 Example Rd'}, 'id-3'), {unitKey: 'SPOTTER 020', field: 'address', requestId: 'id-3', expectedAddressRevision: '11111111-2222-4333-8444-555555555555', value: '1 Example Rd'});
+  assert.deepEqual(handFixRequest({unit: 'SNIPER 021'}, {field: 'address', value: null}, 'id-4'), {unitKey: 'SNIPER 021', field: 'address', requestId: 'id-4', expectedAddressRevision: null, action: 'clear'});
+
+  assert.deepEqual(boardEditState({canEdit: true, handEditsRead: true}, false), {can: true, why: ''});
+  assert.equal(boardEditState(null, false).can, false);
+  assert.equal(boardEditState({canEdit: true, handEditsRead: false}, false).can, false);
+  assert.equal(boardEditState({canEdit: false, handEditsRead: true}, false).why, 'Hand fixes are for the Owner and IT.');
+  // After a save that could not be confirmed, nothing more is saved until the person refreshes.
+  assert.deepEqual(boardEditState({canEdit: true, handEditsRead: true}, true), {can: false, why: 'The last save could not be confirmed. Tap Refresh before making another fix.'});
 });
