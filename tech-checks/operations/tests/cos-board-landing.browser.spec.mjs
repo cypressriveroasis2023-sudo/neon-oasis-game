@@ -1,5 +1,5 @@
 import {test, expect} from '@playwright/test';
-import {mountFleet, fresh, units as fleetUnits} from './fleet-dashboard-fixtures.mjs';
+import {mountFleet, field, fresh, units as fleetUnits} from './fleet-dashboard-fixtures.mjs';
 import {countUnits} from '../shared/starUnitStatus.ts';
 
 const unit = (name, extra = {}) => ({
@@ -176,13 +176,49 @@ test('Refresh on the board reads the camera feed again and Fleet follows', async
   expect(state.errors).toEqual([]);
 });
 
+test('the board has one count: mHelp once its list has loaded, with no other way of counting to pick', async ({page}) => {
+  // A device that had picked the camera-systems count does not keep it.
+  await page.addInitScript(() => { try { localStorage.setItem('cos-count-mode', 'feeds'); } catch {} });
+  const record = (id, unitNumber, category, placement, customer) => ({recordId: 'mhelp_product:' + id, productId: String(id), unitNumber, category, placement, uploadLifecycle: 'UNFLAGGED', customer});
+  const value = structuredClone(field);
+  value.uploadInventory = {
+    contract: 'COS_MHELP_UPLOAD_INVENTORY_V1', source: 'mhelpdesk_api', countBasis: 'mhelp_product_records_not_unique_physical_units', sourceSha256: 'a'.repeat(64), receivedAt: fresh, lastApiReadAt: fresh,
+    // mHelp has Spotter 002 back in the shop and lists a Spotter 009 the camera systems do not see. It lists neither Spotter 004 nor the Sniper.
+    records: [record(1, 'Helios 001', 'Helios Solar Tower', 'FIELD', 'Fixture Homes'), record(2, 'Spotter 002', 'Spotter', 'SHOP', 'Shop'), record(3, 'Spotter 003', 'Spotter', 'FIELD', 'Fixture Homes: Lot 3'), record(9, 'Spotter 009', 'Spotter', 'FIELD', 'Fixture Homes: Lot 9')],
+    summary: {totalRecords: 4, fieldRecords: 3, shopRecords: 1, unflaggedFieldRecords: 3, doNotUseRecords: 0, missingRecords: 0},
+  };
+  const {app, state} = await mountFleet(page, false, {cameraStatus: report, field: value});
+  const host = app.locator('.cos-board-host');
+  await expect(host).toBeVisible();
+  // The count is mHelp's: the unit mHelp has in the shop is not down, the one only mHelp lists is counted, and the two it does not list are set aside.
+  await expect.poll(() => tiles(host)).toEqual({Down: '0', 'Camera issues': '1', Unknown: '1', Up: '1'});
+  expect(await minis(host)).toEqual(['3in the field', '1in the shop', '0online in shop', '2not in mHelp']);
+  const line = await inBoard(host, root => root.getElementById('modeRow').textContent);
+  expect(line).toMatch(/^One count: mHelp, the official list, read .+\. A unit is in the field, at the site mHelp gives, until mHelp shows it back in the shop or it is moved by hand here\.$/);
+  // There is nothing to pick, here or on the TV board, and the old choice is forgotten.
+  expect(await inBoard(host, root => [root.querySelectorAll('#modeRow button').length, root.getElementById('tvMode'), root.getElementById('cosb').textContent.includes('Camera systems')])).toEqual([0, null, false]);
+  expect(await app.locator('body').evaluate(() => localStorage.getItem('cos-count-mode'))).toBeNull();
+  expect(state.errors).toEqual([]);
+});
+
+test('until the mHelp list has loaded the board says its count is only what the camera systems see', async ({page}) => {
+  const {host, state} = await phoneBoard(page);
+  await expect.poll(() => tiles(host)).toEqual({Down: '1', 'Camera issues': '1', Unknown: '1', Up: '1'});
+  expect(await inBoard(host, root => [root.getElementById('modeRow').textContent, root.querySelectorAll('#modeRow button').length])).toEqual(['The mHelp list has not loaded, so this shows only what the camera systems can see. It is not the official count.', 0]);
+  expect(await minis(host)).toEqual(['4in the field', '1in the shop', '0online in shop']);
+  expect(state.errors).toEqual([]);
+});
+
 test('a hand fix on the board is saved through the Camera status route and shows who made it', async ({page}, info) => {
   test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');
   const {app, state, host, server} = await phoneBoard(page);
   await openUnit(host, 'Spotter 002');
   await expect.poll(() => fixButtons(host)).toEqual(['Move to shop', 'Change site', 'Rename', 'Correct IP']);
+  // The fix is the first thing on the card after what is wrong, not under everything else.
+  expect((await inBoard(host, root => [...root.querySelectorAll('#panel .box > h3')].map(head => head.textContent))).slice(0, 2)).toEqual(['Diagnosis', 'Fix it']);
   await pressFix(host, 'Move to shop');
-  await expect.poll(() => toastText(host)).toBe('Saved.');
+  // The save says what it did to the count, once the saved reading is on the board.
+  await expect.poll(() => toastText(host)).toBe('Saved. The count changed: Down 1 to 0.');
   // Exactly what Camera status sends: the unit's own key, one field, a fresh request id, and nothing about who is asking.
   expect(server.sent).toHaveLength(1);
   expect(Object.keys(server.sent[0]).sort()).toEqual(['field', 'requestId', 'unitKey', 'value']);
@@ -563,6 +599,64 @@ test('a spot with units in more than one state is a ring with its own count of d
   // Asking for the down units alone leaves only them: the mixed spot becomes one red pin.
   await inBoard(host, root => [...root.querySelectorAll('#mapChips .chip')].find(chip => chip.textContent.startsWith('Down')).click());
   await expect.poll(async () => (await pins()).map(pin => pin.label)).toEqual(['2 units here: 2 Down', 'Spotter 103, Down']);
+  expect(state.errors).toEqual([]);
+});
+
+test('on a desk the board has the whole screen: no frame, the list and the live map side by side, and a count tile filters both', async ({page}, info) => {
+  const {app, host, state} = await phoneBoard(page, placed);
+  const layout = () => inBoard(host, root => {
+    const box = id => { const r = root.getElementById(id).getBoundingClientRect(); return {x: r.x, y: r.y, w: r.width, h: r.height, right: r.right, bottom: r.bottom}; };
+    return {wide: root.getElementById('cosb').classList.contains('wide'), side: !root.getElementById('boardSide').hidden, mapIn: root.getElementById('mapBlock').parentNode.id,
+      main: box('boardMain'), map: box('mapWrap'), board: box('cosb'), tall: innerHeight, across: innerWidth,
+      shown: ['mapChips', 'mapNote', 'mapList'].filter(id => root.getElementById(id).getClientRects().length > 0),
+      pins: [...root.querySelectorAll('#mapPins .pin')].map(pin => pin.getAttribute('aria-label')).sort()};
+  });
+  const tile = label => inBoard(host, (root, wanted) => [...root.querySelectorAll('.tile')].find(item => item.querySelector('.lab').textContent === wanted).click(), label);
+  if (info.project.name !== 'desktop-1440') {
+    // A phone or a small window keeps the map on its own tab, and the list keeps the full width.
+    expect(await layout()).toMatchObject({wide: false, side: false, mapIn: 'viewMap', pins: []});
+    return;
+  }
+  await expect.poll(async () => (await layout()).pins.length).toBeGreaterThan(0);
+  const first = await layout();
+  expect(first).toMatchObject({wide: true, side: true, mapIn: 'boardSide', shown: []});
+  // No frame and no page title: the board starts at the menu's edge and the top of the window, and reaches the right edge.
+  await expect(app.locator('.company-utility-bar')).toBeHidden();
+  const menu = await app.locator('aside.operations-sidebar').evaluate(element => element.getBoundingClientRect().right);
+  expect(Math.abs(first.board.x - menu)).toBeLessThanOrEqual(1);
+  expect(first.board.y).toBeLessThanOrEqual(1);
+  expect(Math.abs(first.board.right - first.across)).toBeLessThanOrEqual(1);
+  // Side by side: the list on the left, the map beside it, all of the map on screen.
+  expect(first.main.right).toBeLessThanOrEqual(first.map.x);
+  expect(first.main.w).toBeGreaterThanOrEqual(460);
+  expect(first.map.w).toBeGreaterThan(first.main.w);
+  expect(first.map.h).toBeGreaterThanOrEqual(420);
+  expect(first.map.bottom).toBeLessThanOrEqual(first.tall + 1);
+  // The board opens on what is down, and so does the map beside it.
+  expect(first.pins).toEqual(['2 units here: 2 Down', 'Spotter 103, Down']);
+  await tile('Up');
+  await expect.poll(async () => (await layout()).pins).toEqual(['2 units here: 2 Up', 'Spotter 301, Up', 'Spotter 401, Up']);
+  // Tapping the same tile again shows every field unit, in the list and on the map.
+  await tile('Up');
+  await expect.poll(async () => (await layout()).pins).toEqual(['2 units here: 2 Down', '3 units here: 1 Down, 2 Up', 'Spotter 301, Up', 'Spotter 401, Up']);
+  // The Map tab still has the one map to itself, showing everything, with its own key.
+  await tile('Down');
+  await inBoard(host, root => root.getElementById('tabMap').click());
+  await expect.poll(async () => (await layout()).mapIn).toBe('viewMap');
+  const alone = await layout();
+  expect(alone).toMatchObject({side: false, shown: ['mapChips', 'mapNote', 'mapList']});
+  expect(alone.pins).toHaveLength(4);
+  expect(alone.map.w).toBeGreaterThan(first.map.w);
+  expect(await inBoard(host, root => root.querySelector('#mapChips .chip[aria-pressed="true"]').textContent)).toBe('All 7');
+  // Back on the Board tab the map is beside the list again.
+  await inBoard(host, root => root.getElementById('tabBoard').click());
+  await expect.poll(async () => (await layout()).mapIn).toBe('boardSide');
+  await expect.poll(async () => (await layout()).pins).toEqual(['2 units here: 2 Down', 'Spotter 103, Down']);
+  // A unit opens in a panel at the side, with the board still in view behind it.
+  await openUnit(host, 'Spotter 103');
+  const drawer = await inBoard(host, root => { const r = root.getElementById('panel').getBoundingClientRect(); return {x: r.x, right: r.right, w: r.width}; });
+  expect(drawer.x).toBeGreaterThan(first.board.x + first.board.w * 0.45);
+  expect(Math.abs(drawer.right - first.across)).toBeLessThanOrEqual(1);
   expect(state.errors).toEqual([]);
 });
 

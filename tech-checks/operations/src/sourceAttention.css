@@ -46,6 +46,14 @@
  #root#root .cos-fleet-dashboard:has(>.cos-board-landing[data-board='on']):not(:has(>.cos-fleet-drawer[hidden])){border-color:transparent;background:transparent;box-shadow:none;padding-bottom:0}
  .cos-board-landing[data-board='on']{margin-bottom:0}
 }
+/* On a desk the board has the whole screen beside the menu: no frame round it and no page title over it. The board's own header says what it is. */
+@media(min-width:701px){
+ #root#root .operations-shell>main:has(>.cos-fleet-dashboard>.cos-board-landing[data-board='on']):not(:has(>.cos-fleet-dashboard>.cos-fleet-drawer[hidden])){padding:0!important}
+ #root#root .operations-shell>main:has(>.cos-fleet-dashboard>.cos-board-landing[data-board='on']):not(:has(>.cos-fleet-dashboard>.cos-fleet-drawer[hidden]))>.company-utility-bar{display:none}
+ #root#root .cos-fleet-dashboard:has(>.cos-board-landing[data-board='on']):not(:has(>.cos-fleet-drawer[hidden])){border:0;border-radius:0;background:transparent;box-shadow:none;padding:0;margin:0}
+ .cos-board-landing[data-board='on']{margin:0}
+ .cos-board-landing[data-board='on']>:is(.cos-board-host,.cos-board-waiting){min-height:100vh;background:#060a11}
+}
 /* While the board is on screen nothing of the older Fleet screen is: not its view, not its row of tabs, and no way back to them from here.
    The older screen only stands in when the board cannot be shown at all. */
 #root#root .cos-fleet-dashboard:has(>.cos-board-landing[data-board='on']):not(:has(>.cos-fleet-drawer[hidden]))>.cos-fleet-content,

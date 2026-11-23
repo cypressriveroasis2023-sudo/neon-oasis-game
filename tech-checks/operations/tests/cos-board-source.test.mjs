@@ -4,6 +4,7 @@ import {readFileSync, readdirSync} from 'node:fs';
 
 const read = path => readFileSync(new URL(path, import.meta.url), 'utf8');
 const app = read('../src/cosBoard/boardApp.ts');
+const style = read('../src/cosBoard/boardStyle.ts');
 
 test('the board carries no fleet data and reads nothing itself', () => {
   // This repository is public. Unit names, customers, addresses and IPs reach the board from the signed-in feed only.
@@ -38,6 +39,58 @@ test('the board is isolated from the rest of COS and sends nothing itself', () =
   // Two on a unit's page, and on the manager view a handoff's signed report and each of its photos.
   assert.equal(links.length, 4);
   for (const link of links) assert.match(link, /href:[^,}]+,target:"_blank",rel:"noopener noreferrer"/);
+});
+
+test('on a desk the board takes the whole screen, with one map that keeps the drawing\'s shape', () => {
+  const css = read('../src/sourceAttention.css');
+  // No frame and no page title round the board on a desk. The older panel for picking a spot on the older map is still let through.
+  assert.match(css, /@media\(min-width:701px\)\{\n #root#root \.operations-shell>main:has\(>\.cos-fleet-dashboard>\.cos-board-landing\[data-board='on'\]\):not\(:has\(>\.cos-fleet-dashboard>\.cos-fleet-drawer\[hidden\]\)\)\{padding:0!important\}/);
+  assert.match(css, /:not\(:has\(>\.cos-fleet-dashboard>\.cos-fleet-drawer\[hidden\]\)\)>\.company-utility-bar\{display:none\}/);
+  // The board's own width decides, read again whenever it changes.
+  assert.match(app, /const across = \$\("cosb"\)\.getBoundingClientRect\(\)\.width, on = across >= 1000;/);
+  assert.match(app, /new ResizeObserver\(\(\)=>\{ measureWide\(\);/);
+  assert.match(app, /cleanups\.push\(\(\)=>seen\.disconnect\(\)\);/);
+  // One map. Beside the list on a wide Board tab, otherwise on its own tab; beside the list the count tiles choose what it shows.
+  assert.match(app, /const side = W\.wide && S\.view==="board", block=\$\("mapBlock"\), home = side \? \$\("boardSide"\) : \$\("viewMap"\);/);
+  assert.equal(app.split('id=\\"mapSvg\\"').length - 1, 1);
+  assert.match(app, /function sideFilter\(\)\{ if\(!W\.side\) return; const f=\["down","issues","unknown","up"\]\.includes\(S\.filter\) \? S\.filter : "all";/);
+  assert.match(app, /if\(!side\) M\.f="all";/);
+  // The map keeps the drawing's own shape on a desk, so the whole of it is on screen and none of its box is empty.
+  assert.match(style, /\.cosb\.wide \.mapwrap\{aspect-ratio:649\.5\/660\.0;height:auto;/);
+  assert.match(style, /\.cosb\.wide #viewBoard\{display:grid;grid-template-columns:minmax\(460px,1fr\) auto;/);
+  // A unit opens at the side. The page is never made a positioning box, so the panel and the message stay fixed to the window.
+  assert.match(style, /\.cosb\.wide \.panel\{margin:0 0 0 auto;width:min\(620px,48%\);/);
+  assert.doesNotMatch(style, /container-type|contain:/);
+});
+
+test('the TV board is the board itself drawn large, switched on and off, with no count of its own', () => {
+  // One tally, drawn two ways: the TV takes the views and the counts the board has just worked out.
+  assert.match(app, /for\(const v of vs\) c\[v\.status\]\+\+;\n  if\(TV\.on\)\{ drawTv\(vs, c\); return; \}/);
+  assert.match(app, /const tile=\(key,cls\)=>h\("div",\{class:"tile "\+cls\+\(c\[key\]\?"":" zero"\)\},h\("span",\{class:"num",text:c\[key\]\}\),h\("span",\{class:"lab",text:LABEL\[key\]\}\)\);/);
+  // It lists what needs someone: down first, then camera issues. Never a unit in the shop, never an unknown one as down.
+  assert.match(app, /TV\.rows=\[\.\.\.vs\.filter\(v=>v\.status==="down"\)\.sort\(byName\), \.\.\.vs\.filter\(v=>v\.status==="issues"\)\.sort\(byName\)\];/);
+  // The one map moves onto the TV screen and back to where it was.
+  assert.match(app, /\$\("tvMap"\)\.append\(\$\("mapWrap"\)\);/);
+  assert.match(app, /\$\("mapBlock"\)\.insertBefore\(\$\("mapWrap"\), \$\("mapNote"\)\);/);
+  assert.equal(app.split('id=\\"mapSvg\\"').length - 1, 1);
+  // Leaving is always possible: a button, a second button on a small screen, and Escape.
+  assert.match(app, /\$\("tvExit"\)\.addEventListener\("click",tvLeave\); \$\("tvExitTop"\)\.addEventListener\("click",tvLeave\);/);
+  assert.match(app, /if\(ev\.key==="Escape"\) tvLeave\(\);/);
+  assert.match(app, /if\(hooks && typeof hooks\.onTv==="function"\) hooks\.onTv\(false\);/);
+  // It stands over the whole frame without making the page a positioning box for anything else.
+  assert.match(style, /\.cosb\.tv\{position:fixed;inset:0;z-index:2147482000;overflow:hidden;/);
+  const landing = read('../src/CosBoardLanding.tsx'), door = read('../src/BoardsDoor.tsx'), daily = read('../src/DailyBoard.tsx');
+  // The app tells the page around the frame with the message the older TV display sends, on this origin only, and takes it back when the board goes.
+  assert.match(landing, /window\.parent\.postMessage\(\{type: 'COS_TV_BOARD_DISPLAY_MODE', active: on\}, window\.location\.origin\);/);
+  assert.match(landing, /if \(tvOn\.current\) \{ tvOn\.current = false; showTv\(false\); \}/);
+  // Boards opens it only on a device that shows the board. Any other keeps the Daily Board page and its older TV display.
+  assert.match(door, /const \[leaving\] = useState\(boardShownHere\);/);
+  assert.match(door, /return leaving \? <p className='cos-manager-door' role='status'>Opening the TV board…<\/p> : <>\{children\}<\/>;/);
+  assert.match(read('../src/FleetBoard.tsx'), /export const boardShownHere = \(\): boolean => recall\(\) && !switchedOff\(\);/);
+  assert.equal(daily.split('<BoardsDoor>').length - 1, 2);
+  assert.equal(daily.split('</BoardsDoor>').length - 1, 2);
+  assert.match(daily, /  if\(tv\)return <BoardsDoor><TechCheckTvBoard /);
+  assert.match(daily, /  return <BoardsDoor><section className='cos-daily-board' aria-label='COS Daily Board'>/);
 });
 
 test('Fleet hands the board the same feed, clock and field map as its headline', () => {
@@ -136,4 +189,24 @@ test('the map covers its box, and a spot with a mix of states is a ring, not one
   assert.match(app, /sv\("text",\{class:"badn",[^}]*text:String\(by\.down\)\}\)/);
   // Town names are placed clear of the pins, or left off.
   assert.match(app, /boxes=cl\.map\(c=>\{ const n=c\.m\.length, r=/);
+});
+
+test('the board counts one way, and a hand fix comes first on the card and says what it did to the count', () => {
+  const app = read('../src/cosBoard/boardApp.ts');
+  // One count. mHelp's list decides it once it has loaded; there is no stored choice and nothing to pick.
+  assert.equal(/S\.mode\b|setMode|Count by|Camera systems"\)/.test(app), false);
+  assert.equal(app.includes('localStorage.setItem("cos-count-mode"'), false);
+  assert.ok(app.includes('try{ localStorage.removeItem("cos-count-mode"); }catch(_){}'));
+  assert.ok(app.includes('if(S.mh){'));
+  assert.ok(app.includes('One count: mHelp, the official list'));
+  assert.ok(app.includes('The mHelp list has not loaded, so this shows only what the camera systems can see. It is not the official count.'));
+  // What the camera systems see on their own is only the fallback, and so is its DO NOT USE exclusion.
+  assert.ok(app.includes('(v.excl && !S.mh) ? "excl"'));
+  assert.ok(app.includes('const feeds = !S.mh;'));
+  // Fix it sits right under the diagnosis, and the save waits for the saved reading before saying how the count moved.
+  assert.ok(app.includes('body.splice(2,0,fx);'));
+  assert.equal(app.includes('body.push(fx);'), false);
+  assert.match(app, /S\.saved=\{was, said: said \|\| "Saved\."\}; clearTimeout\(savedTimer\); savedTimer=setTimeout\(saidSaved, 1500\);/);
+  assert.match(app, /render\(\);\n  announce\(\);\n  saidSaved\(\);\n\}/);
+  assert.ok(app.includes('" The count changed: "+moved.join(", ")+"."'));
 });

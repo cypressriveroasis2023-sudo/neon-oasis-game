@@ -1,9 +1,12 @@
 import {useRef,useState} from 'react';
 import {workspaceLabel} from './workspaceNavigation';
 import {matchingApprovedTools} from './approvedToolSearch';
+import {approvedToolGroups} from './approvedCosNavigation';
 import './approvedCosToolSearch.css';
 
 const toolLabel=(name:string)=>name==='Units On Hand'?'Shop inventory':workspaceLabel(name);
+// The tools in daily use are on the page as it opens. The older screens stay folded until asked for.
+const inUse:string=approvedToolGroups[0].label;
 
 export default function OperationsAreas({navigate,trackerVisible=false}:{navigate:(workspace:string)=>void;trackerVisible?:boolean}) {
   const [query,setQuery]=useState('');
@@ -19,7 +22,7 @@ export default function OperationsAreas({navigate,trackerVisible=false}:{navigat
       <button type='button' className='secondary' disabled={!query} onClick={clear}>Clear search</button>
     </div>
     <p className='cos-approved-tool-search-status' role='status' aria-live='polite' aria-atomic='true'>{searching?(count?`${count} ${count===1?'tool matches':'tools match'} your search.`:'No tools match your search. Clear it to browse all available tools.'):'Choose a group below, or search by tool name.'}</p>
-    {groups.map(group=><details className='cos-approved-tool-group' key={(searching?query+':':'browse:')+group.label} open={searching?true:undefined}>
+    {groups.map(group=><details className='cos-approved-tool-group' key={(searching?query+':':'browse:')+group.label} open={searching||group.label===inUse?true:undefined}>
       <summary>{group.label}</summary>
       <div className='operations-directory-links'>{group.items.map(name=><button type='button' className='secondary' key={name} onClick={()=>navigate(name)}>{toolLabel(name)}</button>)}</div>
     </details>)}

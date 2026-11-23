@@ -20,6 +20,8 @@ const WAIT_MS = 8000;
  */
 const OFF = 'cos.fleetBoard.off';
 const switchedOff = () => { try { return window.localStorage.getItem(OFF) === '1'; } catch { return false; } };
+/** Whether this device shows the board on Fleet: it has before, and it is not switched off. */
+export const boardShownHere = (): boolean => recall() && !switchedOff();
 
 function Forget() {
   useEffect(() => { remember(false); }, []);

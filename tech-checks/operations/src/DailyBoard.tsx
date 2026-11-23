@@ -9,6 +9,7 @@ import {captureBoardSelection} from './boardRecordDetails';
 import { createBoardReader, createBoardAssignmentSaver, type BoardSnapshot } from './boardPersistence';
 import { validateLocalSchedule } from '../shared/scheduleValidation';
 import TechCheckTvBoard from './TechCheckTvBoard';
+import BoardsDoor from './BoardsDoor';
 import FleetDashboard from './FleetDashboard';
 import { TV_REFRESH_MS, tvBoardLink, tvBoardOptions } from './tvBoardData';
 import {useTvBoardSettings} from './useTvBoardSettings';
@@ -199,9 +200,9 @@ export default function DailyBoard({api,session,openWorkspace,onTvChange,initial
   // The TV already reads fleet through TvFleetView. Mounting the dashboard here
   // would publish that first read into the shared fleet cache and hide the
   // sample TvFleetView takes when Camera Health or the map actually opens.
-  if(tv)return <TechCheckTvBoard counts={null} cards={tvCards} names={laneNames} readiness={readiness} scope={scope} now={now} lastSuccess={lastSuccess} error={error} stale={stale} busy={busy} rotation={rotation} rotationSeconds={tvSettings.settings.rotationSeconds} exit={()=>setTv(false)} refresh={()=>{void refresh();void tvSettings.refresh();}} sections={tvSettings.settings.sections} settingsError={tvSettings.error} reconnecting={reconnecting} api={api}/>;
+  if(tv)return <BoardsDoor><TechCheckTvBoard counts={null} cards={tvCards} names={laneNames} readiness={readiness} scope={scope} now={now} lastSuccess={lastSuccess} error={error} stale={stale} busy={busy} rotation={rotation} rotationSeconds={tvSettings.settings.rotationSeconds} exit={()=>setTv(false)} refresh={()=>{void refresh();void tvSettings.refresh();}} sections={tvSettings.settings.sections} settingsError={tvSettings.error} reconnecting={reconnecting} api={api}/></BoardsDoor>;
   const fleetCounts=<FleetDashboard countsOnly session={session} navigate={openWorkspace} onSelectUnit={()=>undefined} openUnitHealth={()=>undefined} show={()=>undefined} historyReadEnabled={false} locationWritesEnabled={false} ownerManagementEnabled={false} ownerCensusEnabled={false} registerEquipment={()=>undefined}/>;
-  return <section className='cos-daily-board' aria-label='COS Daily Board'>
+  return <BoardsDoor><section className='cos-daily-board' aria-label='COS Daily Board'>
     <header className='daily-board-header'>
       <div><small>CAMERAS ON SITE · DAILY OPERATIONS</small><h2>Daily Board</h2><p>{now.toLocaleDateString('en-US',{timeZone:'America/Chicago',weekday:'long',month:'long',day:'numeric',year:'numeric'})} · {now.toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour:'numeric',minute:'2-digit'})} CT</p></div>
       <div className='daily-board-actions'><button className='secondary' disabled={busy||saving} onClick={()=>void refresh()}>{busy?'Refreshing…':'Refresh'}</button><button className='secondary' aria-pressed={tv} onClick={()=>{setTv(true);setRotation(0);setSelected(null);}}>TV View</button><button className='secondary' onClick={()=>void copyTvLink()}>Copy TV link</button></div>
@@ -252,6 +253,5 @@ export default function DailyBoard({api,session,openWorkspace,onTvChange,initial
       <p className='daily-board-assignment-note'>Saving updates the existing production visit. Drag-and-drop never bypasses scheduling or department validation.</p>
       <div className='daily-board-actions'><button className='secondary' disabled={saving} onClick={()=>setAssigning(null)}>Cancel</button><button disabled={busy||saving||refreshRequired||!assignment.technician} onClick={saveAssignment}>{saving?'Saving…':'Save Schedule & Assignment'}</button></div>
     </section></dialog>}
-  </section>;
+  </section></BoardsDoor>;
 }
-
