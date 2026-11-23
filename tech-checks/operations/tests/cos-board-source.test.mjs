@@ -41,13 +41,14 @@ test('the board is isolated from the rest of COS and sends nothing itself', () =
   for (const link of links) assert.match(link, /href:[^,}]+,target:"_blank",rel:"noopener noreferrer"/);
 });
 
-test('on a desk the board takes the whole screen, with one map that keeps the drawing\'s shape', () => {
+test('on a desk the board is one screen, with one map that keeps the drawing\'s shape', () => {
   const css = read('../src/sourceAttention.css');
   // No frame and no page title round the board on a desk. The older panel for picking a spot on the older map is still let through.
   assert.match(css, /@media\(min-width:701px\)\{\n #root#root \.operations-shell>main:has\(>\.cos-fleet-dashboard>\.cos-board-landing\[data-board='on'\]\):not\(:has\(>\.cos-fleet-dashboard>\.cos-fleet-drawer\[hidden\]\)\)\{padding:0!important\}/);
   assert.match(css, /:not\(:has\(>\.cos-fleet-dashboard>\.cos-fleet-drawer\[hidden\]\)\)>\.company-utility-bar\{display:none\}/);
   // The board's own width decides, read again whenever it changes.
-  assert.match(app, /const across = \$\("cosb"\)\.getBoundingClientRect\(\)\.width, on = across >= 1000;/);
+  assert.match(app, /const across = \$\("cosb"\)\.getBoundingClientRect\(\)\.width, on = across >= 880;/);
+  assert.match(app, /\$\("cosb"\)\.classList\.toggle\("roomy", across >= 1200\);/);
   assert.match(app, /new ResizeObserver\(\(\)=>\{ measureWide\(\);/);
   assert.match(app, /cleanups\.push\(\(\)=>seen\.disconnect\(\)\);/);
   // One map. Beside the list on a wide Board tab, otherwise on its own tab; beside the list the count tiles choose what it shows.
@@ -55,9 +56,18 @@ test('on a desk the board takes the whole screen, with one map that keeps the dr
   assert.equal(app.split('id=\\"mapSvg\\"').length - 1, 1);
   assert.match(app, /function sideFilter\(\)\{ if\(!W\.side\) return; const f=\["down","issues","unknown","up"\]\.includes\(S\.filter\) \? S\.filter : "all";/);
   assert.match(app, /if\(!side\) M\.f="all";/);
-  // The map keeps the drawing's own shape on a desk, so the whole of it is on screen and none of its box is empty.
-  assert.match(style, /\.cosb\.wide \.mapwrap\{aspect-ratio:649\.5\/660\.0;height:auto;/);
-  assert.match(style, /\.cosb\.wide #viewBoard\{display:grid;grid-template-columns:minmax\(460px,1fr\) auto;/);
+  // One screen: the board is as tall as the window, the tabs sit in its top bar, and each tab scrolls inside it.
+  assert.match(style, /\.cosb\.wide:not\(\.tv\)\{height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden\}/);
+  assert.match(style, /\.cosb\.wide>main>section\{flex:1;min-height:0;overflow-y:auto;/);
+  assert.match(app, /if\(W\.wide\)\{ if\(tabs\.parentNode!==bar\) bar\.insertBefore\(tabs, bar\.querySelector\("\.logo"\)\.nextSibling\); \}\n  else if\(tabs\.parentNode!==main\) main\.insertBefore\(tabs, main\.firstChild\);/);
+  // The counts are one row, then the list, which scrolls on its own, and the map beside it.
+  assert.match(style, /\.cosb\.wide #viewBoard\{display:grid;grid-template-columns:minmax\(0,1fr\) auto;grid-template-rows:auto auto minmax\(0,1fr\);grid-template-areas:\\"kpi kpi\\" \\"mode mode\\" \\"list map\\";/);
+  assert.match(style, /\.cosb\.wide #kpi\{grid-area:kpi;display:grid;grid-template-columns:repeat\(4,minmax\(0,1\.3fr\)\);grid-auto-flow:column;grid-auto-columns:minmax\(0,1fr\);/);
+  assert.match(style, /\.cosb\.wide #boardList\{grid-area:list;min-width:0;min-height:0;overflow-y:auto;/);
+  // The map is as tall as its pane and keeps the drawing's own shape, so the whole of it is on screen. The list keeps room of its own.
+  assert.match(style, /\.cosb\.wide \.mapwrap\{aspect-ratio:auto;min-height:0;max-height:none;min-width:0;height:var\(--mh,480px\);width:calc\(var\(--mh,480px\) \* 0\.9841\)\}/);
+  assert.match(app, /const size = Math\.floor\(Math\.max\(240, Math\.min\(tall, room \/ 0\.9841\)\)\);/);
+  assert.match(app, /room = across - 56 - 18 - \(W\.side \? 480 : 380\);/);
   // A unit opens at the side. The page is never made a positioning box, so the panel and the message stay fixed to the window.
   assert.match(style, /\.cosb\.wide \.panel\{margin:0 0 0 auto;width:min\(620px,48%\);/);
   assert.doesNotMatch(style, /container-type|contain:/);
@@ -206,7 +216,16 @@ test('the board counts one way, and a hand fix comes first on the card and says 
   // Fix it sits right under the diagnosis, and the save waits for the saved reading before saying how the count moved.
   assert.ok(app.includes('body.splice(2,0,fx);'));
   assert.equal(app.includes('body.push(fx);'), false);
-  assert.match(app, /S\.saved=\{was, said: said \|\| "Saved\."\}; clearTimeout\(savedTimer\); savedTimer=setTimeout\(saidSaved, 1500\);/);
+  assert.match(app, /S\.saved=\{was, said: said \|\| "Saved\.", unit:v\.id, ip:steps\.some\(x=>x\.field==="public_ip"\)\}; clearTimeout\(savedTimer\); savedTimer=setTimeout\(saidSaved, 1500\);/);
+  // A corrected IP is kept, and the save says that Up or Down still comes from Star4Live.
+  assert.match(app, /still = !moved\.length && ip && v && v\.u\.s==="v" && \["down","issues","unknown"\]\.includes\(v\.status\);/);
+  // What a person set by hand is settled: off the open punch list for as long as the hand fix stands.
+  assert.match(app, /sec:"place", fixed:!!v\.hand\.place,/);
+  assert.match(app, /sec:"name", fixed:!!v\.hand\.name,/);
+  assert.match(app, /const settled=i=>!!\(done\[i\.id\] \|\| i\.fixed\);\n  const open=items\.filter\(i=>!settled\(i\)\)/);
+  assert.ok(app.includes('["done","Fixed by hand","Set by hand in COS, so these are off the list and stay off.'));
+  // The card says in so many words that a hand fix is kept.
+  assert.ok(app.includes('A fix made by hand wins in COS and stays until someone undoes it. No new reading from mHelp or Star4Live replaces it.'));
   assert.match(app, /render\(\);\n  announce\(\);\n  saidSaved\(\);\n\}/);
   assert.ok(app.includes('" The count changed: "+moved.join(", ")+"."'));
 });

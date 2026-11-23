@@ -12,7 +12,7 @@
 import mapData from './boardMap.json';
 import {BOARD_CSS} from './boardStyle';
 
-const SHELL = "<div class=\"cosb\" id=\"cosb\"><header class=\"top\"><div class=\"wrap\">\n  <div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div>\n  <span class=\"topbtns\"><button class=\"tvgo\" id=\"tvGo\" type=\"button\">TV board</button><button class=\"refresh\" id=\"refresh\" type=\"button\">Refresh</button></span>\n</div></header>\n<div class=\"asof\" id=\"asof\"><div class=\"wrap\"><span id=\"asofMain\">Loading the camera reading…</span><span id=\"asofSub\"></span></div></div>\n\n<main class=\"wrap\">\n  <div class=\"tabs\" role=\"tablist\">\n    <button class=\"tab\" role=\"tab\" id=\"tabBoard\" aria-selected=\"true\" type=\"button\">Board</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabMap\" aria-selected=\"false\" type=\"button\">Map</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabTech\" aria-selected=\"false\" type=\"button\">Tech check</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabManager\" aria-selected=\"false\" type=\"button\" hidden>Manager</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabPunch\" aria-selected=\"false\" type=\"button\">Punch list</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabActivity\" aria-selected=\"false\" type=\"button\">Changes</button>\n  </div>\n\n  <section id=\"viewBoard\">\n    <div id=\"boardMain\">\n    <div class=\"mode\" id=\"modeRow\"></div>\n    <div class=\"tiles\" id=\"tiles\"></div>\n    <div class=\"shoprow\" id=\"shoprow\"></div>\n    <div class=\"controls\">\n      <input class=\"search\" id=\"q\" type=\"search\" placeholder=\"Find a unit, site, A# or IP\" autocomplete=\"off\" aria-label=\"Find a unit, site, A number or IP\">\n      <div class=\"chips\" id=\"fam\"></div>\n    </div>\n    <div class=\"count\" id=\"count\"></div>\n    <div class=\"list\" id=\"list\"></div>\n    <ul class=\"foot\"><li>One unit counts once, however many cameras it has.</li><li>A unit in the shop never counts as down.</li><li>A reading that is missing or too old shows Unknown, never Down.</li><li>Router checks are a reference only. A router online does not prove the cameras work.</li><li>Hand fixes made here are saved in COS with your name and the time. Nothing here changes mHelp, Star4Live or InHand.</li></ul>\n    </div>\n    <aside id=\"boardSide\" aria-label=\"Map of field units\" hidden></aside>\n  </section>\n\n  <section id=\"viewMap\" hidden>\n    <div id=\"mapBlock\">\n    <div class=\"chips\" id=\"mapChips\"></div>\n    <div class=\"chips\" id=\"mapGo\" style=\"margin-top:8px\"></div>\n    <div class=\"mapwrap\" id=\"mapWrap\">\n      <svg id=\"mapSvg\" role=\"img\" aria-label=\"Map of field units\"><g id=\"mapBase\"></g><g id=\"mapLabels\"></g><g id=\"mapPins\"></g></svg>\n      <div class=\"mapbtns\"><button type=\"button\" id=\"zin\" aria-label=\"Zoom in\">+</button><button type=\"button\" id=\"zout\" aria-label=\"Zoom out\">&minus;</button></div>\n      <div class=\"mapmsg\" id=\"mapMsg\" hidden></div>\n      <div class=\"mapsel\" id=\"mapSel\" hidden></div>\n    </div>\n    <p class=\"note\" id=\"mapNote\" style=\"margin-top:10px\"></p>\n    <div class=\"list\" id=\"mapList\"></div>\n    </div>\n  </section>\n\n  <section id=\"viewTech\" hidden>\n    <div id=\"techForm\"></div>\n    <div id=\"techList\"></div>\n  </section>\n\n  <section id=\"viewManager\" hidden>\n    <div id=\"mgNow\"></div>\n    <div id=\"mgChecks\"></div>\n    <div id=\"mgTrucks\"></div>\n    <div id=\"mgX\"></div>\n    <div id=\"mgTools\"></div>\n  </section>\n\n  <section id=\"viewPunch\" hidden>\n    <div class=\"box\" id=\"punchTop\"><p class=\"note\">Loading the mHelp list…</p></div>\n    <div class=\"chips\" id=\"punchChips\" style=\"margin-top:12px\"></div>\n    <div class=\"count\" id=\"punchCount\"></div>\n    <div class=\"list\" id=\"punchList\"></div>\n  </section>\n\n  <section id=\"viewActivity\" hidden>\n    <p class=\"note\" id=\"actNote\">Every change made by hand on this board, newest first.</p>\n    <ul class=\"hist\" id=\"activity\"></ul>\n  </section>\n</main>\n\n<section id=\"viewTv\" hidden><header class=\"tvtop\"><div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div><div class=\"tvread\" id=\"tvRead\" role=\"status\">Loading the camera reading…</div><div class=\"tvclock\"><b id=\"tvClock\"></b><span id=\"tvDate\"></span></div><button type=\"button\" class=\"tvx\" id=\"tvExitTop\">Exit TV</button></header><div class=\"tvgrid\" id=\"tvGrid\"><div class=\"tvleft\"><div class=\"tvtiles\" id=\"tvTiles\"></div><div class=\"tvminis\" id=\"tvMinis\"></div><div class=\"tvhead\" id=\"tvHead\"></div><div class=\"tvlist\" id=\"tvList\"></div></div><div class=\"tvright\" id=\"tvRight\"><div class=\"tvmaptitle\" id=\"tvMapTitle\"></div><div class=\"tvmap\" id=\"tvMap\"></div></div></div><footer class=\"tvfoot\"><span id=\"tvNote\"></span><span class=\"tvbtns\"><button type=\"button\" id=\"tvRefresh\">Refresh</button><button type=\"button\" id=\"tvFull\">Full screen</button><button type=\"button\" id=\"tvExit\">Exit TV</button></span></footer></section><div class=\"sheet\" id=\"sheet\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"pname\"><div class=\"panel\" id=\"panel\"></div></div>\n<div class=\"toast\" id=\"toast\" role=\"status\" aria-live=\"polite\"></div></div>";
+const SHELL = "<div class=\"cosb\" id=\"cosb\"><header class=\"top\"><div class=\"wrap\">\n  <div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div>\n  <span class=\"topbtns\"><button class=\"tvgo\" id=\"tvGo\" type=\"button\">TV board</button><button class=\"refresh\" id=\"refresh\" type=\"button\">Refresh</button></span>\n</div></header>\n<div class=\"asof\" id=\"asof\"><div class=\"wrap\"><span id=\"asofMain\">Loading the camera reading…</span><span id=\"asofSub\"></span></div></div>\n\n<main class=\"wrap\">\n  <div class=\"tabs\" role=\"tablist\">\n    <button class=\"tab\" role=\"tab\" id=\"tabBoard\" aria-selected=\"true\" type=\"button\">Board</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabMap\" aria-selected=\"false\" type=\"button\">Map</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabTech\" aria-selected=\"false\" type=\"button\">Tech check</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabManager\" aria-selected=\"false\" type=\"button\" hidden>Manager</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabPunch\" aria-selected=\"false\" type=\"button\">Punch list</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabActivity\" aria-selected=\"false\" type=\"button\">Changes</button>\n  </div>\n\n  <section id=\"viewBoard\">\n    <div id=\"boardMain\">\n    <div class=\"mode\" id=\"modeRow\"></div>\n    <div class=\"kpi\" id=\"kpi\">\n    <div class=\"tiles\" id=\"tiles\"></div>\n    <div class=\"shoprow\" id=\"shoprow\"></div>\n    </div>\n    <div id=\"boardList\">\n    <div class=\"controls\">\n      <input class=\"search\" id=\"q\" type=\"search\" placeholder=\"Find a unit, site, A# or IP\" autocomplete=\"off\" aria-label=\"Find a unit, site, A number or IP\">\n      <div class=\"chips\" id=\"fam\"></div>\n    </div>\n    <div class=\"count\" id=\"count\"></div>\n    <div class=\"list\" id=\"list\"></div>\n    <ul class=\"foot\"><li>One unit counts once, however many cameras it has.</li><li>A unit in the shop never counts as down.</li><li>A reading that is missing or too old shows Unknown, never Down.</li><li>Router checks are a reference only. A router online does not prove the cameras work.</li><li>Hand fixes made here are saved in COS with your name and the time. Nothing here changes mHelp, Star4Live or InHand.</li></ul>\n    </div>\n    </div>\n    <aside id=\"boardSide\" aria-label=\"Map of field units\" hidden></aside>\n  </section>\n\n  <section id=\"viewMap\" hidden>\n    <div id=\"mapBlock\">\n    <div class=\"chips\" id=\"mapChips\"></div>\n    <div class=\"chips\" id=\"mapGo\" style=\"margin-top:8px\"></div>\n    <div class=\"mapwrap\" id=\"mapWrap\">\n      <svg id=\"mapSvg\" role=\"img\" aria-label=\"Map of field units\"><g id=\"mapBase\"></g><g id=\"mapLabels\"></g><g id=\"mapPins\"></g></svg>\n      <div class=\"mapbtns\"><button type=\"button\" id=\"zin\" aria-label=\"Zoom in\">+</button><button type=\"button\" id=\"zout\" aria-label=\"Zoom out\">&minus;</button></div>\n      <div class=\"mapmsg\" id=\"mapMsg\" hidden></div>\n      <div class=\"mapsel\" id=\"mapSel\" hidden></div>\n    </div>\n    <p class=\"note\" id=\"mapNote\" style=\"margin-top:10px\"></p>\n    <div class=\"list\" id=\"mapList\"></div>\n    </div>\n  </section>\n\n  <section id=\"viewTech\" hidden>\n    <div id=\"techForm\"></div>\n    <div id=\"techList\"></div>\n  </section>\n\n  <section id=\"viewManager\" hidden>\n    <div id=\"mgNow\"></div>\n    <div id=\"mgChecks\"></div>\n    <div id=\"mgTrucks\"></div>\n    <div id=\"mgX\"></div>\n    <div id=\"mgTools\"></div>\n  </section>\n\n  <section id=\"viewPunch\" hidden>\n    <div class=\"box\" id=\"punchTop\"><p class=\"note\">Loading the mHelp list…</p></div>\n    <div class=\"chips\" id=\"punchChips\" style=\"margin-top:12px\"></div>\n    <div class=\"count\" id=\"punchCount\"></div>\n    <div class=\"list\" id=\"punchList\"></div>\n  </section>\n\n  <section id=\"viewActivity\" hidden>\n    <p class=\"note\" id=\"actNote\">Every change made by hand on this board, newest first.</p>\n    <ul class=\"hist\" id=\"activity\"></ul>\n  </section>\n</main>\n\n<section id=\"viewTv\" hidden><header class=\"tvtop\"><div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div><div class=\"tvread\" id=\"tvRead\" role=\"status\">Loading the camera reading…</div><div class=\"tvclock\"><b id=\"tvClock\"></b><span id=\"tvDate\"></span></div><button type=\"button\" class=\"tvx\" id=\"tvExitTop\">Exit TV</button></header><div class=\"tvgrid\" id=\"tvGrid\"><div class=\"tvleft\"><div class=\"tvtiles\" id=\"tvTiles\"></div><div class=\"tvminis\" id=\"tvMinis\"></div><div class=\"tvhead\" id=\"tvHead\"></div><div class=\"tvlist\" id=\"tvList\"></div></div><div class=\"tvright\" id=\"tvRight\"><div class=\"tvmaptitle\" id=\"tvMapTitle\"></div><div class=\"tvmap\" id=\"tvMap\"></div></div></div><footer class=\"tvfoot\"><span id=\"tvNote\"></span><span class=\"tvbtns\"><button type=\"button\" id=\"tvRefresh\">Refresh</button><button type=\"button\" id=\"tvFull\">Full screen</button><button type=\"button\" id=\"tvExit\">Exit TV</button></span></footer></section><div class=\"sheet\" id=\"sheet\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"pname\"><div class=\"panel\" id=\"panel\"></div></div>\n<div class=\"toast\" id=\"toast\" role=\"status\" aria-live=\"polite\"></div></div>";
 /* A shadow root can be attached to an element only once, so a host that is mounted again gets its first root back. */
 const ROOTS = new WeakMap();
 
@@ -115,9 +115,9 @@ function reconcile(vs, mh){
     if(best>=0){ used.add(best); out.match[v.id]={ rec:mh.recs[best], fuzzy:true }; } else still.push(v); }
   const pl=p=>p==="field"?"Field":"Shop";
   for(const v of sorted){ const m=out.match[v.id]; if(!m) continue; const r=m.rec;
-    if(v.place!==r.place) out.items.push({ id:"place~"+v.id, sec:"place", unit:v.id, name:v.name, st:v.status,
+    if(v.place!==r.place) out.items.push({ id:"place~"+v.id, sec:"place", fixed:!!v.hand.place, unit:v.id, name:v.name, st:v.status,
       text:[["mHelp: ",pl(r.place)+(r.cust?" at "+r.cust:"")+(m.fuzzy?" (listed as "+r.label+")":"")],[SRC(v)+": ",pl(v.place)+(v.site?" at "+v.site:"")]] });
-    else if(m.fuzzy) out.items.push({ id:"name~"+v.id, sec:"name", unit:v.id, name:v.name, st:v.status, text:[["mHelp: ",r.label+" (A# "+r.id+")"],[SRC(v)+": ",v.name]] });
+    else if(m.fuzzy) out.items.push({ id:"name~"+v.id, sec:"name", fixed:!!v.hand.name, unit:v.id, name:v.name, st:v.status, text:[["mHelp: ",r.label+" (A# "+r.id+")"],[SRC(v)+": ",v.name]] });
   }
   const seen={}; for(const v of sorted){ if(out.match[v.id]) { const k=bk.get(v.id).join("|"); seen[k]=1; } }
   for(const v of still){ const k=bk.get(v.id); const dup = k[0] && seen[k.join("|")];
@@ -226,7 +226,7 @@ const PSEC = [["place","Placed differently","mHelp is official, so the board sho
   ["name","Names differ","Same number, different name in each system. Worth making the names match."],
   ["mhShop","Shop, no camera feed","In mHelp's shop list with no camera record. Normal for units on the shelf."],
   ["bdShop","Shop feed, not in mHelp","Camera records under shop with nothing in mHelp: test devices, retired units, old tracker rows. Not counted."],
-  ["done","Handled","Items someone marked handled. They drop off by themselves once the systems agree."]];
+  ["done","Fixed by hand","Set by hand in COS, so these are off the list and stay off. mHelp still shows them differently: make the same change there when you can."]];
 /* The answers James added for the punch list: where each unit really is, what record to fix, and who fixes it. */
 function normName(n){ return String(n||"").toUpperCase().replace(/SOLAR\s*SPOTTER/,"SS").replace(/RECON\s*(II|2)/,"RII").replace(/CAM[\s-]*V/,"CAMV").replace(/[^A-Z0-9.]/g,""); }
 function resFor(...names){ if(!S.res) return null;
@@ -243,7 +243,9 @@ function drawPunch(vs){
   const top=$("punchTop"), mh=S.mh;
   if(!mh){ top.replaceChildren(h("p",{class:"note",text:"The mHelp list has not loaded. Tap Refresh, or reopen COS."})); $("punchChips").replaceChildren(); $("punchList").replaceChildren(); $("punchCount").textContent=""; return; }
   vs = vs || allViews(); const items=S.rec.items, done=S.pdone;
-  const open=items.filter(i=>!done[i.id]), cnt={}; for(const i of open) cnt[i.sec]=(cnt[i.sec]||0)+1; cnt.done=items.filter(i=>done[i.id]).length;
+  /* What a person set by hand in COS is settled: it is off the open list for as long as the hand fix stands. */
+  const settled=i=>!!(done[i.id] || i.fixed);
+  const open=items.filter(i=>!settled(i)), cnt={}; for(const i of open) cnt[i.sec]=(cnt[i.sec]||0)+1; cnt.done=items.filter(settled).length;
   const real=vs.filter(v=>!v.mhOnly), sf=real.filter(v=>v.feedPlace==="field").length, cam=mh.recs.length, mf=mh.recs.filter(r=>r.place==="field").length;
   const blocking=(cnt.place||0)+(cnt.mhField||0)+(cnt.bdField||0);
   top.replaceChildren(
@@ -255,7 +257,7 @@ function drawPunch(vs){
     h("p",{class:"note",text:"mHelp is the official count: "+mh.meta.total+" pieces of equipment, "+mh.meta.field+" in the field and "+mh.meta.shop+" in the shop. "+mh.meta.stands+" of those are stands, poles and skids ("+mh.meta.standsField+" in the field). They count, but they have no cameras, so they are not listed on this board."}),
     h("p",{class:"note",text:"mHelp read "+when(mh.meta.at)+". Camera systems read "+when(S.meta.v)+"."}));
   $("punchChips").replaceChildren(...PSEC.map(([k,l])=>h("button",{class:"chip",type:"button","aria-pressed":String(S.psec===k),onclick:()=>{S.psec=k;drawPunch();}},l+" · "+(cnt[k]||0))));
-  const sec=PSEC.find(p=>p[0]===S.psec), rows = S.psec==="done" ? items.filter(i=>done[i.id]) : open.filter(i=>i.sec===S.psec);
+  const sec=PSEC.find(p=>p[0]===S.psec), rows = S.psec==="done" ? items.filter(settled) : open.filter(i=>i.sec===S.psec);
   $("punchCount").textContent=sec[2];
   const can = S.db && S.canWrite!==false;
   $("punchList").replaceChildren(...(rows.length ? rows.slice(0,400).map(it=>{
@@ -442,7 +444,7 @@ function drawPanel(){
         h("div",{class:"btns"},h("button",{class:"fixbtn",type:"submit",disabled:S.busy},"Save"),h("button",{class:"fixbtn alt",type:"button",onclick:()=>{S.form=null;drawPanel();}},"Cancel"))));
       setTimeout(()=>{ try{ inp.focus(); }catch(_){} },0);
     }
-    fx.append(h("p",{class:"note",text:"A fix made by hand wins in COS and is saved with your name and the time. mHelp is the official count, so make the same change in mHelp."}));
+    fx.append(h("p",{class:"note",text:"A fix made by hand wins in COS and stays until someone undoes it. No new reading from mHelp or Star4Live replaces it. It is saved with your name and the time. mHelp is the official count, so make the same change in mHelp."}));
   }
   /* The fix comes first on the card, right under what is wrong. */
   body.splice(2,0,fx);
@@ -609,6 +611,7 @@ function showOnMap(v){ const pin=pinOf(v); if(!pin) return; closeUnit(); M.focus
 const GO = [["All units",null],["Houston",29.80,-95.42,7.5],["Austin",30.22,-97.72,9],["San Antonio",29.45,-98.5,11],["Dallas–Fort Worth",32.7,-97.2,8]];
 function drawMap(vs){
   if(!(S.view==="map" || W.side || TV.on) || !S.meta) return;
+  fitMap();
   vs = vs || allViews();
   const field = vs.filter(v=>v.place==="field" && v.status!=="notin" && v.status!=="excl"), pts=[], none=[];
   for(const v of field){ const p=pinOf(v); if(p){ const [x,y]=toXY(p.lat,p.lng); pts.push({v,p,x,y}); } else none.push(v); }
@@ -637,16 +640,20 @@ function drawMap(vs){
     if(M.drop){ const [lat,lng]=toLL((px-M.tx)/M.z,(py-M.ty)/M.z); M.drop.ll={lat,lng}; drawMsg(); paint(); }
     else if(M.sel){ M.sel=null; drawSel(); } });
   $("zin").addEventListener("click",()=>zoomAt(M.w/2,M.h/2,1.8)); $("zout").addEventListener("click",()=>zoomAt(M.w/2,M.h/2,1/1.8));
-  onWin("resize",()=>{ measureWide(); if(S.view==="map" || W.side){ sizeMap(); paint(); } });
+  onWin("resize",()=>{ measureWide(); if(S.view==="map" || W.side){ fitMap(); sizeMap(); paint(); } });
 })();
 
 /* What a hand fix did to the count. The saved reading reaches the board a moment after the save, so the answer waits
    for it, and says a plain "Saved." when the count did not move. */
 let savedTimer=null;
 function countNow(){ const c={down:0,issues:0,unknown:0,up:0}; if(S.meta) for(const v of allViews()) if(c[v.status]!==undefined) c[v.status]++; return c; }
-function saidSaved(){ if(!S.saved) return; const was=S.saved.was, said=S.saved.said; S.saved=null; clearTimeout(savedTimer);
+function saidSaved(){ if(!S.saved) return; const was=S.saved.was, said=S.saved.said, id=S.saved.unit, ip=S.saved.ip; S.saved=null; clearTimeout(savedTimer);
   const now=countNow(), moved=["down","issues","unknown","up"].filter(k=>was[k]!==now[k]).map(k=>LABEL[k]+" "+was[k]+" to "+now[k]);
-  toast(said+(moved.length ? " The count changed: "+moved.join(", ")+"." : ""), 9000); }
+  /* A corrected IP is kept, but it is not what makes a unit Up or Down. Say so, so a unit that still shows
+     Down after its IP was fixed is not a puzzle. */
+  const v=S.vmap && S.vmap[id], still = !moved.length && ip && v && v.u.s==="v" && ["down","issues","unknown"].includes(v.status);
+  toast(said+(moved.length ? " The count changed: "+moved.join(", ")+"." : "")
+    +(still ? " "+v.name+" still shows "+LABEL[v.status]+": Up or Down comes from Star4Live's own reading of its cameras, so it clears when Star4Live sees them online." : ""), still ? 14000 : 9000); }
 /* ---------- saving a hand fix ---------- */
 /* The board sends nothing itself. It hands Fleet the edits in order, and Fleet saves each one through the same
    route as Camera status. An empty value clears a hand fix, and only where there is one to clear. */
@@ -667,7 +674,7 @@ async function save(v, ch){
   if(!steps.length){ S.form=null; drawPanel(); return; }
   S.busy=true; drawPanel();
   const was=countNow();
-  try{ const said = await hooks.onEdit(v.k, steps); S.form=null; S.saved={was, said: said || "Saved."}; clearTimeout(savedTimer); savedTimer=setTimeout(saidSaved, 1500); }
+  try{ const said = await hooks.onEdit(v.k, steps); S.form=null; S.saved={was, said: said || "Saved.", unit:v.id, ip:steps.some(x=>x.field==="public_ip")}; clearTimeout(savedTimer); savedTimer=setTimeout(saidSaved, 1500); }
   catch(err){ S.form=null; toast("Not saved. "+((err && err.message) || "COS could not confirm the save."), 14000); }
   S.busy=false; render();
 }
@@ -914,8 +921,8 @@ function mgTools(){
 }
 
 /* ---------- wide screens ----------
-   On a desk the board uses the whole screen: counts and list on the left, the live map beside them, and a unit
-   opens in a panel at the side. The board's own width decides, so it is right at any size inside the app's frame. */
+   On a desk the board is one screen: a slim bar, the counts in one row, then the list and the live map side by
+   side, each filling the window. The board's own width decides, so it is right at any size inside the app's frame. */
 const W = { wide:false, side:false };
 /* The one map lives on the Map tab, and on a wide Board tab it sits beside the list. */
 function placeMap(){
@@ -927,16 +934,32 @@ function placeMap(){
   sideFilter();
 }
 function sideFilter(){ if(!W.side) return; const f=["down","issues","unknown","up"].includes(S.filter) ? S.filter : "all"; if(M.f!==f){ M.f=f; M.sel=null; } }
-function measureWide(){
-  const across = $("cosb").getBoundingClientRect().width, on = across >= 1000;
-  /* The map keeps the drawing's own shape, so all of it shows. Its size is worked out from the room the board has. */
-  $("cosb").style.setProperty("--bw", Math.round(across)+"px");
-  if(W.wide!==on){ W.wide=on; $("cosb").classList.toggle("wide",on); placeMap(); if(S.meta) render(); }
+/* On a desk the tabs sit in the top bar beside the name. On a phone they are the first thing under it, as before. */
+function placeTabs(){
+  const tabs=root.querySelector(".tabs"), bar=root.querySelector(".top .wrap"), main=root.querySelector("main");
+  if(W.wide){ if(tabs.parentNode!==bar) bar.insertBefore(tabs, bar.querySelector(".logo").nextSibling); }
+  else if(tabs.parentNode!==main) main.insertBefore(tabs, main.firstChild);
 }
-/* The app can give the board more room without the window changing size, so the board watches its own width. */
+/* The map is as tall as the pane it is in and keeps the drawing's own shape, so all of it shows.
+   It never takes the room the list beside it needs. */
+function fitMap(){
+  if(!W.wide) return;
+  const pane = W.side ? $("boardSide") : S.view==="map" ? $("viewMap") : null; if(!pane) return;
+  const above = W.side ? $("mapGo").getBoundingClientRect().height + 8 : 0;
+  const tall = pane.clientHeight - above - (W.side ? 0 : 14);
+  const across = $("cosb").getBoundingClientRect().width, room = across - 56 - 18 - (W.side ? 480 : 380);
+  const size = Math.floor(Math.max(240, Math.min(tall, room / 0.9841)));
+  if(W.mh!==size){ W.mh=size; $("cosb").style.setProperty("--mh", size+"px"); }
+}
+function measureWide(){
+  const across = $("cosb").getBoundingClientRect().width, on = across >= 880;
+  $("cosb").classList.toggle("roomy", across >= 1200);
+  if(W.wide!==on){ W.wide=on; $("cosb").classList.toggle("wide",on); placeTabs(); placeMap(); if(S.meta) render(); }
+}
+/* The app can give the board more room without the window changing size, so the board watches its own size. */
 function watchWidth(){
   if(typeof ResizeObserver!=="function") return;
-  const seen=new ResizeObserver(()=>{ measureWide(); if(S.meta && (S.view==="map" || W.side)){ sizeMap(); paint(); } });
+  const seen=new ResizeObserver(()=>{ measureWide(); if(S.meta && (S.view==="map" || W.side)){ fitMap(); sizeMap(); paint(); } });
   seen.observe($("cosb")); cleanups.push(()=>seen.disconnect());
 }
 /* ---------- the TV board ---------- */
