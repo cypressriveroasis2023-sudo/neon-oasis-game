@@ -227,6 +227,115 @@ function restoreToolRoute() {
 }
 window.addEventListener('popstate', restoreToolRoute);
 window.addEventListener('hashchange', restoreToolRoute);
+// ---- Manager view -----------------------------------------------------------
+// The Owner's board asks for what the Tech Check screens already hold: today's
+// truck inspections, each truck's stock, and the IT / Service handoffs. Every
+// answer goes through the Owner's own signed-in client, so the database decides
+// what this account may read or change exactly as it does for the screens here.
+const managerUnitTypes = ['Sniper','Ranger','Spotter','Solar Spotter'];
+const managerStock = [['Recon Battery','recon_battery_qty','Recon batteries',25],['AGM 12V 110Ah','agm_12v_110ah_qty','AGM 12V 110Ah',4],['LiTime 12V 100Ah','litime_12v_100ah_qty','LiTime 12V 100Ah',2],['12V 35Ah','battery_12v_35ah_qty','12V 35Ah',4]];
+const managerPurposes = {truck_replenishment:'Truck replenishment', installation:'Installation'};
+const managerId = value => typeof value === 'string' && /^[a-zA-Z0-9-]{1,100}$/.test(value);
+const managerUuid = value => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+const managerText = (value, max = 120) => (typeof value === 'string' || typeof value === 'number') ? String(value).replace(/[\u0000-\u001f\u007f\s]+/g, ' ').trim().slice(0, max) : '';
+const managerTime = value => { const at = typeof value === 'string' ? Date.parse(value) : NaN; return Number.isFinite(at) ? new Date(at).toISOString() : null; };
+const managerCount = value => { const n = Math.floor(Number(value)); return Number.isFinite(n) ? Math.max(0, Math.min(9999, n)) : 0; };
+const managerHeld = status => status === 'assigned' ? 'assigned' : status === 'used_restock_due' ? 'used' : 'missing';
+const managerTest = name => /^test\b/i.test(name);
+let managerPhotoPaths = new Set();
+const managerReady = () => Boolean(owner() && context()?.getEffectiveRole() === 'owner' && typeof context()?.db?.rpc === 'function' &&
+  !document.getElementById('appView')?.classList.contains('hidden'));
+function managerTech(row) {
+  const id = managerText(row?.user_id || row?.service_tech_id, 36);
+  if (!managerUuid(id)) return null;
+  const name = managerText(row.name, 80) || 'Service tech';
+  const inspection = row.inspection || {}, check = row.inventory_check || {}, stock = row.stock || {};
+  const units = Array.isArray(row.units) ? row.units : [], sims = Array.isArray(row.sims) ? row.sims : [];
+  return {
+    id, name, test:managerTest(name), ready:row.truck_ready === true,
+    inspection:{ done:inspection.submitted === true, at:managerTime(inspection.submitted_at), truck:inspection.truck_complete === true,
+      trailer:inspection.trailer_state === 'not_taking' ? 'not_taking' : inspection.trailer_complete === true && inspection.submitted === true ? 'done' : 'not_done' },
+    stockCheck:{ state:check.ready === true ? 'done' : check.stock_complete === true && check.verification_required === true ? 'verify' : 'missing', at:managerTime(check.submitted_at) },
+    units:managerUnitTypes.map(type => {
+      const unit = units.find(item => item?.equipment_type === type) || {};
+      const tag = managerText(unit.unit_tag, 40), held = tag ? managerHeld(unit.status) : 'missing';
+      return { type, tag, status:held, ticket:held === 'used' ? managerText(unit.last_used_ticket_no, 40) : '' };
+    }),
+    sims:[1,2,3].map(slot => {
+      const sim = sims.find(item => Number(item?.slot_no) === slot) || {};
+      const number = managerText(sim.sim_number, 40), held = number ? managerHeld(sim.status) : 'missing';
+      return { slot, number, status:held, ticket:held === 'used' ? managerText(sim.last_used_ticket_no, 40) : '' };
+    }),
+    stock:managerStock.map(([key, column, label, need]) => ({ key, label, have:managerCount(stock[column]), need })),
+    restock:(Array.isArray(row.restock_requests) ? row.restock_requests : []).slice(0, 20)
+      .map(item => ({ item:managerText(item?.item_type, 60), status:managerText(String(item?.status || 'requested').replaceAll('_', ' '), 40) })).filter(item => item.item),
+  };
+}
+function managerExchange(row, paths) {
+  if (!managerUuid(row?.id)) return null;
+  const items = (Array.isArray(row.manifest) ? row.manifest : []).slice(0, 20)
+    .map(item => [managerText(item?.family, 40), managerText(item?.unit_tag, 40)].filter(Boolean).join(' ')).filter(Boolean);
+  const events = (Array.isArray(row.events) ? row.events : []).slice(-40).map(event => {
+    const photos = (Array.isArray(event?.photos) ? event.photos : []).slice(0, 30)
+      .filter(photo => typeof photo?.path === 'string' && /^[A-Za-z0-9._/-]{10,300}$/.test(photo.path) && !photo.path.includes('..'))
+      .map(photo => ({ path:photo.path, kind:photo.kind === 'signature' ? 'signature' : 'photo' }));
+    for (const photo of photos) paths.add(photo.path);
+    const report = typeof event?.report_url === 'string' && /^https:\/\/drive\.google\.com\/file\/d\/[A-Za-z0-9_-]{10,200}\/view$/.test(event.report_url) ? event.report_url : null;
+    return { kind:event?.kind === 'checkout' ? 'checkout' : event?.kind === 'receipt' ? 'receipt' : event?.kind === 'owner_resolution' ? 'owner' : 'other',
+      who:managerText(event?.actor_name, 80) || 'Unknown', at:managerTime(event?.signed_at), photos,
+      differences:Array.isArray(event?.snapshot?.differences) ? Math.min(99, event.snapshot.differences.length) : 0, report };
+  });
+  return { id:row.id.toLowerCase(), items, purpose:managerPurposes[row.purpose] || 'Purpose not set',
+    from:managerText(row.it_name, 80) || 'IT', to:managerText(row.service_name, 80) || 'Service',
+    state:managerText(row.state, 40) || 'unknown', at:managerTime(row.updated_at) || managerTime(row.created_at), events };
+}
+async function managerRead() {
+  const db = context().db;
+  const day = new Intl.DateTimeFormat('en-CA', { timeZone:'America/Chicago' }).format(new Date());
+  const board = await db.rpc('owner_tech_command_board_v2', { p_date:day });
+  if (board?.error || !Array.isArray(board?.data?.service_techs)) throw new Error('unavailable');
+  let exchanges = null;
+  const paths = new Set();
+  try {
+    const handoffs = await db.rpc('techcheck_transfer_context_v1');
+    if (!handoffs?.error && Array.isArray(handoffs?.data?.transfers)) exchanges = handoffs.data.transfers.slice(0, 100).map(row => managerExchange(row, paths)).filter(Boolean);
+  } catch {}
+  managerPhotoPaths = paths;
+  return { day, at:new Date().toISOString(),
+    techs:board.data.service_techs.slice(0, 100).map(managerTech).filter(Boolean),
+    it:(Array.isArray(board.data.it_techs) ? board.data.it_techs : []).slice(0, 100).map(row => managerText(row?.name, 80)).filter(Boolean).map(name => ({ name, test:managerTest(name) })),
+    exchanges };
+}
+// One truck, written with the same call and the same shape as the truck editor on Truck & team readiness.
+function managerKit(value) {
+  const exact = (object, keys) => object && typeof object === 'object' && !Array.isArray(object) && Object.keys(object).length === keys.length && keys.every(key => Object.hasOwn(object, key));
+  if (!exact(value, ['units','sims','stock']) || !exact(value.units, managerUnitTypes) || !exact(value.sims, ['1','2','3']) || !exact(value.stock, managerStock.map(([key]) => key))) return null;
+  const label = text => typeof text === 'string' && text.length <= 40 && !/[\u0000-\u001f\u007f]/.test(text) ? text.trim() : null;
+  const units = {}, sims = {}, stock = {};
+  for (const type of managerUnitTypes) { const tag = label(value.units[type]); if (tag === null) return null; units[type] = tag; }
+  for (const slot of ['1','2','3']) { const number = label(value.sims[slot]); if (number === null) return null; sims[slot] = number; }
+  for (const [key] of managerStock) { const count = value.stock[key]; if (!Number.isSafeInteger(count) || count < 0 || count > 9999) return null; stock[key] = count; }
+  return { units, sims, stock };
+}
+async function managerAnswer(data) {
+  if (data.kind === 'hello') return {};
+  if (data.kind === 'read') return { snapshot:await managerRead() };
+  if (data.kind === 'photo') {
+    if (typeof data.path !== 'string' || !managerPhotoPaths.has(data.path)) return { error:'invalid' };
+    const signed = await context().db.storage.from('techcheck-transfer-evidence').createSignedUrl(data.path, 300);
+    return !signed?.error && typeof signed?.data?.signedUrl === 'string' ? { url:signed.data.signedUrl } : { error:'unavailable' };
+  }
+  if (data.kind === 'truck') {
+    const kit = managerKit(data.kit);
+    if (!managerUuid(data.techId) || !kit) return { error:'invalid' };
+    const saved = await context().db.rpc('owner_save_service_truck_inventory_batch_v1', { p_service_tech_id:data.techId, p_payload:kit });
+    if (saved?.error) return { error:'rejected', message:managerText(saved.error.message, 200) };
+    // The older truck screen keeps its own copy of the board. Let it read the change too.
+    try { Promise.resolve(window.refreshData?.()).catch(() => {}); } catch {}
+    return {};
+  }
+  return { error:'invalid' };
+}
 window.addEventListener('message', async event => {
   if (event.origin !== window.location.origin || event.source !== frame?.contentWindow || !owner()) return;
   const data = event.data;
@@ -244,6 +353,16 @@ window.addEventListener('message', async event => {
   }
   if(data?.type==='COS_FIELD_MAP_DISPLAY_MODE'&&typeof data.active==='boolean'){setFieldMapDisplay(frame,data.active);return;}
   if (!data || typeof data !== 'object') return;
+  if (data.type === 'COS_MANAGER_REQUEST' && managerId(data.requestId) && typeof data.kind === 'string') {
+    const requestedUser = owner(), target = event.source;
+    let reply = { error:'unavailable' };
+    if (!managerReady()) reply = { error:typeof context()?.db?.rpc === 'function' ? 'forbidden' : 'unavailable' };
+    else { try { reply = await managerAnswer(data); } catch {} }
+    // An answer read for one account is never handed to another.
+    if (target === frame?.contentWindow && requestedUser && owner() === requestedUser && managerReady()) target.postMessage({ ...reply, type:'COS_MANAGER_RESPONSE', requestId:data.requestId }, event.origin);
+    else if (target === frame?.contentWindow) target.postMessage({ type:'COS_MANAGER_RESPONSE', requestId:data.requestId, error:reply.error === 'unavailable' ? 'unavailable' : 'forbidden' }, event.origin);
+    return;
+  }
   if (data.type === 'COS_OPERATIONS_TOKEN_REQUEST' && typeof data.requestId === 'string' && data.requestId.length <= 100) {
     const requestedUser = owner();
     let token = null;

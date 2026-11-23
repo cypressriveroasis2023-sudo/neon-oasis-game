@@ -1,5 +1,5 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
-import {api} from './api';
+import {api, openLegacy} from './api';
 import {cameraFeedCensus, cameraFeedClock, recorderLinksFromHealth} from './sharedFleetCounts';
 import {STAR_UNIT_STATUS_CONTRACT, type UnitCameraStatus} from '../shared/starUnitStatus';
 import type {CameraRow} from './cameraEvidence';
@@ -10,6 +10,7 @@ import {boardData} from './cosBoard/boardData';
 import {boardEditState, handFixRequest, type BoardEditFlags, type BoardEditState, type BoardFixStep} from './cosBoard/boardEdit';
 import {mountCosBoard} from './cosBoard/boardApp';
 import {loadBoardFonts} from './cosBoard/boardFonts';
+import {managerHost, managerKnown, managerPhoto, readManager, rememberManager, saveTruck, takeBoardView, type TruckKit} from './managerBridge';
 
 export type CosBoardLandingProps = {
   /** The camera feed the shared count reads. Until it arrives the board shows its own "loading" line. */
@@ -138,6 +139,18 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
       onEdit: (unitKey: string, steps: BoardFixStep[]) => fix.current(unitKey, steps),
       // Tech checks are their own screen in COS.
       onTechCheck: () => { window.location.hash = workspaceHash({workspace: 'Tech Check', jobId: '', detail: false}); },
+      // The owner's manager view. The signed-in Tech Check app around this frame reads the trucks, inspections and
+      // handoffs; the board only draws them. A sign-in with no manager view never gets an answer, and never a tab.
+      manager: managerHost() ? {
+        read: (fresh: boolean) => readManager(fresh, true),
+        save: (techId: string, kit: TruckKit) => saveTruck(techId, kit),
+        photo: (path: string) => managerPhoto(path),
+        open: (route: string) => openLegacy(route),
+        known: (shown: boolean) => rememberManager(shown),
+        wasKnown: () => managerKnown(),
+      } : undefined,
+      // Tech Check sends the owner here, to the manager view.
+      startView: takeBoardView(),
     });
     board.current = mounted;
     // The board's own browser test reads the screen through this handle.

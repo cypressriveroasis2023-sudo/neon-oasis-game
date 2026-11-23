@@ -12,7 +12,7 @@
 import mapData from './boardMap.json';
 import {BOARD_CSS} from './boardStyle';
 
-const SHELL = "<div class=\"cosb\" id=\"cosb\"><header class=\"top\"><div class=\"wrap\">\n  <div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div>\n  <button class=\"refresh\" id=\"refresh\" type=\"button\">Refresh</button>\n</div></header>\n<div class=\"asof\" id=\"asof\"><div class=\"wrap\"><span id=\"asofMain\">Loading the camera reading…</span><span id=\"asofSub\"></span></div></div>\n\n<main class=\"wrap\">\n  <div class=\"tabs\" role=\"tablist\">\n    <button class=\"tab\" role=\"tab\" id=\"tabBoard\" aria-selected=\"true\" type=\"button\">Board</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabMap\" aria-selected=\"false\" type=\"button\">Map</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabTech\" aria-selected=\"false\" type=\"button\">Tech check</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabPunch\" aria-selected=\"false\" type=\"button\">Punch list</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabActivity\" aria-selected=\"false\" type=\"button\">Changes</button>\n  </div>\n\n  <section id=\"viewBoard\">\n    <div class=\"mode\" id=\"modeRow\"></div>\n    <div class=\"tiles\" id=\"tiles\"></div>\n    <div class=\"shoprow\" id=\"shoprow\"></div>\n    <div class=\"controls\">\n      <input class=\"search\" id=\"q\" type=\"search\" placeholder=\"Find a unit, site, A# or IP\" autocomplete=\"off\" aria-label=\"Find a unit, site, A number or IP\">\n      <div class=\"chips\" id=\"fam\"></div>\n    </div>\n    <div class=\"count\" id=\"count\"></div>\n    <div class=\"list\" id=\"list\"></div>\n    <ul class=\"foot\"><li>One unit counts once, however many cameras it has.</li><li>A unit in the shop never counts as down.</li><li>A reading that is missing or too old shows Unknown, never Down.</li><li>Router checks are a reference only. A router online does not prove the cameras work.</li><li>Hand fixes made here are saved in COS with your name and the time. Nothing here changes mHelp, Star4Live or InHand.</li></ul>\n  </section>\n\n  <section id=\"viewMap\" hidden>\n    <div class=\"chips\" id=\"mapChips\"></div>\n    <div class=\"chips\" id=\"mapGo\" style=\"margin-top:8px\"></div>\n    <div class=\"mapwrap\" id=\"mapWrap\">\n      <svg id=\"mapSvg\" role=\"img\" aria-label=\"Map of field units\"><g id=\"mapBase\"></g><g id=\"mapLabels\"></g><g id=\"mapPins\"></g></svg>\n      <div class=\"mapbtns\"><button type=\"button\" id=\"zin\" aria-label=\"Zoom in\">+</button><button type=\"button\" id=\"zout\" aria-label=\"Zoom out\">&minus;</button></div>\n      <div class=\"mapmsg\" id=\"mapMsg\" hidden></div>\n      <div class=\"mapsel\" id=\"mapSel\" hidden></div>\n    </div>\n    <p class=\"note\" id=\"mapNote\" style=\"margin-top:10px\"></p>\n    <div class=\"list\" id=\"mapList\"></div>\n  </section>\n\n  <section id=\"viewTech\" hidden>\n    <div id=\"techForm\"></div>\n    <div id=\"techList\"></div>\n  </section>\n\n  <section id=\"viewPunch\" hidden>\n    <div class=\"box\" id=\"punchTop\"><p class=\"note\">Loading the mHelp list…</p></div>\n    <div class=\"chips\" id=\"punchChips\" style=\"margin-top:12px\"></div>\n    <div class=\"count\" id=\"punchCount\"></div>\n    <div class=\"list\" id=\"punchList\"></div>\n  </section>\n\n  <section id=\"viewActivity\" hidden>\n    <p class=\"note\" id=\"actNote\">Every change made by hand on this board, newest first.</p>\n    <ul class=\"hist\" id=\"activity\"></ul>\n  </section>\n</main>\n\n<div class=\"sheet\" id=\"sheet\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"pname\"><div class=\"panel\" id=\"panel\"></div></div>\n<div class=\"toast\" id=\"toast\" role=\"status\" aria-live=\"polite\"></div></div>";
+const SHELL = "<div class=\"cosb\" id=\"cosb\"><header class=\"top\"><div class=\"wrap\">\n  <div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div>\n  <button class=\"refresh\" id=\"refresh\" type=\"button\">Refresh</button>\n</div></header>\n<div class=\"asof\" id=\"asof\"><div class=\"wrap\"><span id=\"asofMain\">Loading the camera reading…</span><span id=\"asofSub\"></span></div></div>\n\n<main class=\"wrap\">\n  <div class=\"tabs\" role=\"tablist\">\n    <button class=\"tab\" role=\"tab\" id=\"tabBoard\" aria-selected=\"true\" type=\"button\">Board</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabMap\" aria-selected=\"false\" type=\"button\">Map</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabTech\" aria-selected=\"false\" type=\"button\">Tech check</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabManager\" aria-selected=\"false\" type=\"button\" hidden>Manager</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabPunch\" aria-selected=\"false\" type=\"button\">Punch list</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabActivity\" aria-selected=\"false\" type=\"button\">Changes</button>\n  </div>\n\n  <section id=\"viewBoard\">\n    <div class=\"mode\" id=\"modeRow\"></div>\n    <div class=\"tiles\" id=\"tiles\"></div>\n    <div class=\"shoprow\" id=\"shoprow\"></div>\n    <div class=\"controls\">\n      <input class=\"search\" id=\"q\" type=\"search\" placeholder=\"Find a unit, site, A# or IP\" autocomplete=\"off\" aria-label=\"Find a unit, site, A number or IP\">\n      <div class=\"chips\" id=\"fam\"></div>\n    </div>\n    <div class=\"count\" id=\"count\"></div>\n    <div class=\"list\" id=\"list\"></div>\n    <ul class=\"foot\"><li>One unit counts once, however many cameras it has.</li><li>A unit in the shop never counts as down.</li><li>A reading that is missing or too old shows Unknown, never Down.</li><li>Router checks are a reference only. A router online does not prove the cameras work.</li><li>Hand fixes made here are saved in COS with your name and the time. Nothing here changes mHelp, Star4Live or InHand.</li></ul>\n  </section>\n\n  <section id=\"viewMap\" hidden>\n    <div class=\"chips\" id=\"mapChips\"></div>\n    <div class=\"chips\" id=\"mapGo\" style=\"margin-top:8px\"></div>\n    <div class=\"mapwrap\" id=\"mapWrap\">\n      <svg id=\"mapSvg\" role=\"img\" aria-label=\"Map of field units\"><g id=\"mapBase\"></g><g id=\"mapLabels\"></g><g id=\"mapPins\"></g></svg>\n      <div class=\"mapbtns\"><button type=\"button\" id=\"zin\" aria-label=\"Zoom in\">+</button><button type=\"button\" id=\"zout\" aria-label=\"Zoom out\">&minus;</button></div>\n      <div class=\"mapmsg\" id=\"mapMsg\" hidden></div>\n      <div class=\"mapsel\" id=\"mapSel\" hidden></div>\n    </div>\n    <p class=\"note\" id=\"mapNote\" style=\"margin-top:10px\"></p>\n    <div class=\"list\" id=\"mapList\"></div>\n  </section>\n\n  <section id=\"viewTech\" hidden>\n    <div id=\"techForm\"></div>\n    <div id=\"techList\"></div>\n  </section>\n\n  <section id=\"viewManager\" hidden>\n    <div id=\"mgNow\"></div>\n    <div id=\"mgChecks\"></div>\n    <div id=\"mgTrucks\"></div>\n    <div id=\"mgX\"></div>\n    <div id=\"mgTools\"></div>\n  </section>\n\n  <section id=\"viewPunch\" hidden>\n    <div class=\"box\" id=\"punchTop\"><p class=\"note\">Loading the mHelp list…</p></div>\n    <div class=\"chips\" id=\"punchChips\" style=\"margin-top:12px\"></div>\n    <div class=\"count\" id=\"punchCount\"></div>\n    <div class=\"list\" id=\"punchList\"></div>\n  </section>\n\n  <section id=\"viewActivity\" hidden>\n    <p class=\"note\" id=\"actNote\">Every change made by hand on this board, newest first.</p>\n    <ul class=\"hist\" id=\"activity\"></ul>\n  </section>\n</main>\n\n<div class=\"sheet\" id=\"sheet\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"pname\"><div class=\"panel\" id=\"panel\"></div></div>\n<div class=\"toast\" id=\"toast\" role=\"status\" aria-live=\"polite\"></div></div>";
 /* A shadow root can be attached to an element only once, so a host that is mounted again gets its first root back. */
 const ROOTS = new WeakMap();
 
@@ -216,6 +216,7 @@ function render(){
   if(S.view==="activity") drawActivity();
   if(S.view==="punch") drawPunch(vs);
   if(S.view==="map") drawMap(vs);
+  if(S.view==="manager") mgDraw("feed");
 }
 const PSEC = [["place","Placed differently","mHelp is official, so the board shows mHelp's placement. The other system says something different, and the other system is the one to fix. Never change mHelp or the tracker to match it."],
   ["mhField","Field, no camera feed","mHelp says these are in the field. COS has no camera record for them, so the board cannot show whether they are up."],
@@ -677,17 +678,242 @@ let announceTimer=null;
 function announce(){ if(!S.announce) return; S.announce=false; clearTimeout(announceTimer);
   const at = S.meta && S.meta.v;
   toast(!at ? "New reading loaded." : at===S.before ? "No newer Star4Live reading yet. Last read "+when(at)+"." : "New reading: Star4Live "+when(at)+".", 5000); }
+/* ---------- manager view ----------
+   For the owner sign-in only. One screen of what Tech Check already records: today's truck inspections, what each
+   truck carries, and what IT and Service handed to each other. The camera numbers at the top are the board's own.
+   Nothing here is read by the board: the app hands it in (hooks.manager), and takes a truck change back out. */
+const MGK = hooks && hooks.manager && typeof hooks.manager.read==="function" ? hooks.manager : null;
+const MG = { on:false, state:"idle", data:null, err:"", at:0, edit:null, busy:false, open:{}, shots:{}, tests:false, tools:false, allX:false };
+const fmtClock = new Intl.DateTimeFormat("en-US",{hour:"numeric",minute:"2-digit",timeZone:TZ});
+const fmtLongDay = new Intl.DateTimeFormat("en-US",{weekday:"short",month:"short",day:"numeric",timeZone:"UTC"});
+const mgClock = iso => iso ? fmtClock.format(new Date(iso)) : "";
+const mgWhen = iso => iso ? when(Date.parse(iso)/1000) : "";
+const mgDay = day => fmtLongDay.format(new Date(day+"T12:00:00Z"));
+const mgFirst = name => String(name||"").trim().split(/\s+/)[0] || "The tech";
+const mgPlural = (n, one, many) => n+" "+(n===1 ? one : (many || one+"s"));
+const mgKey = n => normName(n).replace(/([A-Z])0+(?=\d)/g,"$1");
+const mgQty = v => /^\d{1,4}$/.test(String(v).trim()) ? Number(String(v).trim()) : null;
+const mgTool = (route,label) => h("button",{class:"lk",type:"button",onclick:()=>MGK.open(route)},label);
+const mgCheck = (tone,label,text) => h("div",{class:"chk"},h("span",{class:"dot "+tone}),h("div",null,h("b",{text:label}),h("span",{text:text})));
+
+function mgShow(on){ MG.on=on; $("tabManager").hidden=!on;
+  $("tabTech").hidden = on || !(hooks && typeof hooks.onTechCheck==="function");
+  if(MGK && typeof MGK.known==="function") MGK.known(on);
+  if(!on && S.view==="manager") setView("board"); }
+function mgLoad(fresh){
+  if(!MGK || MG.state==="loading") return;
+  MG.state="loading"; if(S.view==="manager") mgDraw();
+  MGK.read(!!fresh).then(d=>{ MG.data=d; MG.err=""; MG.at=Date.now(); MG.state="ready"; if(!MG.on) mgShow(true); },
+    e=>{ MG.err=(e && e.message) || "Trucks and inspections could not be read just now."; MG.state = MG.data ? "ready" : "failed"; if(e && e.gone) mgShow(false); })
+   .then(()=>{ if(S.view==="manager") mgDraw(); });
+}
+function mgStart(){
+  $("tabManager").addEventListener("click",()=>setView("manager"));
+  if(!MGK) return;
+  if(hooks.startView==="manager" || (typeof MGK.wasKnown==="function" && MGK.wasKnown())) mgShow(true);
+  mgLoad(false);
+}
+function mgOpen(){ mgDraw(); if(MG.state==="idle" || MG.state==="failed" || (MG.state==="ready" && Date.now()-MG.at>60000 && !MG.edit && !MG.busy)) mgLoad(true); }
+/* Which board unit a truck's unit is, when exactly one carries that name. */
+function mgIndex(vs){ const idx={}; for(const v of vs){ if(v.mhOnly && !v.name) continue; const k=mgKey(v.name); if(k) (idx[k]=idx[k]||[]).push(v); } return idx; }
+const mgUnitOf = (idx, name) => { const hit=idx[mgKey(name)]; return hit && hit.length===1 ? hit[0] : null; };
+
+/* part: nothing for everything, or one of "checks", "trucks", "x", "tools"; "feed" is what a new camera reading can change. */
+function mgDraw(part){
+  const vs = S.meta ? allViews() : [], feed = part==="feed";
+  if(!part || feed) mgNow(vs);
+  const d=MG.data;
+  if(!d){
+    if(feed) return;
+    const body = MG.state==="failed" ? h("div",{class:"box"},h("p",{text:MG.err}),h("div",{class:"links"},h("button",{class:"lk",type:"button",onclick:()=>mgLoad(true)},"Try again"),mgTool("team","Open the older truck screen")))
+      : h("div",{class:"box"},h("p",{class:"note",text:"Loading trucks and inspections…"}));
+    $("mgChecks").replaceChildren(body); $("mgTrucks").replaceChildren(); $("mgX").replaceChildren(); $("mgTools").replaceChildren(); return;
+  }
+  const real=d.techs.filter(t=>!t.test), tests=d.techs.filter(t=>t.test), idx=mgIndex(vs);
+  if(!part || part==="checks") $("mgChecks").replaceChildren(mgChecks(d, real));
+  if(!part || feed || part==="trucks"){
+    const editing = MG.edit ? d.techs.find(x=>x.id===MG.edit.id) : null;
+    if(MG.edit && !editing) MG.edit=null;
+    /* A truck being changed is left alone when the rest is redrawn, so the typing is never lost. */
+    if(part==="trucks" || !editing || !$("mgEdit")) $("mgTrucks").replaceChildren(mgTrucks(real, tests, idx));
+    if(editing) mgEditSync(editing);
+  }
+  if(!part || part==="x") $("mgX").replaceChildren(mgExchanges(d, idx));
+  if(!part || part==="tools") $("mgTools").replaceChildren(mgTools());
+}
+
+/* Cameras right now: the same numbers as the Board tab, and the down units by name. */
+function mgNow(vs){
+  if(!S.meta){ $("mgNow").replaceChildren(h("div",{class:"box"},h("h3",{text:"Cameras right now"}),h("p",{class:"note",text:"Loading the camera reading…"}))); return; }
+  const c={down:0,issues:0,unknown:0,up:0}; for(const v of vs) if(c[v.status]!==undefined) c[v.status]++;
+  const down=vs.filter(v=>v.status==="down").sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
+  const num=k=>h("button",{class:"mgnum s-"+k,type:"button","aria-label":c[k]+" "+LABEL[k]+". Show them on the board.",onclick:()=>{ S.filter=k; S.fam="all"; setView("board"); render(); }},h("b",{text:c[k]}),h("span",{text:LABEL[k]}));
+  $("mgNow").replaceChildren(h("div",{class:"box"},h("h3",{text:"Cameras right now"}),
+    h("div",{class:"mgnums"},num("down"),num("issues"),num("unknown"),num("up")),
+    down.length ? [h("p",{class:"note",text:"Down now. Tap one to open it."}), h("div",{class:"chips mgdown"},...down.map(v=>h("button",{class:"chip",type:"button",onclick:()=>openUnit(v.id)},v.name)))]
+                : h("p",{class:"note",text:"No field unit is down."}),
+    h("div",{class:"links"},h("button",{class:"lk",type:"button",onclick:()=>{ M.f = down.length ? "down" : "all"; setView("map"); }}, down.length ? "Show the down units on the map" : "Open the map"))));
+}
+
+/* Today's truck inspections. Techs do these on their phone; this only reads them. */
+function mgChecks(d, techs){
+  const ready=techs.filter(t=>t.ready).length, none=techs.filter(t=>!t.inspection.done);
+  const line = !techs.length ? "No service tech is set up."
+    : ready===techs.length ? (techs.length===1 ? "The truck is ready." : "All "+techs.length+" trucks are ready.")
+    : ready+" of "+mgPlural(techs.length,"truck")+" ready."+(none.length ? " No inspection today from "+none.map(t=>t.name).join(", ")+"." : "");
+  return h("div",{class:"box"},h("h3",{text:"Truck inspections · "+mgDay(d.day)}),h("p",{class:"big",text:line}),
+    ...techs.map(t=>{ const i=t.inspection, s=t.stockCheck;
+      return h("div",{class:"mgtech"},
+        h("div",{class:"mgwho"},h("span",{class:"who",text:t.name}),h("span",{class:"pill "+(t.ready?"s-up":"s-down"),text:t.ready?"Truck ready":"Not ready"})),
+        h("div",{class:"mgchecks"},
+          mgCheck(i.truck?"ok":"bad","Truck inspection", i.truck ? "Done "+mgClock(i.at) : i.done ? "Sent "+mgClock(i.at)+". Not every item passed." : "Not done today"),
+          mgCheck(i.trailer==="done"?"ok":i.trailer==="not_taking"?"info":"bad","Trailer inspection", i.trailer==="done" ? "Done "+mgClock(i.at) : i.trailer==="not_taking" ? "Not taking a trailer" : i.done ? "Sent "+mgClock(i.at)+". Not every item passed." : "Not done today"),
+          mgCheck(s.state==="done"?"ok":s.state==="verify"?"warn":"bad","Truck stock check", s.state==="done" ? "Done "+mgClock(s.at) : s.state==="verify" ? "Waiting on "+mgFirst(t.name)+" to check the truck" : "Stock is short")));
+    }),
+    h("p",{class:"note",text:"Techs do these in Tech Check on their phone. This screen only reads them."}));
+}
+
+/* What each truck carries. */
+function mgTrucks(techs, tests, idx){
+  return h("div",{class:"box"},h("h3",{text:"What is on each truck"}),
+    techs.length ? h("div",{class:"mgcards"},...techs.map(t=>mgTruck(t, idx))) : h("p",{class:"note",text:"No truck is set up."}),
+    tests.length ? h("div",{class:"links mgmore"},h("button",{class:"lk",type:"button","aria-expanded":String(MG.tests),onclick:()=>{ MG.tests=!MG.tests; mgDraw("trucks"); }},(MG.tests?"Hide ":"Show ")+mgPlural(tests.length,"test account"))) : null,
+    tests.length && MG.tests ? h("div",{class:"mgcards"},...tests.map(t=>mgTruck(t, idx))) : null);
+}
+function mgTruck(t, idx){
+  if(MG.edit && MG.edit.id===t.id) return mgEditor(t);
+  const short=t.stock.filter(s=>s.have<s.need), gone=t.units.filter(u=>u.status==="missing"), used=t.units.filter(u=>u.status==="used").length+t.sims.filter(s=>s.status==="used").length, nosim=t.sims.filter(s=>s.status==="missing");
+  const parts=[]; if(gone.length) parts.push(mgPlural(gone.length,"unit")+" missing"); if(nosim.length) parts.push(mgPlural(nosim.length,"SIM")+" missing"); if(short.length) parts.push("batteries short"); if(used) parts.push(used+" used, waiting on a replacement");
+  const tone = gone.length||nosim.length||short.length ? " h" : used ? " p" : "";
+  const flags=[];
+  const unit=u=>{ if(u.status==="missing") return h("span",{class:"mgitem none",text:"No "+u.type});
+    const name=u.type+" "+u.tag, v=mgUnitOf(idx,name);
+    if(v && v.place==="field") flags.push(name+" is on this truck, but the board has it in the field"+(LABEL[v.status] ? " ("+LABEL[v.status]+")" : "")+".");
+    const text=name+(u.status==="used" ? " · used"+(u.ticket?" on #"+u.ticket:"") : "");
+    return v ? h("button",{class:"mgitem"+(u.status==="used"?" used":""),type:"button","aria-label":"Open "+name,onclick:()=>openUnit(v.id)},text) : h("span",{class:"mgitem"+(u.status==="used"?" used":""),text:text}); };
+  const units=t.units.map(unit);
+  return h("div",{class:"tcard mgtruck"+tone},
+    h("div",{class:"mgwho"},h("span",{class:"who"},t.name,t.test?h("span",{class:"tag",text:"Test"}):null),h("span",{class:"mgsum",text:parts.length ? parts.join(" · ") : "Fully stocked"})),
+    h("dl",{class:"kv mgkit"},
+      h("dt",{text:"Units"}),h("dd",null,...units),
+      h("dt",{text:"SIMs"}),h("dd",null,...t.sims.map(s=>s.status==="missing" ? h("span",{class:"mgitem none",text:"No SIM "+s.slot}) : h("span",{class:"mgitem"+(s.status==="used"?" used":""),text:s.number+(s.status==="used"?" · used":"")}))),
+      h("dt",{text:"Batteries"}),h("dd",null,...t.stock.map(s=>h("span",{class:"mgitem"+(s.have<s.need?" none":""),text:s.label+" "+s.have+" of "+s.need})))),
+    flags.map(f=>h("p",{class:"mgflag",text:f})),
+    t.restock.length ? h("p",{class:"note",text:"Waiting on IT: "+t.restock.map(r=>r.item+" ("+r.status+")").join(", ")+"."}) : null,
+    h("div",{class:"links"},h("button",{class:"lk",type:"button",disabled:MG.busy||!!MG.edit,onclick:()=>{ MG.edit=mgDraft(t); mgDraw("trucks"); const first=$("mgEdit") && $("mgEdit").querySelector("input"); if(first) first.focus(); }},"Add or remove")));
+}
+
+/* Changing one truck. Nothing is saved until the list of changes has been read and Save is tapped. */
+function mgDraft(t){ const e={ id:t.id, units:{}, sims:{}, stock:{}, err:"" };
+  for(const u of t.units) e.units[u.type]=u.tag; for(const s of t.sims) e.sims[String(s.slot)]=s.number; for(const s of t.stock) e.stock[s.key]=String(s.have); return e; }
+function mgChanges(t, e){ const out=[];
+  for(const u of t.units){ const now=(e.units[u.type]||"").trim();
+    if(now!==u.tag) out.push(u.tag ? (now ? u.type+" "+u.tag+" comes off, "+u.type+" "+now+" goes on" : u.type+" "+u.tag+" comes off the truck") : u.type+" "+now+" goes on the truck");
+    else if(u.status==="used" && now) out.push(u.type+" "+u.tag+" is marked used. Saving marks it ready on the truck again."); }
+  for(const s of t.sims){ const now=(e.sims[String(s.slot)]||"").trim(); if(now && now!==s.number) out.push(s.number ? "SIM "+s.slot+": "+s.number+" is replaced by "+now : "SIM "+s.slot+": "+now+" goes on the truck"); }
+  for(const s of t.stock){ const now=mgQty(e.stock[s.key]); if(now!==null && now!==s.have) out.push(s.label+": "+s.have+" becomes "+now); }
+  return out; }
+/* Only a real change is worth a save: a save always sends the tech back to check the truck. */
+function mgReal(t, e){ return t.units.some(u=>(e.units[u.type]||"").trim()!==u.tag) || t.sims.some(s=>{ const now=(e.sims[String(s.slot)]||"").trim(); return now && now!==s.number; }) || t.stock.some(s=>{ const now=mgQty(e.stock[s.key]); return now!==null && now!==s.have; }); }
+function mgBad(t, e){ for(const s of t.stock) if(mgQty(e.stock[s.key])===null) return "Enter a whole number for "+s.label+"."; return ""; }
+function mgEditor(t){ const e=MG.edit;
+  const field=(label, value, set, attrs)=>h("label",{class:"mgfield"},h("span",{text:label}),
+    h("input",Object.assign({class:"tin",value:value,autocomplete:"off",autocapitalize:"characters",spellcheck:"false",maxlength:"40",oninput:ev=>{ set(ev.target.value); e.err=""; mgEditSync(t); }},attrs||{})));
+  return h("div",{class:"tcard mgtruck mgedit",id:"mgEdit"},
+    h("div",{class:"mgwho"},h("span",{class:"who",text:"Change "+t.name+"’s truck"})),
+    h("h3",{text:"Units"}),
+    h("div",{class:"mgfields"},...t.units.map(u=>field(u.type, e.units[u.type]||"", v=>{ e.units[u.type]=v; }, {placeholder:"None on the truck"}))),
+    h("p",{class:"note",text:"Type the unit number. Clear a box to take that unit off the truck."}),
+    h("h3",{text:"SIM cards"}),
+    h("div",{class:"mgfields"},...t.sims.map(s=>field("SIM "+s.slot, e.sims[String(s.slot)]||"", v=>{ e.sims[String(s.slot)]=v; }, {placeholder:"None"}))),
+    h("p",{class:"note",text:"A SIM can be replaced here, not removed. A cleared box leaves that SIM as it is."}),
+    h("h3",{text:"Batteries on the truck"}),
+    h("div",{class:"mgfields"},...t.stock.map(s=>field(s.label+" (carries "+s.need+")", e.stock[s.key], v=>{ e.stock[s.key]=v; }, {inputmode:"numeric",maxlength:"4"}))),
+    h("div",{id:"mgDiff"}),
+    h("div",{class:"form"},h("div",{class:"btns"},
+      h("button",{class:"fixbtn",id:"mgSave",type:"button",onclick:()=>mgSave(t)},"Save truck"),
+      h("button",{class:"fixbtn alt",id:"mgCancel",type:"button",onclick:()=>{ if(MG.busy) return; MG.edit=null; mgDraw("trucks"); }},"Cancel"))));
+}
+function mgEditSync(t){ const e=MG.edit, box=$("mgDiff"), btn=$("mgSave"); if(!e || !box || !btn) return;
+  const ch=mgChanges(t,e), real=mgReal(t,e), bad=mgBad(t,e);
+  box.replaceChildren(...[
+    e.err ? h("p",{class:"mgerr",role:"alert",text:e.err}) : null,
+    bad ? h("p",{class:"mgerr",text:bad}) : null,
+    real ? [h("p",{class:"note",text:"This will change:"}),h("ul",{class:"mgdiff"},...ch.map(x=>h("li",{text:x}))),
+            h("p",{class:"note",text:"It is saved with your name. "+mgFirst(t.name)+" then has to check the truck again in Tech Check before leaving."})]
+         : h("p",{class:"note",text:"Nothing is changed yet."})].flat().filter(Boolean));
+  btn.disabled = MG.busy || !real || !!bad; btn.textContent = MG.busy ? "Saving…" : "Save truck"; $("mgCancel").disabled = MG.busy;
+  for(const input of $("mgEdit").querySelectorAll("input")) input.disabled = MG.busy; }
+async function mgSave(t){ const e=MG.edit; if(!e || MG.busy || !mgReal(t,e) || mgBad(t,e)) return;
+  const kit={ units:{}, sims:{}, stock:{} };
+  for(const u of t.units) kit.units[u.type]=(e.units[u.type]||"").trim();
+  /* A SIM that is not being replaced is sent blank, which leaves it exactly as it is. */
+  for(const s of t.sims){ const now=(e.sims[String(s.slot)]||"").trim(); kit.sims[String(s.slot)] = now!==s.number ? now : ""; }
+  for(const s of t.stock) kit.stock[s.key]=mgQty(e.stock[s.key]);
+  MG.busy=true; e.err=""; mgEditSync(t);
+  try{ const d=await MGK.save(t.id, kit); MG.data=d; MG.at=Date.now(); MG.edit=null; MG.busy=false; mgDraw();
+    toast(t.name+"’s truck is saved. "+mgFirst(t.name)+" has to check the truck again before leaving.", 9000); }
+  catch(x){ MG.busy=false; e.err=(x && x.message) || "The truck could not be saved."; mgEditSync(t); }
+}
+
+/* Equipment handed between IT and Service: every step signed, with its photos. */
+const MGSTATE = { awaiting_service:["Waiting on Service","s-issues"], accepted:["Received","s-up"], discrepancy:["Differences to review","s-down"], cancelled:["Cancelled","s-unknown"], returned_review:["Returned for review","s-unknown"], returned_repair:["Returned for repair","s-unknown"] };
+const MGKIND = { checkout:"Handed over by ", receipt:"Received by ", owner:"Completed by ", other:"Updated by " };
+function mgExchanges(d, idx){
+  const title=h("h3",{text:"Handed between IT and Service"});
+  if(d.exchanges===null) return h("div",{class:"box"},title,h("p",{class:"note",text:"The handoff log could not be read just now."}),h("div",{class:"links"},mgTool("handoffs","Open the handoffs desk")));
+  const xs=d.exchanges, open=xs.filter(x=>x.state==="awaiting_service"||x.state==="discrepancy").length, show=MG.allX ? xs : xs.slice(0,5);
+  return h("div",{class:"box"},title,
+    h("p",{class:"big",text: !xs.length ? "No handoff is on record yet." : mgPlural(xs.length,"handoff")+" on record, "+(open ? open+" still open." : "none open.")}),
+    h("div",{class:"mgxs"},...show.map(x=>mgExchange(x, idx))),
+    xs.length>show.length ? h("div",{class:"links mgmore"},h("button",{class:"lk",type:"button",onclick:()=>{ MG.allX=true; mgDraw("x"); }},"Show all "+xs.length)) : null,
+    h("p",{class:"note",text:"IT starts a handoff in Tech Check and Service signs for it. Each step is saved with its photos and signature."}),
+    h("div",{class:"links"},mgTool("handoffs","Open the handoffs desk")));
+}
+function mgExchange(x, idx){ const st=MGSTATE[x.state]||[x.state.replace(/_/g," "),"s-unknown"], isOpen=!!MG.open[x.id];
+  const shots=x.events.reduce((n,e)=>n+e.photos.filter(p=>p.kind!=="signature").length,0), signs=x.events.filter(e=>e.photos.some(p=>p.kind==="signature")).length;
+  return h("div",{class:"prow mgx "+st[1]},
+    h("button",{class:"pmain",type:"button","aria-expanded":String(isOpen),onclick:()=>{ MG.open[x.id]=!isOpen; mgDraw("x"); }},
+      h("span",{class:"mgxtop"},h("span",{class:"name",text:x.items.join(", ")||"Equipment"}),h("span",{class:"pill "+st[1],text:st[0]})),
+      h("span",{class:"sub"},x.purpose+" · ",h("b",{text:x.from})," to ",h("b",{text:x.to})),
+      h("span",{class:"sub",text:mgWhen(x.at)+" · "+mgPlural(shots,"photo")+" · "+mgPlural(signs,"signature")+(isOpen ? "" : " · Tap to see them")})),
+    isOpen ? h("div",{class:"mgxlog"},...x.events.map(mgEvent)) : null);
+}
+function mgEvent(e){ const signed=e.photos.some(p=>p.kind==="signature");
+  return h("div",{class:"mgev"},
+    h("p",null,h("b",{text:(MGKIND[e.kind]||MGKIND.other)+e.who})," · "+mgWhen(e.at)+(signed ? " · signed" : "")+(e.differences ? " · "+mgPlural(e.differences,"difference")+" recorded" : "")),
+    e.photos.length ? h("div",{class:"mgshots"},...e.photos.map(mgShot)) : null,
+    e.report ? h("div",{class:"links"},h("a",{class:"lk",href:e.report,target:"_blank",rel:"noopener noreferrer"},"Open the signed report")) : null);
+}
+/* A saved photo or signature. Its link is fetched when the handoff is opened and lasts a few minutes. */
+function mgShot(p){ const s=MG.shots[p.path], label=p.kind==="signature" ? "Signature" : "Photo";
+  if(s && s.url && Date.now()-s.at<240000) return h("a",{class:"mgshot"+(p.kind==="signature"?" sig":""),href:s.url,target:"_blank",rel:"noopener noreferrer"},h("img",{src:s.url,alt:label,loading:"lazy"}),h("span",{text:label}));
+  if(!s || s.url){ MG.shots[p.path]={ wait:true };
+    MGK.photo(p.path).then(url=>{ MG.shots[p.path]={ url:url, at:Date.now() }; },()=>{ MG.shots[p.path]={ failed:true }; }).then(()=>{ if(S.view==="manager") mgDraw("x"); }); }
+  return h("span",{class:"mgshot wait",text: s && s.failed ? label+" not available" : "Loading…"});
+}
+
+function mgTools(){
+  const tools=[["handoffs","Handoffs desk"],["history","Check history"],["review","Completed checks"],["attention","Needs attention"],["assign","Assign checks"],["calendar","Schedule"],["units","Equipment records"],["activity","Activity log"],["accounts","Tech accounts"],["team","Older truck screen"],["it","IT tech screen"],["service","Service tech screen"]];
+  return h("div",{class:"box"},h("h3",{text:"More"}),
+    h("div",{class:"links"},h("button",{class:"lk",type:"button","aria-expanded":String(MG.tools),onclick:()=>{ MG.tools=!MG.tools; mgDraw("tools"); }},MG.tools ? "Hide the Tech Check screens" : "Other Tech Check screens"),
+      h("button",{class:"lk",type:"button",disabled:MG.state==="loading",onclick:()=>mgLoad(true)},MG.state==="loading" ? "Reading…" : "Read trucks again")),
+    MG.tools ? h("div",{class:"links mgmore"},...tools.map(([r,l])=>mgTool(r,l))) : null,
+    h("p",{class:"note",text:(MG.err ? MG.err+" " : "")+(MG.at ? "Trucks and inspections read "+fmtClock.format(new Date(MG.at))+"." : "")}));
+}
+
 /* ---------- start ---------- */
-const VIEWS = { board:["viewBoard","tabBoard"], map:["viewMap","tabMap"], punch:["viewPunch","tabPunch"], activity:["viewActivity","tabActivity"] };
+const VIEWS = { board:["viewBoard","tabBoard"], map:["viewMap","tabMap"], punch:["viewPunch","tabPunch"], activity:["viewActivity","tabActivity"], manager:["viewManager","tabManager"] };
 function setView(vw){ S.view=vw; for(const [k,[sec,tab]] of Object.entries(VIEWS)){ $(sec).hidden = k!==vw; $(tab).setAttribute("aria-selected",String(k===vw)); }
   if(vw!=="map"){ M.drop=null; M.sel=null; }
-  if(vw==="activity") drawActivity(); if(vw==="punch" && S.meta) drawPunch(); if(vw==="map") drawMap(); }
+  if(vw==="activity") drawActivity(); if(vw==="punch" && S.meta) drawPunch(); if(vw==="map") drawMap(); if(vw==="manager") mgOpen(); }
 $("tabBoard").addEventListener("click",()=>setView("board"));
 $("tabMap").addEventListener("click",()=>setView("map"));
 $("tabPunch").addEventListener("click",()=>setView("punch"));
 $("tabActivity").addEventListener("click",()=>setView("activity"));
 /* Tech checks are their own screen in COS. The tab goes there. */
 if(hooks && typeof hooks.onTechCheck==="function") $("tabTech").addEventListener("click",()=>hooks.onTechCheck()); else $("tabTech").hidden = true;
+mgStart();
 $("q").addEventListener("input",ev=>{ S.q=ev.target.value; render(); });
 $("refresh").addEventListener("click",refresh);
 $("sheet").addEventListener("click",ev=>{ if(ev.target===$("sheet")) closeUnit(); });
@@ -695,7 +921,7 @@ onDoc("keydown",ev=>{ if(ev.key==="Escape" && S.openId) closeUnit(); });
 const tick=setInterval(()=>{ if(S.meta && !S.openId) render(); }, 60000);
 cleanups.push(()=>clearInterval(tick));
 M.data = mapData;
-setView("board");
+setView(MGK && hooks.startView==="manager" ? "manager" : "board");
 
 /* ---------- data in ---------- */
 function update(data){
