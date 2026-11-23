@@ -23,6 +23,8 @@ export type CosBoardLandingProps = {
   addresses: MhelpAddressMapResult | null | undefined;
   /** Hands a newer camera feed back to Fleet, so the headline and the board move together. */
   onFeed: (units: UnitCameraStatus[]) => void;
+  /** Called once the board is on screen. */
+  onReady?: () => void;
 };
 
 type Board = {update(data: unknown): void; setEdit(state: BoardEditState): void; destroy(): void; root: ShadowRoot};
@@ -47,12 +49,14 @@ function checked(value: unknown): Reading {
  * holds and is counted by the shared count's own unit list, so its tiles are a
  * split of the Fleet headline and never a second count.
  */
-export default function CosBoardLanding({feed, recorderRows, now, fieldMap, routers, upload, addresses, onFeed}: CosBoardLandingProps) {
+export default function CosBoardLanding({feed, recorderRows, now, fieldMap, routers, upload, addresses, onFeed, onReady}: CosBoardLandingProps) {
   const host = useRef<HTMLDivElement>(null), board = useRef<Board | null>(null);
   const deliver = useRef(onFeed);
   deliver.current = onFeed;
   const held = useRef(feed);
   held.current = feed;
+  const ready = useRef(onReady);
+  ready.current = onReady;
   const [flags, setFlags] = useState<BoardEditFlags | null>(null), [locked, setLocked] = useState(false);
   const writing = useRef(false);
   const data = useMemo(() => {
@@ -132,6 +136,7 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
     Object.defineProperty(element, 'cosBoardRoot', {value: mounted.root, configurable: true});
     // Fleet keeps only the units from its own read. Read once more to learn whether this person may make hand fixes.
     void reread.current();
+    ready.current?.();
     return () => { board.current = null; mounted.destroy(); };
   }, []);
   useEffect(() => { board.current?.update(data); }, [data]);
