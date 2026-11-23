@@ -32,18 +32,27 @@
  .cos-todo-card button{grid-column:2;justify-self:start}
 }
 .cos-phone-landing{display:none}
-/* The COS Board screen at the top of Fleet. Its own styles live inside its shadow root. */
+/* The COS Board is the Fleet screen. Its own styles live inside its shadow root. */
 .cos-board-landing{display:block;margin:0 0 14px}
-.cos-board-older{display:block;width:100%;min-height:44px;margin:10px 0 0;text-align:center;font-weight:600}
+/* A device that has shown the board before opens straight to it. On a phone its place is held, in the board's own colour, while its code and the camera reading arrive. */
+.cos-board-waiting{background:#060a11}
 #root#root .cos-board-landing>.cos-board-notice{margin:0 0 10px;padding:12px 14px;border:1px solid var(--cos-border);border-left:4px solid #f59e0b;border-radius:7px;background:var(--cos-selected);color:var(--cos-text);font-size:14px;line-height:1.45;font-weight:600}
+#root#root .cos-board-landing>.cos-board-notice>button{margin-left:8px}
 @media(max-width:700px){
  .cos-board-landing{width:100vw;margin:-1px 0 14px calc(50% - 50vw)}
- .cos-board-older{width:calc(100% - 32px);margin:12px 16px 0}
+ .cos-board-waiting,.cos-board-host{min-height:70vh;background:#060a11}
  #root#root .cos-board-landing>.cos-board-notice{margin:0;padding:12px 16px;border-width:0 0 1px 4px;border-radius:0}
+ /* The board runs edge to edge on a phone, so the frame Fleet draws round its screen has nothing left to hold. */
+ #root#root .cos-fleet-dashboard:has(>.cos-board-landing[data-board='on']):not(:has(>.cos-fleet-drawer[hidden])){border-color:transparent;background:transparent;box-shadow:none;padding-bottom:0}
+ .cos-board-landing[data-board='on']{margin-bottom:0}
 }
-/* On a phone the board is the Fleet screen. The older view is folded away behind one button, never removed. */
-#root#root .cos-fleet-dashboard:has(>.cos-board-landing[data-older-view='closed'])>.cos-fleet-content,
-#root#root .cos-fleet-dashboard:has(>.cos-board-landing[data-older-view='closed'])>.cos-fleet-map-jump{display:none}
+/* While the board is on screen nothing of the older Fleet screen is: not its view, not its row of tabs, and no way back to them from here.
+   The older screen only stands in when the board cannot be shown at all. */
+#root#root .cos-fleet-dashboard:has(>.cos-board-landing[data-board='on']):not(:has(>.cos-fleet-drawer[hidden]))>.cos-fleet-content,
+#root#root .cos-fleet-dashboard:has(>.cos-board-landing[data-board='on']):not(:has(>.cos-fleet-drawer[hidden]))>.cos-fleet-map-jump,
+#root#root .cos-fleet-dashboard:has(>.cos-board-landing[data-board='on']):not(:has(>.cos-fleet-drawer[hidden]))>nav.cos-fleet-tabs{display:none}
+/* One exception. A unit's older panel can ask for a spot to be picked on the older map. Until that is done the map is needed, so the board steps aside for it. */
+#root#root .cos-fleet-dashboard:has(>.cos-fleet-drawer[hidden])>.cos-board-landing{display:none}
 /* Why a unit could not be opened is said once, above the board. The older view's copy of the same words steps aside. */
 #root#root .cos-fleet-dashboard:has(>.cos-board-landing>.cos-board-notice)>.cos-fleet-content>p.cos-fleet-message[role='status']{display:none}
 .cos-phone-board-info>summary{display:none}
