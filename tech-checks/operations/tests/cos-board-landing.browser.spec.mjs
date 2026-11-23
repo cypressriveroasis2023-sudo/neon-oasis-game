@@ -566,6 +566,64 @@ test('a spot with units in more than one state is a ring with its own count of d
   expect(state.errors).toEqual([]);
 });
 
+test('on a desk the board has the whole screen: no frame, the list and the live map side by side, and a count tile filters both', async ({page}, info) => {
+  const {app, host, state} = await phoneBoard(page, placed);
+  const layout = () => inBoard(host, root => {
+    const box = id => { const r = root.getElementById(id).getBoundingClientRect(); return {x: r.x, y: r.y, w: r.width, h: r.height, right: r.right, bottom: r.bottom}; };
+    return {wide: root.getElementById('cosb').classList.contains('wide'), side: !root.getElementById('boardSide').hidden, mapIn: root.getElementById('mapBlock').parentNode.id,
+      main: box('boardMain'), map: box('mapWrap'), board: box('cosb'), tall: innerHeight, across: innerWidth,
+      shown: ['mapChips', 'mapNote', 'mapList'].filter(id => root.getElementById(id).getClientRects().length > 0),
+      pins: [...root.querySelectorAll('#mapPins .pin')].map(pin => pin.getAttribute('aria-label')).sort()};
+  });
+  const tile = label => inBoard(host, (root, wanted) => [...root.querySelectorAll('.tile')].find(item => item.querySelector('.lab').textContent === wanted).click(), label);
+  if (info.project.name !== 'desktop-1440') {
+    // A phone or a small window keeps the map on its own tab, and the list keeps the full width.
+    expect(await layout()).toMatchObject({wide: false, side: false, mapIn: 'viewMap', pins: []});
+    return;
+  }
+  await expect.poll(async () => (await layout()).pins.length).toBeGreaterThan(0);
+  const first = await layout();
+  expect(first).toMatchObject({wide: true, side: true, mapIn: 'boardSide', shown: []});
+  // No frame and no page title: the board starts at the menu's edge and the top of the window, and reaches the right edge.
+  await expect(app.locator('.company-utility-bar')).toBeHidden();
+  const menu = await app.locator('aside.operations-sidebar').evaluate(element => element.getBoundingClientRect().right);
+  expect(Math.abs(first.board.x - menu)).toBeLessThanOrEqual(1);
+  expect(first.board.y).toBeLessThanOrEqual(1);
+  expect(Math.abs(first.board.right - first.across)).toBeLessThanOrEqual(1);
+  // Side by side: the list on the left, the map beside it, all of the map on screen.
+  expect(first.main.right).toBeLessThanOrEqual(first.map.x);
+  expect(first.main.w).toBeGreaterThanOrEqual(460);
+  expect(first.map.w).toBeGreaterThan(first.main.w);
+  expect(first.map.h).toBeGreaterThanOrEqual(420);
+  expect(first.map.bottom).toBeLessThanOrEqual(first.tall + 1);
+  // The board opens on what is down, and so does the map beside it.
+  expect(first.pins).toEqual(['2 units here: 2 Down', 'Spotter 103, Down']);
+  await tile('Up');
+  await expect.poll(async () => (await layout()).pins).toEqual(['2 units here: 2 Up', 'Spotter 301, Up', 'Spotter 401, Up']);
+  // Tapping the same tile again shows every field unit, in the list and on the map.
+  await tile('Up');
+  await expect.poll(async () => (await layout()).pins).toEqual(['2 units here: 2 Down', '3 units here: 1 Down, 2 Up', 'Spotter 301, Up', 'Spotter 401, Up']);
+  // The Map tab still has the one map to itself, showing everything, with its own key.
+  await tile('Down');
+  await inBoard(host, root => root.getElementById('tabMap').click());
+  await expect.poll(async () => (await layout()).mapIn).toBe('viewMap');
+  const alone = await layout();
+  expect(alone).toMatchObject({side: false, shown: ['mapChips', 'mapNote', 'mapList']});
+  expect(alone.pins).toHaveLength(4);
+  expect(alone.map.w).toBeGreaterThan(first.map.w);
+  expect(await inBoard(host, root => root.querySelector('#mapChips .chip[aria-pressed="true"]').textContent)).toBe('All 7');
+  // Back on the Board tab the map is beside the list again.
+  await inBoard(host, root => root.getElementById('tabBoard').click());
+  await expect.poll(async () => (await layout()).mapIn).toBe('boardSide');
+  await expect.poll(async () => (await layout()).pins).toEqual(['2 units here: 2 Down', 'Spotter 103, Down']);
+  // A unit opens in a panel at the side, with the board still in view behind it.
+  await openUnit(host, 'Spotter 103');
+  const drawer = await inBoard(host, root => { const r = root.getElementById('panel').getBoundingClientRect(); return {x: r.x, right: r.right, w: r.width}; });
+  expect(drawer.x).toBeGreaterThan(first.board.x + first.board.w * 0.45);
+  expect(Math.abs(drawer.right - first.across)).toBeLessThanOrEqual(1);
+  expect(state.errors).toEqual([]);
+});
+
 test('with no camera feed Fleet shows as before', async ({page}) => {
   const {app, state} = await mountFleet(page);
   await expect(app.locator('.cos-fleet-dashboard')).toHaveAttribute('data-shared-problem-count', /^\d+$/);

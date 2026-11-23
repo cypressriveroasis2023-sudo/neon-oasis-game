@@ -4,6 +4,7 @@ import {readFileSync, readdirSync} from 'node:fs';
 
 const read = path => readFileSync(new URL(path, import.meta.url), 'utf8');
 const app = read('../src/cosBoard/boardApp.ts');
+const style = read('../src/cosBoard/boardStyle.ts');
 
 test('the board carries no fleet data and reads nothing itself', () => {
   // This repository is public. Unit names, customers, addresses and IPs reach the board from the signed-in feed only.
@@ -38,6 +39,28 @@ test('the board is isolated from the rest of COS and sends nothing itself', () =
   // Two on a unit's page, and on the manager view a handoff's signed report and each of its photos.
   assert.equal(links.length, 4);
   for (const link of links) assert.match(link, /href:[^,}]+,target:"_blank",rel:"noopener noreferrer"/);
+});
+
+test('on a desk the board takes the whole screen, with one map that keeps the drawing\'s shape', () => {
+  const css = read('../src/sourceAttention.css');
+  // No frame and no page title round the board on a desk. The older panel for picking a spot on the older map is still let through.
+  assert.match(css, /@media\(min-width:701px\)\{\n #root#root \.operations-shell>main:has\(>\.cos-fleet-dashboard>\.cos-board-landing\[data-board='on'\]\):not\(:has\(>\.cos-fleet-dashboard>\.cos-fleet-drawer\[hidden\]\)\)\{padding:0!important\}/);
+  assert.match(css, /:not\(:has\(>\.cos-fleet-dashboard>\.cos-fleet-drawer\[hidden\]\)\)>\.company-utility-bar\{display:none\}/);
+  // The board's own width decides, read again whenever it changes.
+  assert.match(app, /const across = \$\("cosb"\)\.getBoundingClientRect\(\)\.width, on = across >= 1000;/);
+  assert.match(app, /new ResizeObserver\(\(\)=>\{ measureWide\(\);/);
+  assert.match(app, /cleanups\.push\(\(\)=>seen\.disconnect\(\)\);/);
+  // One map. Beside the list on a wide Board tab, otherwise on its own tab; beside the list the count tiles choose what it shows.
+  assert.match(app, /const side = W\.wide && S\.view==="board", block=\$\("mapBlock"\), home = side \? \$\("boardSide"\) : \$\("viewMap"\);/);
+  assert.equal(app.split('id=\\"mapSvg\\"').length - 1, 1);
+  assert.match(app, /function sideFilter\(\)\{ if\(!W\.side\) return; const f=\["down","issues","unknown","up"\]\.includes\(S\.filter\) \? S\.filter : "all";/);
+  assert.match(app, /if\(!side\) M\.f="all";/);
+  // The map keeps the drawing's own shape on a desk, so the whole of it is on screen and none of its box is empty.
+  assert.match(style, /\.cosb\.wide \.mapwrap\{aspect-ratio:649\.5\/660\.0;height:auto;/);
+  assert.match(style, /\.cosb\.wide #viewBoard\{display:grid;grid-template-columns:minmax\(460px,1fr\) auto;/);
+  // A unit opens at the side. The page is never made a positioning box, so the panel and the message stay fixed to the window.
+  assert.match(style, /\.cosb\.wide \.panel\{margin:0 0 0 auto;width:min\(620px,48%\);/);
+  assert.doesNotMatch(style, /container-type|contain:/);
 });
 
 test('Fleet hands the board the same feed, clock and field map as its headline', () => {
