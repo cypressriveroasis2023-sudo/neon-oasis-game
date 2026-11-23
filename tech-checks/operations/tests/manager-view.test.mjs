@@ -176,7 +176,9 @@ test('the door only wraps the Tech Check page, and the manager view is drawn by 
   const door = read('../src/ManagerDoor.tsx'), page = read('../src/TechChecksWorkspace.tsx'), bridge = read('../src/managerBridge.ts'), landing = read('../src/CosBoardLanding.tsx');
   assert.equal(page.split('<ManagerDoor>').length - 1, 1);
   assert.match(page, /return <ManagerDoor><section className='panel module operations-tools cos-approved-checks' aria-label='Tech Check workspaces'>/);
-  assert.match(door, /return asking \? <p className='cos-manager-door' role='status'>Opening the manager view…<\/p> : <>\{children\}<\/>;/);
+  assert.match(door, /return waiting \? <p className='cos-manager-door' role='status'>Opening the manager view…<\/p> : <>\{children\}<\/>;/);
+  // Only a device that has shown the manager view waits for it; any other has the page at once, whatever a timer does.
+  assert.match(door, /const \[waiting, setWaiting\] = useState\(\(\) => managerHost\(\) && managerKnown\(\)\);/);
   assert.doesNotMatch(door, /cloneElement|Children\.|openLegacy|api\.|fetch\(|localStorage/);
   // Nothing here reaches the network or a database: the bridge is messages to the page around the frame, on this origin only.
   assert.doesNotMatch(bridge, /fetch\(|XMLHttpRequest|supabase|api\.(?:get|post)|\.rpc\(/);

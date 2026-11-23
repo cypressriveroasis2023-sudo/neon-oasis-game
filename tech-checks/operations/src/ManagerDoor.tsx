@@ -12,14 +12,15 @@ import {workspaceHash} from './workspaceNavigation';
  * exactly as it was, so nothing is lost.
  */
 export default function ManagerDoor({children}: {children: ReactNode}) {
-  const [asking, setAsking] = useState(managerHost);
+  // Only a device that has already shown the manager view waits for it. Any other gets the page as it was at once,
+  // so nothing ever holds Tech Check up, and is taken to the manager view if the app answers straight away.
+  const [waiting, setWaiting] = useState(() => managerHost() && managerKnown());
   useEffect(() => {
-    if (!asking) return;
+    if (!managerHost()) return;
     let live = true;
-    // The app answers at once when it is free. A device that has shown the manager view waits out a busy moment;
-    // any other gets the page as it was without being kept waiting.
-    // Once the page as it was is on screen it stays: a late answer never pulls the person away from it.
-    const stay = () => { if (!live) return; live = false; window.clearTimeout(timer); setAsking(false); };
+    // The app answers at once when it is free. A device that has shown the manager view waits out a busy moment.
+    // Once the answer is late the page as it was stays: a late answer never pulls the person away from it.
+    const stay = () => { if (!live) return; live = false; window.clearTimeout(timer); setWaiting(false); };
     const timer = window.setTimeout(stay, managerKnown() ? 5000 : 700);
     managerHello().then(() => {
       if (!live) return;
@@ -30,5 +31,5 @@ export default function ManagerDoor({children}: {children: ReactNode}) {
     }, stay);
     return () => { live = false; window.clearTimeout(timer); };
   }, []);
-  return asking ? <p className='cos-manager-door' role='status'>Opening the manager view…</p> : <>{children}</>;
+  return waiting ? <p className='cos-manager-door' role='status'>Opening the manager view…</p> : <>{children}</>;
 }
