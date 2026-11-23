@@ -1,5 +1,5 @@
 import {test, expect} from '@playwright/test';
-import {mountFleet, fresh} from './fleet-dashboard-fixtures.mjs';
+import {mountFleet, fresh, units as fleetUnits} from './fleet-dashboard-fixtures.mjs';
 import {countUnits} from '../shared/starUnitStatus.ts';
 
 const unit = (name, extra = {}) => ({
@@ -308,6 +308,58 @@ test('the Tech check tab opens the Tech Check screen COS already has', async ({p
   await inBoard(host, root => root.getElementById('tabTech').click());
   await expect.poll(() => app.locator('body').evaluate(() => location.hash)).toBe('#tech-check');
   await expect(app.locator('.cos-board-host')).toHaveCount(0);
+});
+
+test('a unit asked for from another screen that cannot be opened is explained above the board', async ({page}, info) => {
+  const phone = info.project.name === 'mobile-390';
+  const {app, state} = await mountFleet(page, false, {hash: '#fleet-dashboard?unitLabel=RANGER%20999', cameraStatus: report});
+  const host = app.locator('.cos-board-host'), board = app.locator('.cos-board-landing'), toggle = app.locator('.cos-board-older');
+  await expect(host).toBeVisible();
+  // Fleet's own words for it, once, where they are seen: above the board.
+  const notice = app.locator('.cos-board-notice'), below = app.locator(".cos-fleet-content>p.cos-fleet-message[role='status']");
+  await expect(notice).toBeVisible();
+  await expect(notice).toHaveText('This unit is not in the current inventory. Shop / ROOT and unresolved placement remain available through the placement filters.');
+  await expect(below).toHaveText(await notice.textContent());
+  await expect(below).toBeHidden();
+  await expect(app.getByRole('status').filter({hasText: 'not in the current inventory'})).toHaveCount(1);
+  const said = await notice.boundingBox(), drawn = await host.boundingBox();
+  expect(said.y + said.height).toBeLessThanOrEqual(drawn.y + 1);
+  // On a phone it spans the screen, as the board under it does.
+  if (phone) { expect(Math.round(said.x)).toBe(0); expect(Math.round(said.width)).toBe(390); }
+  // The answer to a unit asked for lives in the older view, so it is open at every width, with the search already filled in.
+  await expect(board).toHaveAttribute('data-older-view', 'open');
+  await expect(toggle).toHaveText('Hide the older Fleet view');
+  await expect(app.locator('.cos-fleet-content')).toBeVisible();
+  await expect(app.locator('.cos-fleet-drawer')).toHaveCount(0);
+  // Folding the older view away keeps the words on screen.
+  await toggle.click();
+  await expect(board).toHaveAttribute('data-older-view', 'closed');
+  await expect(app.locator('.cos-fleet-content')).toBeHidden();
+  await expect(notice).toBeVisible();
+  // The board itself is whole: every unit, not only the one asked for.
+  await expect.poll(() => tiles(host)).toEqual({Down: '1', 'Camera issues': '1', Unknown: '1', Up: '1'});
+  expect(state.errors).toEqual([]);
+});
+
+test('opening Fleet for one unit keeps the older view open, where that unit is shown', async ({page}, info) => {
+  const {app, state} = await mountFleet(page, false, {hash: '#fleet-dashboard?unit=' + fleetUnits[1].id, cameraStatus: report});
+  const host = app.locator('.cos-board-host'), board = app.locator('.cos-board-landing'), toggle = app.locator('.cos-board-older');
+  await expect(app.locator('.cos-fleet-drawer>h2')).toHaveText('Spotter 1');
+  await expect(host).toBeAttached();
+  await expect(board).toHaveAttribute('data-older-view', 'open');
+  await expect(app.locator('.cos-board-notice')).toHaveCount(0);
+  // Closing the unit leaves the older view open at every width: it is in use until the person folds it.
+  await app.getByRole('button', {name: 'Close unit details', exact: true}).click();
+  await expect(app.locator('.cos-fleet-drawer')).toHaveCount(0);
+  await expect(board).toHaveAttribute('data-older-view', 'open');
+  await expect(toggle).toHaveText('Hide the older Fleet view');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(app.locator('.cos-fleet-content')).toBeVisible();
+  await toggle.click();
+  await expect(board).toHaveAttribute('data-older-view', 'closed');
+  await expect(app.locator('.cos-fleet-content')).toBeHidden();
+  await expect(toggle).toHaveText('Show the older Fleet view');
+  expect(state.errors).toEqual([]);
 });
 
 test('with no camera feed Fleet shows as before', async ({page}) => {

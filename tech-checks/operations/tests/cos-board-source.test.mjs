@@ -59,4 +59,14 @@ test('Fleet hands the board the same feed, clock and field map as its headline',
   const css = read('../src/sourceAttention.css');
   assert.ok(css.includes("#root#root .cos-fleet-dashboard:has(>.cos-board-landing[data-older-view='closed'])>.cos-fleet-content,"));
   assert.equal(css.split("data-older-view='closed'").length - 1, 2);
+  // A unit asked for from another screen is answered in the older view. Fleet says when one is open and why one could not be.
+  assert.ok(fleet.includes(' onFeed={setCameraUnits} notice={selectionNotice} inUse={Boolean(selectedRow||selectedSource||selectedMhelpAddress)}/>}'));
+  // So the older view opens for it and stays open until the person folds it, and the reason is shown above the board.
+  assert.match(board, /const wanted = inUse \|\| Boolean\(notice\);/);
+  assert.match(board, /useState<boolean \| null>\(wanted \? true : null\)/);
+  assert.match(board, /if \(seen !== wanted\) \{ setSeen\(wanted\); if \(wanted\) setChosen\(true\); \}/);
+  assert.match(board, /const older = chosen \?\? !phone;/);
+  assert.match(board, /\{notice && <p className='cos-board-notice' role='status'>\{notice\}<\/p>\}\s*<Suspense /);
+  // The same words are never on screen twice.
+  assert.ok(css.includes("#root#root .cos-fleet-dashboard:has(>.cos-board-landing>.cos-board-notice)>.cos-fleet-content>p.cos-fleet-message[role='status']{display:none}"));
 });
