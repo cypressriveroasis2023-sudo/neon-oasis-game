@@ -96,39 +96,26 @@ test('Fleet opens on the board, counted by the shared count', async ({page}, inf
   expect(await minis(host)).toEqual(['4in the field', '1in the shop', '0online in shop']);
   // The board's five tabs, as on the board itself.
   expect(await inBoard(host, root => [...root.querySelectorAll('.tab')].filter(tab => !tab.hidden).map(tab => tab.textContent))).toEqual(['Board', 'Map', 'Tech check', 'Punch list', 'Changes']);
-  // On a phone the board is the Fleet screen: it spans the phone and the older view is folded away, never removed.
-  // On a wider screen there is room for both, so the older view stays open underneath.
-  const board = app.locator('.cos-board-landing'), older = app.locator('.cos-fleet-content'), toggle = app.locator('.cos-board-older');
-  const landing = app.getByRole('region', {name: 'Phone technician landing'});
+  // The board is the Fleet screen at every width. Nothing of the older screen is on it: not its view, not its
+  // row of tabs, not its jump button, and no button to bring any of them back.
+  const board = app.locator('.cos-board-landing');
+  await expect(board).toHaveAttribute('data-board', 'on');
+  await expect(app.locator('.cos-fleet-content')).toBeHidden();
+  await expect(app.locator('.cos-fleet-map-jump')).toBeHidden();
+  await expect(app.locator('nav.cos-fleet-tabs')).toBeHidden();
+  await expect(app.getByRole('navigation', {name: 'Fleet dashboard views', exact: true})).toHaveCount(0);
+  await expect(app.getByRole('region', {name: 'Phone technician landing'})).toHaveCount(0);
+  await expect(board.locator('button')).toHaveCount(0);
+  await expect(app.getByText('older Fleet', {exact: false})).toHaveCount(0);
   const box = await board.boundingBox();
   if (phone) {
+    // On a phone it runs edge to edge, and the frame Fleet draws round its screen is gone with the rest.
     expect(Math.round(box.x)).toBe(0);
     expect(Math.round(box.width)).toBe(390);
-    await expect(board).toHaveAttribute('data-older-view', 'closed');
-    await expect(older).toBeHidden();
-    await expect(app.locator('.cos-fleet-map-jump')).toBeHidden();
-    await expect(toggle).toHaveText('Show the older Fleet view');
-    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    // The other Fleet views stay one tap away.
-    await expect(app.getByRole('navigation', {name: 'Fleet dashboard views', exact: true})).toBeVisible();
-    await toggle.click();
-    await expect(toggle).toHaveText('Hide the older Fleet view');
-    await expect(landing).toBeVisible();
-  } else {
-    await expect(board).toHaveAttribute('data-older-view', 'open');
-    await expect(toggle).toHaveText('Hide the older Fleet view');
-    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(await app.locator('.cos-fleet-dashboard').evaluate(element => getComputedStyle(element).borderTopColor)).toBe('rgba(0, 0, 0, 0)');
   }
-  await expect(older).toBeVisible();
-  // The older Fleet readout underneath is the same count: Up is online, Down plus Camera issues is offline.
+  // The older screen's count is still kept underneath, out of sight, and it is the same count: Up is online, Down plus Camera issues is offline.
   await expect(readout(app)).toHaveText(['1', '2', '1']);
-  const below = await older.boundingBox(), above = await board.boundingBox();
-  expect(above.y + above.height).toBeLessThanOrEqual(below.y + 1);
-  if (!phone) {
-    await toggle.click();
-    await expect(board).toHaveAttribute('data-older-view', 'closed');
-    await expect(older).toBeHidden();
-  }
   // It opens on what is down. A shop unit is never listed as down.
   expect(await inBoard(host, root => [root.getElementById('count').textContent, ...[...root.querySelectorAll('#list .row .name')].map(name => name.textContent)])).toEqual(['1 field units down', 'Spotter 002']);
   // A unit page: diagnosis, cameras, and the IP held back until asked for.
@@ -156,11 +143,21 @@ test('Refresh on the board reads the camera feed again and Fleet follows', async
   const {app, state, host, server} = await phoneBoard(page);
   await expect.poll(() => tiles(host)).toEqual({Down: '1', 'Camera issues': '1', Unknown: '1', Up: '1'});
   // Spotter 002 comes back before the next read.
-  server.units = server.units.map(row => row.unit === 'SPOTTER 002' ? unit('SPOTTER 002') : row);
+  server.units = server.units.map(row => row.unit === 'SPOTTER 002' ? unit('SPOTTER 002', {observedAt: '2026-10-06T17:58:00Z'}) : row);
   await inBoard(host, root => root.getElementById('refresh').click());
   await expect.poll(() => tiles(host)).toEqual({Down: '0', 'Camera issues': '1', Unknown: '1', Up: '2'});
   await expect(readout(app)).toHaveText(['2', '1', '1']);
   await expect.poll(() => toastText(host)).toContain('New reading: Star4Live');
+  // The message sits above COS's bottom bar, never on top of it.
+  const bar = await app.locator('.operations-bottom-nav').boundingBox();
+  expect(bar.height).toBeGreaterThan(40);
+  const said = await inBoard(host, root => { const box = root.getElementById('toast').getBoundingClientRect(); return {shown: root.getElementById('toast').classList.contains('show'), bottom: box.bottom}; });
+  expect(said.shown).toBe(true);
+  expect(said.bottom).toBeLessThanOrEqual(bar.y - 8);
+  // Asked again before Star4Live has been read again, it says so. It does not call the same reading new.
+  await inBoard(host, root => root.getElementById('refresh').click());
+  await expect.poll(() => toastText(host)).toMatch(/^No newer Star4Live reading yet\. Last read .+\.$/);
+  await expect.poll(() => tiles(host)).toEqual({Down: '0', 'Camera issues': '1', Unknown: '1', Up: '2'});
   expect(server.sent).toEqual([]);
   expect(state.errors).toEqual([]);
 });
@@ -313,7 +310,7 @@ test('the Tech check tab opens the Tech Check screen COS already has', async ({p
 test('a unit asked for from another screen that cannot be opened is explained above the board', async ({page}, info) => {
   const phone = info.project.name === 'mobile-390';
   const {app, state} = await mountFleet(page, false, {hash: '#fleet-dashboard?unitLabel=RANGER%20999', cameraStatus: report});
-  const host = app.locator('.cos-board-host'), board = app.locator('.cos-board-landing'), toggle = app.locator('.cos-board-older');
+  const host = app.locator('.cos-board-host'), board = app.locator('.cos-board-landing');
   await expect(host).toBeVisible();
   // Fleet's own words for it, once, where they are seen: above the board.
   const notice = app.locator('.cos-board-notice'), below = app.locator(".cos-fleet-content>p.cos-fleet-message[role='status']");
@@ -326,39 +323,169 @@ test('a unit asked for from another screen that cannot be opened is explained ab
   expect(said.y + said.height).toBeLessThanOrEqual(drawn.y + 1);
   // On a phone it spans the screen, as the board under it does.
   if (phone) { expect(Math.round(said.x)).toBe(0); expect(Math.round(said.width)).toBe(390); }
-  // The answer to a unit asked for lives in the older view, so it is open at every width, with the search already filled in.
-  await expect(board).toHaveAttribute('data-older-view', 'open');
-  await expect(toggle).toHaveText('Hide the older Fleet view');
-  await expect(app.locator('.cos-fleet-content')).toBeVisible();
-  await expect(app.locator('.cos-fleet-drawer')).toHaveCount(0);
-  // Folding the older view away keeps the words on screen.
-  await toggle.click();
-  await expect(board).toHaveAttribute('data-older-view', 'closed');
+  // It is still only the board underneath, and the board is whole: every unit, not only the one asked for.
+  await expect(board).toHaveAttribute('data-board', 'on');
   await expect(app.locator('.cos-fleet-content')).toBeHidden();
-  await expect(notice).toBeVisible();
-  // The board itself is whole: every unit, not only the one asked for.
+  await expect(app.locator('nav.cos-fleet-tabs')).toBeHidden();
+  await expect(app.locator('.cos-fleet-drawer')).toHaveCount(0);
   await expect.poll(() => tiles(host)).toEqual({Down: '1', 'Camera issues': '1', Unknown: '1', Up: '1'});
   expect(state.errors).toEqual([]);
 });
 
-test('opening Fleet for one unit keeps the older view open, where that unit is shown', async ({page}, info) => {
+test('a unit opened from another screen shows in its own panel, and closing it leaves only the board', async ({page}) => {
   const {app, state} = await mountFleet(page, false, {hash: '#fleet-dashboard?unit=' + fleetUnits[1].id, cameraStatus: report});
-  const host = app.locator('.cos-board-host'), board = app.locator('.cos-board-landing'), toggle = app.locator('.cos-board-older');
+  const host = app.locator('.cos-board-host'), board = app.locator('.cos-board-landing');
   await expect(app.locator('.cos-fleet-drawer>h2')).toHaveText('Spotter 1');
   await expect(host).toBeAttached();
-  await expect(board).toHaveAttribute('data-older-view', 'open');
   await expect(app.locator('.cos-board-notice')).toHaveCount(0);
-  // Closing the unit leaves the older view open at every width: it is in use until the person folds it.
   await app.getByRole('button', {name: 'Close unit details', exact: true}).click();
   await expect(app.locator('.cos-fleet-drawer')).toHaveCount(0);
-  await expect(board).toHaveAttribute('data-older-view', 'open');
-  await expect(toggle).toHaveText('Hide the older Fleet view');
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-  await expect(app.locator('.cos-fleet-content')).toBeVisible();
-  await toggle.click();
-  await expect(board).toHaveAttribute('data-older-view', 'closed');
+  await expect(board).toHaveAttribute('data-board', 'on');
+  await expect(host).toBeVisible();
   await expect(app.locator('.cos-fleet-content')).toBeHidden();
-  await expect(toggle).toHaveText('Show the older Fleet view');
+  await expect(app.locator('nav.cos-fleet-tabs')).toBeHidden();
+  await expect.poll(() => tiles(host)).toEqual({Down: '1', 'Camera issues': '1', Unknown: '1', Up: '1'});
+  expect(state.errors).toEqual([]);
+});
+
+// Holds the app's own read of the camera feed until the test lets it go, so the moment before it arrives can be looked at.
+const holdFeed = page => page.addInitScript(() => {
+  const real = window.fetch.bind(window);
+  let release; const gate = new Promise(resolve => { release = resolve; });
+  window.cosTestReleaseFeed = release;
+  window.fetch = async (input, init) => { if (String(typeof input === 'string' ? input : input?.url).includes('cos-unit-camera-status')) await gate; return real(input, init); };
+});
+const shownBefore = page => page.addInitScript(() => { try { localStorage.setItem('cos.fleetBoard.shown', '1'); } catch {} });
+
+test('a device that has shown the board opens straight to it, and the older screen never shows first', async ({page}) => {
+  await shownBefore(page);
+  await holdFeed(page);
+  const {app, state} = await mountFleet(page, false, {cameraStatus: report});
+  const host = app.locator('.cos-board-host'), board = app.locator('.cos-board-landing');
+  // The feed has not arrived. The board is already the screen, saying it is loading, and nothing of the older screen shows.
+  await expect(host).toBeVisible();
+  await expect(board).toHaveAttribute('data-board', 'on');
+  expect(await inBoard(host, root => root.getElementById('asofMain').textContent)).toBe('Loading the camera reading…');
+  expect(await inBoard(host, root => root.querySelectorAll('.tile').length)).toBe(0);
+  await expect(app.locator('.cos-fleet-content')).toBeHidden();
+  await expect(app.locator('nav.cos-fleet-tabs')).toBeHidden();
+  await expect(app.locator('.cos-board-notice')).toHaveCount(0);
+  // The feed arrives, and the same screen fills in.
+  await app.locator('body').evaluate(() => window.cosTestReleaseFeed());
+  await expect.poll(() => tiles(host)).toEqual({Down: '1', 'Camera issues': '1', Unknown: '1', Up: '1'});
+  await expect(board).toHaveAttribute('data-board', 'on');
+  await expect(app.locator('.cos-fleet-content')).toBeHidden();
+  expect(await app.locator('body').evaluate(() => localStorage.getItem('cos.fleetBoard.shown'))).toBe('1');
+  expect(state.errors).toEqual([]);
+});
+
+test('the first time on a device, the older screen gives way once the board is on screen, and the device is remembered', async ({page}) => {
+  await holdFeed(page);
+  const {app, state} = await mountFleet(page, false, {cameraStatus: report});
+  // Nothing says this device shows the board yet, so Fleet is as it was until there is a board to show.
+  await expect(app.locator('.cos-fleet-content')).toBeVisible();
+  await expect(app.locator('nav.cos-fleet-tabs')).toBeVisible();
+  await expect(app.locator('.cos-board-landing')).toHaveCount(0);
+  expect(await app.locator('body').evaluate(() => localStorage.getItem('cos.fleetBoard.shown'))).toBeNull();
+  await app.locator('body').evaluate(() => window.cosTestReleaseFeed());
+  const host = app.locator('.cos-board-host');
+  await expect(host).toBeVisible();
+  await expect.poll(() => tiles(host)).toEqual({Down: '1', 'Camera issues': '1', Unknown: '1', Up: '1'});
+  await expect(app.locator('.cos-fleet-content')).toBeHidden();
+  await expect(app.locator('nav.cos-fleet-tabs')).toBeHidden();
+  await expect.poll(() => app.locator('body').evaluate(() => localStorage.getItem('cos.fleetBoard.shown'))).toBe('1');
+  expect(state.errors).toEqual([]);
+});
+
+test('when the board cannot load on a device that has shown it, Fleet says so above the older screen and can try again', async ({page}) => {
+  await shownBefore(page);
+  // No camera feed is served: the read fails.
+  const {app, state} = await mountFleet(page);
+  const notice = app.locator('.cos-board-notice');
+  await expect(notice).toContainText('The board could not be loaded, so this is the older Fleet screen.');
+  await expect(app.locator('.cos-board-landing')).toHaveAttribute('data-board', 'off');
+  await expect(app.locator('.cos-board-host')).toHaveCount(0);
+  // Fleet still opens: the older screen stands in, whole.
+  await expect(app.locator('.cos-fleet-content')).toBeVisible();
+  await expect(app.locator('nav.cos-fleet-tabs')).toBeVisible();
+  // The device is no longer taken to show the board, so the next visit does not wait for it.
+  expect(await app.locator('body').evaluate(() => localStorage.getItem('cos.fleetBoard.shown'))).toBeNull();
+  // The feed comes back. Try again brings the board.
+  const cors = {'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST,OPTIONS'};
+  await page.route('**/functions/v1/cos-unit-camera-status', route => route.request().method() === 'OPTIONS' ? route.fulfill({status: 204, headers: cors}) : route.fulfill({status: 200, headers: cors, json: report}));
+  await notice.getByRole('button', {name: 'Try again', exact: true}).click();
+  const host = app.locator('.cos-board-host');
+  await expect(host).toBeVisible();
+  await expect.poll(() => tiles(host)).toEqual({Down: '1', 'Camera issues': '1', Unknown: '1', Up: '1'});
+  await expect(app.locator('.cos-board-landing')).toHaveAttribute('data-board', 'on');
+  await expect(app.locator('.cos-fleet-content')).toBeHidden();
+  await expect(app.locator('.cos-board-notice')).toHaveCount(0);
+  await expect.poll(() => app.locator('body').evaluate(() => localStorage.getItem('cos.fleetBoard.shown'))).toBe('1');
+  expect(state.errors).toEqual([]);
+});
+
+test('a device with the board switched off keeps the older Fleet screen', async ({page}) => {
+  await page.addInitScript(() => { try { localStorage.setItem('cos.fleetBoard.off', '1'); } catch {} });
+  const {app, state} = await mountFleet(page, false, {cameraStatus: report});
+  await expect(app.locator('.cos-fleet-dashboard')).toHaveAttribute('data-shared-problem-count', /^\d+$/);
+  await expect(readout(app)).toHaveText(['1', '2', '1']);
+  await expect(app.locator('.cos-board-landing')).toHaveCount(0);
+  await expect(app.locator('.cos-board-host')).toHaveCount(0);
+  await expect(app.locator('.cos-fleet-content')).toBeVisible();
+  await expect(app.locator('nav.cos-fleet-tabs')).toBeVisible();
+  expect(state.errors).toEqual([]);
+});
+
+test('the map cannot be dragged out of its box, and a swipe up or down on the whole map scrolls the page', async ({page}) => {
+  const {app, state} = await mountFleet(page, false, {cameraStatus: report});
+  const host = app.locator('.cos-board-host');
+  await expect(host).toBeVisible();
+  await expect.poll(() => tiles(host)).toEqual({Down: '1', 'Camera issues': '1', Unknown: '1', Up: '1'});
+  await inBoard(host, root => root.getElementById('tabMap').click());
+  // The drawing, where it sits in its box, and whether a finger moves it or the page.
+  const read = () => inBoard(host, root => {
+    const svg = root.getElementById('mapSvg'), box = root.getElementById('mapWrap').getBoundingClientRect();
+    const [, tx, ty, z] = /translate\(([-\d.]+),([-\d.]+)\) scale\(([\d.]+)\)/.exec(root.getElementById('mapBase').getAttribute('transform') || '') || [];
+    return {x: box.x, y: box.y, w: box.width, h: box.height, tx: +tx, ty: +ty, z: +z, touch: svg.style.touchAction};
+  });
+  await expect.poll(async () => (await read()).z).toBeGreaterThan(0);
+  const W = 649.5, H = 660;   // the drawn map, in its own units
+  const inside = view => {
+    const left = view.tx, right = view.tx + W * view.z, top = view.ty, bottom = view.ty + H * view.z;
+    // Along each side the drawing either fills the box edge to edge or sits whole and centred in it. It is never part-way out.
+    for (const [from, to, size] of [[left, right, view.w], [top, bottom, view.h]]) {
+      if (to - from >= size - 1) { expect(from).toBeLessThanOrEqual(1); expect(to).toBeGreaterThanOrEqual(size - 1); }
+      else expect(Math.abs((from + to) / 2 - size / 2)).toBeLessThanOrEqual(1.5);
+    }
+  };
+  const drag = async (dx, dy) => {
+    const view = await read(), x = view.x + view.w / 2, y = view.y + view.h / 2;
+    await host.scrollIntoViewIfNeeded();
+    const now = await read(), cx = now.x + now.w / 2, cy = now.y + now.h / 2;
+    await page.mouse.move(cx, cy); await page.mouse.down();
+    for (let step = 1; step <= 10; step++) await page.mouse.move(cx + dx * step / 10, cy + dy * step / 10);
+    await page.mouse.up();
+    await page.waitForTimeout(80);
+    return read();
+  };
+  // As it opens, the whole fleet is in view.
+  const start = await read();
+  inside(start);
+  // Dragged hard every way, it stays in its box.
+  for (const [dx, dy] of [[0, -900], [0, 900], [-900, 0], [900, 0]]) inside(await drag(dx, dy));
+  // Zoomed in there is more drawing than box, so a finger moves the map; it still cannot leave.
+  await inBoard(host, root => { for (let press = 0; press < 3; press++) root.getElementById('zin').click(); });
+  await expect.poll(async () => (await read()).z).toBeGreaterThan(start.z * 4);
+  const close = await read();
+  expect(H * close.z).toBeGreaterThan(close.h);
+  expect(close.touch).toBe('none');
+  for (const [dx, dy] of [[0, -2000], [0, 2000], [-2000, 0], [2000, 0]]) inside(await drag(dx, dy));
+  // Zoomed all the way out, the whole drawing fits top to bottom, so an up-or-down swipe is the page's to scroll.
+  await inBoard(host, root => { for (let press = 0; press < 8; press++) root.getElementById('zout').click(); });
+  await expect.poll(async () => (await read()).touch).toBe('pan-y');
+  const far = await read();
+  expect(H * far.z).toBeLessThanOrEqual(far.h + 0.5);
+  inside(far);
   expect(state.errors).toEqual([]);
 });
 

@@ -43,6 +43,12 @@ const report = {
   source: 'Star4Live',
 };
 
+// These tests are about the older Fleet screen's shared count. With a camera feed the COS Board is the
+// Fleet screen now and the older screen only stands in when the board is off, so switch the board off.
+test.beforeEach(async ({page}) => {
+  await page.addInitScript(() => { try { localStorage.setItem('cos.fleetBoard.off', '1'); } catch {} });
+});
+
 test('Camera status, Fleet and the phone landing show the same battery-alarm count', async ({page}) => {
   const power = structuredClone(vrm);
   power.power[0].measurements.push({metric: 'battery_voltage', unit: 'V', value: 10, instance: 512, source: 'battery', observedAt: fresh});

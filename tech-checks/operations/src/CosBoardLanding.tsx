@@ -12,8 +12,8 @@ import {mountCosBoard} from './cosBoard/boardApp';
 import {loadBoardFonts} from './cosBoard/boardFonts';
 
 export type CosBoardLandingProps = {
-  /** The camera feed the shared count reads. */
-  feed: UnitCameraStatus[];
+  /** The camera feed the shared count reads. Until it arrives the board shows its own "loading" line. */
+  feed: UnitCameraStatus[] | null;
   recorderRows: readonly CameraRow[] | null | undefined;
   /** The same clock and field map the Fleet headline is counted with. */
   now: number;
@@ -25,6 +25,8 @@ export type CosBoardLandingProps = {
   onFeed: (units: UnitCameraStatus[]) => void;
   /** Called once the board is on screen. */
   onReady?: () => void;
+  /** Called when the board was opened ahead of the camera feed and the feed then could not be read. */
+  onNone?: () => void;
 };
 
 type Board = {update(data: unknown): void; setEdit(state: BoardEditState): void; destroy(): void; root: ShadowRoot};
@@ -49,7 +51,7 @@ function checked(value: unknown): Reading {
  * holds and is counted by the shared count's own unit list, so its tiles are a
  * split of the Fleet headline and never a second count.
  */
-export default function CosBoardLanding({feed, recorderRows, now, fieldMap, routers, upload, addresses, onFeed, onReady}: CosBoardLandingProps) {
+export default function CosBoardLanding({feed, recorderRows, now, fieldMap, routers, upload, addresses, onFeed, onReady, onNone}: CosBoardLandingProps) {
   const host = useRef<HTMLDivElement>(null), board = useRef<Board | null>(null);
   const deliver = useRef(onFeed);
   deliver.current = onFeed;
@@ -57,9 +59,12 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
   held.current = feed;
   const ready = useRef(onReady);
   ready.current = onReady;
+  const none = useRef(onNone);
+  none.current = onNone;
   const [flags, setFlags] = useState<BoardEditFlags | null>(null), [locked, setLocked] = useState(false);
   const writing = useRef(false);
   const data = useMemo(() => {
+    if (!feed) return null;
     const clock = cameraFeedClock(feed, now);
     const census = cameraFeedCensus(feed, recorderLinksFromHealth(recorderRows), clock, fieldMap) || [];
     return boardData({feed, census, now: clock, routers, upload, addresses});
@@ -83,7 +88,10 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
     try {
       const result = checked((await api.get('/api/unit-camera-status')).data);
       if (started === generation.current) take.current(result);
-    } catch { /* keep what is on screen */ } finally { reading.current = false; }
+    } catch {
+      // With a reading on screen, keep it. With none, there is no board to show: say so, and Fleet shows as before.
+      if (!held.current) none.current?.();
+    } finally { reading.current = false; }
   };
   // One save at a time, each through the route Camera status uses. The board asks; this is the only place that sends.
   const fix = useRef(async (_unit: string, _steps: BoardFixStep[]): Promise<string> => 'Saved.');
@@ -94,7 +102,7 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
     const notes: string[] = [];
     try {
       for (const step of steps) {
-        const unit = held.current.find(row => row.unit === unitKey);
+        const unit = held.current?.find(row => row.unit === unitKey);
         if (!unit) throw new Error('COS is no longer reporting ' + unitKey + '.');
         generation.current += 1;
         const result = checked((await api.post('/api/unit-camera-status/edit', handFixRequest(unit, step, crypto.randomUUID()))).data);
@@ -139,7 +147,22 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
     ready.current?.();
     return () => { board.current = null; mounted.destroy(); };
   }, []);
-  useEffect(() => { board.current?.update(data); }, [data]);
+  useEffect(() => { if (data) board.current?.update(data); }, [data]);
+  // COS has a bar across the bottom of a phone. Tell the board how much room it takes, so its messages sit above it.
+  useEffect(() => {
+    const element = host.current, bar = document.querySelector('.operations-bottom-nav');
+    if (!element) return;
+    const measure = () => {
+      const box = bar instanceof HTMLElement ? bar.getBoundingClientRect() : null;
+      const shown = box && box.height > 0 && box.bottom >= window.innerHeight - 1;
+      element.style.setProperty('--cos-board-clear', (shown ? Math.max(0, Math.round(window.innerHeight - box.top)) : 0) + 'px');
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    const watch = bar && typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
+    if (bar) watch?.observe(bar);
+    return () => { window.removeEventListener('resize', measure); watch?.disconnect(); };
+  }, []);
   useEffect(() => { board.current?.setEdit(boardEditState(flags, locked)); }, [flags, locked]);
   // Fleet reads the camera feed once when it opens. When Fleet moves on to a
   // newer reading, read the feed again, or every unit would age into Unknown.

@@ -520,6 +520,17 @@ function centerOn(x,y,z){ M.z=clampZ(z); M.tx=M.w/2-x*M.z; M.ty=M.h/2-y*M.z; pai
 function fitPts(pts,pad,zcap){ if(!pts.length||!M.w) return; let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; for(const q of pts){ x0=Math.min(x0,q.x); y0=Math.min(y0,q.y); x1=Math.max(x1,q.x); y1=Math.max(y1,q.y); }
   pad=pad||40; const z=Math.min((M.w-2*pad)/Math.max(x1-x0,.01),(M.h-2*pad)/Math.max(y1-y0,.01),zcap||60); centerOn((x0+x1)/2,(y0+y1)/2,z); }
 function zoomAt(px,py,f){ const nz=clampZ(M.z*f), k=nz/M.z; M.tx=px-(px-M.tx)*k; M.ty=py-(py-M.ty)*k; M.z=nz; paint(); }
+/* The drawing has edges, so it is held inside its box: it can never be dragged away to leave the box empty.
+   Pins beyond the drawn map still count as part of it, so every unit can be reached.
+   When all of it already fits top to bottom there is nothing to move that way, so an up-or-down swipe scrolls the page. */
+function mapEdges(){ let x0=0,y0=0,x1=M.data?M.data.w:660,y1=M.data?M.data.h:670; for(const q of M.pts){ x0=Math.min(x0,q.x-8); y0=Math.min(y0,q.y-8); x1=Math.max(x1,q.x+8); y1=Math.max(y1,q.y+8); } return [x0,y0,x1,y1]; }
+function hold(){
+  if(!M.w) return;
+  const [x0,y0,x1,y1]=mapEdges(), cw=(x1-x0)*M.z, ch=(y1-y0)*M.z;
+  M.tx = cw<=M.w ? (M.w-cw)/2-x0*M.z : Math.min(-x0*M.z, Math.max(M.w-x1*M.z, M.tx));
+  M.ty = ch<=M.h ? (M.h-ch)/2-y0*M.z : Math.min(-y0*M.z, Math.max(M.h-y1*M.z, M.ty));
+  $("mapSvg").style.touchAction = ch>M.h+.5 ? "none" : "pan-y";
+}
 function buildBase(){ if(M.built||!M.data) return; const d=M.data, P=(cls,dd)=>dd?sv("path",{class:cls,d:dd}):null;
   $("mapBase").replaceChildren(...[P("m-land",d.land),P("m-urban",d.urban),P("m-water",d.lakes),P("m-river",d.rivers),P("m-county",d.counties),P("m-road",d.roads),P("m-state",d.states),P("m-hwy",d.hwy)].filter(Boolean)); M.built=true; }
 function clusters(){
@@ -528,7 +539,7 @@ function clusters(){
   const cl=[]; for(const a of show){ let c=cl.find(c=>Math.hypot(c.sx-a.sx,c.sy-a.sy)<26); if(!c){ c={sx:a.sx,sy:a.sy,m:[]}; cl.push(c); } c.m.push(a.q); }
   return cl;
 }
-function paint(){ cancelAnimationFrame(M.raf); M.raf=requestAnimationFrame(paintNow); }
+function paint(){ hold(); cancelAnimationFrame(M.raf); M.raf=requestAnimationFrame(paintNow); }
 function paintNow(){
   if(!M.w) return;
   $("mapBase").setAttribute("transform","translate("+M.tx.toFixed(1)+","+M.ty.toFixed(1)+") scale("+M.z.toFixed(4)+")");
@@ -636,13 +647,17 @@ async function refresh(){
   const was = S.meta ? when(S.meta.v) : "the last reading";
   if(!hooks || typeof hooks.onRefresh!=="function"){ toast("Refresh isn't available here. Still showing the reading from "+was+"."); return; }
   btn.disabled=true; btn.textContent="Reading…";
+  S.before = S.meta ? S.meta.v : null;
   try{ await hooks.onRefresh(); S.announce=true; clearTimeout(announceTimer); announceTimer=setTimeout(announce, 1500); }
   catch(_){ toast("Couldn't get a new reading. Still showing "+was+".", 12000); }
   btn.disabled=false; btn.textContent="Refresh";
 }
-/* The new reading reaches this screen a moment after it is read. Say so once it is on screen. */
+/* The reading reaches this screen a moment after it is read. Say what came back once it is on screen:
+   a newer Star4Live reading, or the same one because Star4Live has not been read again yet. */
 let announceTimer=null;
-function announce(){ if(!S.announce) return; S.announce=false; clearTimeout(announceTimer); toast(S.meta && S.meta.v ? "New reading: Star4Live "+when(S.meta.v)+"." : "New reading loaded.", 5000); }
+function announce(){ if(!S.announce) return; S.announce=false; clearTimeout(announceTimer);
+  const at = S.meta && S.meta.v;
+  toast(!at ? "New reading loaded." : at===S.before ? "No newer Star4Live reading yet. Last read "+when(at)+"." : "New reading: Star4Live "+when(at)+".", 5000); }
 /* ---------- start ---------- */
 const VIEWS = { board:["viewBoard","tabBoard"], map:["viewMap","tabMap"], punch:["viewPunch","tabPunch"], activity:["viewActivity","tabActivity"] };
 function setView(vw){ S.view=vw; for(const [k,[sec,tab]] of Object.entries(VIEWS)){ $(sec).hidden = k!==vw; $(tab).setAttribute("aria-selected",String(k===vw)); }
