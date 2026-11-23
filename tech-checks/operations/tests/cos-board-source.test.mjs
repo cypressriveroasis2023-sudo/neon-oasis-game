@@ -190,3 +190,23 @@ test('the map covers its box, and a spot with a mix of states is a ring, not one
   // Town names are placed clear of the pins, or left off.
   assert.match(app, /boxes=cl\.map\(c=>\{ const n=c\.m\.length, r=/);
 });
+
+test('the board counts one way, and a hand fix comes first on the card and says what it did to the count', () => {
+  const app = read('../src/cosBoard/boardApp.ts');
+  // One count. mHelp's list decides it once it has loaded; there is no stored choice and nothing to pick.
+  assert.equal(/S\.mode\b|setMode|Count by|Camera systems"\)/.test(app), false);
+  assert.equal(app.includes('localStorage.setItem("cos-count-mode"'), false);
+  assert.ok(app.includes('try{ localStorage.removeItem("cos-count-mode"); }catch(_){}'));
+  assert.ok(app.includes('if(S.mh){'));
+  assert.ok(app.includes('One count: mHelp, the official list'));
+  assert.ok(app.includes('The mHelp list has not loaded, so this shows only what the camera systems can see. It is not the official count.'));
+  // What the camera systems see on their own is only the fallback, and so is its DO NOT USE exclusion.
+  assert.ok(app.includes('(v.excl && !S.mh) ? "excl"'));
+  assert.ok(app.includes('const feeds = !S.mh;'));
+  // Fix it sits right under the diagnosis, and the save waits for the saved reading before saying how the count moved.
+  assert.ok(app.includes('body.splice(2,0,fx);'));
+  assert.equal(app.includes('body.push(fx);'), false);
+  assert.match(app, /S\.saved=\{was, said: said \|\| "Saved\."\}; clearTimeout\(savedTimer\); savedTimer=setTimeout\(saidSaved, 1500\);/);
+  assert.match(app, /render\(\);\n  announce\(\);\n  saidSaved\(\);\n\}/);
+  assert.ok(app.includes('" The count changed: "+moved.join(", ")+"."'));
+});

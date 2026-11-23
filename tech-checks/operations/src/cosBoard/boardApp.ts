@@ -12,7 +12,7 @@
 import mapData from './boardMap.json';
 import {BOARD_CSS} from './boardStyle';
 
-const SHELL = "<div class=\"cosb\" id=\"cosb\"><header class=\"top\"><div class=\"wrap\">\n  <div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div>\n  <span class=\"topbtns\"><button class=\"tvgo\" id=\"tvGo\" type=\"button\">TV board</button><button class=\"refresh\" id=\"refresh\" type=\"button\">Refresh</button></span>\n</div></header>\n<div class=\"asof\" id=\"asof\"><div class=\"wrap\"><span id=\"asofMain\">Loading the camera reading…</span><span id=\"asofSub\"></span></div></div>\n\n<main class=\"wrap\">\n  <div class=\"tabs\" role=\"tablist\">\n    <button class=\"tab\" role=\"tab\" id=\"tabBoard\" aria-selected=\"true\" type=\"button\">Board</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabMap\" aria-selected=\"false\" type=\"button\">Map</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabTech\" aria-selected=\"false\" type=\"button\">Tech check</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabManager\" aria-selected=\"false\" type=\"button\" hidden>Manager</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabPunch\" aria-selected=\"false\" type=\"button\">Punch list</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabActivity\" aria-selected=\"false\" type=\"button\">Changes</button>\n  </div>\n\n  <section id=\"viewBoard\">\n    <div id=\"boardMain\">\n    <div class=\"mode\" id=\"modeRow\"></div>\n    <div class=\"tiles\" id=\"tiles\"></div>\n    <div class=\"shoprow\" id=\"shoprow\"></div>\n    <div class=\"controls\">\n      <input class=\"search\" id=\"q\" type=\"search\" placeholder=\"Find a unit, site, A# or IP\" autocomplete=\"off\" aria-label=\"Find a unit, site, A number or IP\">\n      <div class=\"chips\" id=\"fam\"></div>\n    </div>\n    <div class=\"count\" id=\"count\"></div>\n    <div class=\"list\" id=\"list\"></div>\n    <ul class=\"foot\"><li>One unit counts once, however many cameras it has.</li><li>A unit in the shop never counts as down.</li><li>A reading that is missing or too old shows Unknown, never Down.</li><li>Router checks are a reference only. A router online does not prove the cameras work.</li><li>Hand fixes made here are saved in COS with your name and the time. Nothing here changes mHelp, Star4Live or InHand.</li></ul>\n    </div>\n    <aside id=\"boardSide\" aria-label=\"Map of field units\" hidden></aside>\n  </section>\n\n  <section id=\"viewMap\" hidden>\n    <div id=\"mapBlock\">\n    <div class=\"chips\" id=\"mapChips\"></div>\n    <div class=\"chips\" id=\"mapGo\" style=\"margin-top:8px\"></div>\n    <div class=\"mapwrap\" id=\"mapWrap\">\n      <svg id=\"mapSvg\" role=\"img\" aria-label=\"Map of field units\"><g id=\"mapBase\"></g><g id=\"mapLabels\"></g><g id=\"mapPins\"></g></svg>\n      <div class=\"mapbtns\"><button type=\"button\" id=\"zin\" aria-label=\"Zoom in\">+</button><button type=\"button\" id=\"zout\" aria-label=\"Zoom out\">&minus;</button></div>\n      <div class=\"mapmsg\" id=\"mapMsg\" hidden></div>\n      <div class=\"mapsel\" id=\"mapSel\" hidden></div>\n    </div>\n    <p class=\"note\" id=\"mapNote\" style=\"margin-top:10px\"></p>\n    <div class=\"list\" id=\"mapList\"></div>\n    </div>\n  </section>\n\n  <section id=\"viewTech\" hidden>\n    <div id=\"techForm\"></div>\n    <div id=\"techList\"></div>\n  </section>\n\n  <section id=\"viewManager\" hidden>\n    <div id=\"mgNow\"></div>\n    <div id=\"mgChecks\"></div>\n    <div id=\"mgTrucks\"></div>\n    <div id=\"mgX\"></div>\n    <div id=\"mgTools\"></div>\n  </section>\n\n  <section id=\"viewPunch\" hidden>\n    <div class=\"box\" id=\"punchTop\"><p class=\"note\">Loading the mHelp list…</p></div>\n    <div class=\"chips\" id=\"punchChips\" style=\"margin-top:12px\"></div>\n    <div class=\"count\" id=\"punchCount\"></div>\n    <div class=\"list\" id=\"punchList\"></div>\n  </section>\n\n  <section id=\"viewActivity\" hidden>\n    <p class=\"note\" id=\"actNote\">Every change made by hand on this board, newest first.</p>\n    <ul class=\"hist\" id=\"activity\"></ul>\n  </section>\n</main>\n\n<section id=\"viewTv\" hidden><header class=\"tvtop\"><div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div><div class=\"tvread\" id=\"tvRead\" role=\"status\">Loading the camera reading…</div><div class=\"tvclock\"><b id=\"tvClock\"></b><span id=\"tvDate\"></span></div><button type=\"button\" class=\"tvx\" id=\"tvExitTop\">Exit TV</button></header><div class=\"tvgrid\" id=\"tvGrid\"><div class=\"tvleft\"><div class=\"tvtiles\" id=\"tvTiles\"></div><div class=\"tvminis\" id=\"tvMinis\"></div><div class=\"tvhead\" id=\"tvHead\"></div><div class=\"tvlist\" id=\"tvList\"></div></div><div class=\"tvright\" id=\"tvRight\"><div class=\"tvmaptitle\" id=\"tvMapTitle\"></div><div class=\"tvmap\" id=\"tvMap\"></div></div></div><footer class=\"tvfoot\"><span id=\"tvNote\"></span><span class=\"tvbtns\"><span class=\"tvmode\" id=\"tvMode\"></span><button type=\"button\" id=\"tvRefresh\">Refresh</button><button type=\"button\" id=\"tvFull\">Full screen</button><button type=\"button\" id=\"tvExit\">Exit TV</button></span></footer></section><div class=\"sheet\" id=\"sheet\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"pname\"><div class=\"panel\" id=\"panel\"></div></div>\n<div class=\"toast\" id=\"toast\" role=\"status\" aria-live=\"polite\"></div></div>";
+const SHELL = "<div class=\"cosb\" id=\"cosb\"><header class=\"top\"><div class=\"wrap\">\n  <div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div>\n  <span class=\"topbtns\"><button class=\"tvgo\" id=\"tvGo\" type=\"button\">TV board</button><button class=\"refresh\" id=\"refresh\" type=\"button\">Refresh</button></span>\n</div></header>\n<div class=\"asof\" id=\"asof\"><div class=\"wrap\"><span id=\"asofMain\">Loading the camera reading…</span><span id=\"asofSub\"></span></div></div>\n\n<main class=\"wrap\">\n  <div class=\"tabs\" role=\"tablist\">\n    <button class=\"tab\" role=\"tab\" id=\"tabBoard\" aria-selected=\"true\" type=\"button\">Board</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabMap\" aria-selected=\"false\" type=\"button\">Map</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabTech\" aria-selected=\"false\" type=\"button\">Tech check</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabManager\" aria-selected=\"false\" type=\"button\" hidden>Manager</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabPunch\" aria-selected=\"false\" type=\"button\">Punch list</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabActivity\" aria-selected=\"false\" type=\"button\">Changes</button>\n  </div>\n\n  <section id=\"viewBoard\">\n    <div id=\"boardMain\">\n    <div class=\"mode\" id=\"modeRow\"></div>\n    <div class=\"tiles\" id=\"tiles\"></div>\n    <div class=\"shoprow\" id=\"shoprow\"></div>\n    <div class=\"controls\">\n      <input class=\"search\" id=\"q\" type=\"search\" placeholder=\"Find a unit, site, A# or IP\" autocomplete=\"off\" aria-label=\"Find a unit, site, A number or IP\">\n      <div class=\"chips\" id=\"fam\"></div>\n    </div>\n    <div class=\"count\" id=\"count\"></div>\n    <div class=\"list\" id=\"list\"></div>\n    <ul class=\"foot\"><li>One unit counts once, however many cameras it has.</li><li>A unit in the shop never counts as down.</li><li>A reading that is missing or too old shows Unknown, never Down.</li><li>Router checks are a reference only. A router online does not prove the cameras work.</li><li>Hand fixes made here are saved in COS with your name and the time. Nothing here changes mHelp, Star4Live or InHand.</li></ul>\n    </div>\n    <aside id=\"boardSide\" aria-label=\"Map of field units\" hidden></aside>\n  </section>\n\n  <section id=\"viewMap\" hidden>\n    <div id=\"mapBlock\">\n    <div class=\"chips\" id=\"mapChips\"></div>\n    <div class=\"chips\" id=\"mapGo\" style=\"margin-top:8px\"></div>\n    <div class=\"mapwrap\" id=\"mapWrap\">\n      <svg id=\"mapSvg\" role=\"img\" aria-label=\"Map of field units\"><g id=\"mapBase\"></g><g id=\"mapLabels\"></g><g id=\"mapPins\"></g></svg>\n      <div class=\"mapbtns\"><button type=\"button\" id=\"zin\" aria-label=\"Zoom in\">+</button><button type=\"button\" id=\"zout\" aria-label=\"Zoom out\">&minus;</button></div>\n      <div class=\"mapmsg\" id=\"mapMsg\" hidden></div>\n      <div class=\"mapsel\" id=\"mapSel\" hidden></div>\n    </div>\n    <p class=\"note\" id=\"mapNote\" style=\"margin-top:10px\"></p>\n    <div class=\"list\" id=\"mapList\"></div>\n    </div>\n  </section>\n\n  <section id=\"viewTech\" hidden>\n    <div id=\"techForm\"></div>\n    <div id=\"techList\"></div>\n  </section>\n\n  <section id=\"viewManager\" hidden>\n    <div id=\"mgNow\"></div>\n    <div id=\"mgChecks\"></div>\n    <div id=\"mgTrucks\"></div>\n    <div id=\"mgX\"></div>\n    <div id=\"mgTools\"></div>\n  </section>\n\n  <section id=\"viewPunch\" hidden>\n    <div class=\"box\" id=\"punchTop\"><p class=\"note\">Loading the mHelp list…</p></div>\n    <div class=\"chips\" id=\"punchChips\" style=\"margin-top:12px\"></div>\n    <div class=\"count\" id=\"punchCount\"></div>\n    <div class=\"list\" id=\"punchList\"></div>\n  </section>\n\n  <section id=\"viewActivity\" hidden>\n    <p class=\"note\" id=\"actNote\">Every change made by hand on this board, newest first.</p>\n    <ul class=\"hist\" id=\"activity\"></ul>\n  </section>\n</main>\n\n<section id=\"viewTv\" hidden><header class=\"tvtop\"><div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div><div class=\"tvread\" id=\"tvRead\" role=\"status\">Loading the camera reading…</div><div class=\"tvclock\"><b id=\"tvClock\"></b><span id=\"tvDate\"></span></div><button type=\"button\" class=\"tvx\" id=\"tvExitTop\">Exit TV</button></header><div class=\"tvgrid\" id=\"tvGrid\"><div class=\"tvleft\"><div class=\"tvtiles\" id=\"tvTiles\"></div><div class=\"tvminis\" id=\"tvMinis\"></div><div class=\"tvhead\" id=\"tvHead\"></div><div class=\"tvlist\" id=\"tvList\"></div></div><div class=\"tvright\" id=\"tvRight\"><div class=\"tvmaptitle\" id=\"tvMapTitle\"></div><div class=\"tvmap\" id=\"tvMap\"></div></div></div><footer class=\"tvfoot\"><span id=\"tvNote\"></span><span class=\"tvbtns\"><button type=\"button\" id=\"tvRefresh\">Refresh</button><button type=\"button\" id=\"tvFull\">Full screen</button><button type=\"button\" id=\"tvExit\">Exit TV</button></span></footer></section><div class=\"sheet\" id=\"sheet\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"pname\"><div class=\"panel\" id=\"panel\"></div></div>\n<div class=\"toast\" id=\"toast\" role=\"status\" aria-live=\"polite\"></div></div>";
 /* A shadow root can be attached to an element only once, so a host that is mounted again gets its first root back. */
 const ROOTS = new WeakMap();
 
@@ -34,8 +34,9 @@ const TZ = "America/Chicago";
 /* ---------- state ---------- */
 const S = { meta:null, units:[], edits:{}, filter:"down", fam:"all", q:"", view:"board", openId:null, form:null,
             db:null, user:null, mcp:null, uid:null, canWrite:null, feedNote:"", editsReady:false, busy:false,
-            mh:null, pdone:{}, psec:"place", mode:"feeds", pins0:null, checks:{}, tc:null, tcOpen:false };
-try{ if(localStorage.getItem("cos-count-mode")==="mhelp") S.mode="mhelp"; }catch(_){}
+            mh:null, pdone:{}, psec:"place", pins0:null, checks:{}, tc:null, tcOpen:false };
+/* One count. A device that had picked a way of counting forgets it. */
+try{ localStorage.removeItem("cos-count-mode"); }catch(_){}
 const $ = id => root.getElementById(id);
 
 function h(tag, attrs, ...kids){
@@ -148,7 +149,7 @@ function view(u){
   if(u.s==="a") v.last = u.on ? "online" : u.off ? "offline" : "";
   v.fs = fs; v.unk = unk; v.excl = !!u.x;
   v.why = fs!=="unknown" ? "" : u.s==="a" ? "No fresh Avigilon check for this unit." : u.s==="r" ? "The Recon cloud has no fresh reading for this unit." : "Star4Live has no fresh reading for every camera on this unit.";
-  v.status = (v.excl && S.mode==="feeds") ? "excl" : place==="shop" ? (u.so ? "shopOnline" : "shop") : fs;
+  v.status = (v.excl && !S.mh) ? "excl" : place==="shop" ? (u.so ? "shopOnline" : "shop") : fs;
   v.side = (u.s==="a" || u.on+u.off===0) ? "" : (u.on+"/"+(u.on+u.off));
   return v;
 }
@@ -164,7 +165,7 @@ function pseudo(r){ const f=famOfCat(r.cat), place=r.place;
 /* mHelp is the official count: a unit counts only if mHelp has it, and mHelp decides shop or field unless someone set it by hand here. */
 function allViews(){
   const vs = S.units.map(view), rec = reconcile(vs, S.mh); S.rec = rec;
-  if(S.mh && S.mode!=="feeds"){
+  if(S.mh){
     for(const v of vs){ const m=rec.match[v.id];
       if(m){ v.mh=m; v.counted=true;
         if(!v.hand.place && v.place!==m.rec.place){ v.srcDiff=true; v.place=m.rec.place; if(!v.hand.site) v.site = m.rec.place==="field" ? m.rec.cust : ""; }
@@ -189,15 +190,14 @@ function render(){
   const vs = allViews(); const c = {down:0,issues:0,up:0,unknown:0,shop:0,shopOnline:0,notin:0,excl:0};
   for(const v of vs) c[v.status]++;
   if(TV.on){ drawTv(vs, c); return; }
-  const setMode=m=>{ S.mode=m; try{ localStorage.setItem("cos-count-mode",m); }catch(_){} if(S.filter==="notin"||S.filter==="excl") S.filter="field"; render(); };
-  $("modeRow").replaceChildren("Count by",
-    h("button",{class:"chip",type:"button","aria-pressed":String(S.mode!=="feeds"),onclick:()=>setMode("mhelp")},"mHelp (official)"),
-    h("button",{class:"chip",type:"button","aria-pressed":String(S.mode==="feeds"),onclick:()=>setMode("feeds")},"Camera systems"),
-    h("span",{class:"hint",text: !S.mh && S.mode!=="feeds" ? "The mHelp list has not loaded, so this is showing what the camera systems can see." : S.mode==="feeds" ? "Counting only what the camera systems can see. Shop or field comes from Star4Live, COS's own Sniper and CAM V records, and the Recon cloud. This is not the official count." : "Counting what mHelp lists. Shop or field comes from mHelp."}));
+  /* One count. mHelp is the official list: a unit is in the field, at the site mHelp gives, until mHelp shows it back in the shop or it is moved by hand here. */
+  if(S.mh ? S.filter==="excl" : S.filter==="notin") S.filter="field";
+  $("modeRow").replaceChildren(h("span",{class:"hint",text: S.mh ? "One count: mHelp, the official list"+(S.mh.meta.at ? ", read "+when(S.mh.meta.at) : "")+". A unit is in the field, at the site mHelp gives, until mHelp shows it back in the shop or it is moved by hand here."
+    : "The mHelp list has not loaded, so this shows only what the camera systems can see. It is not the official count."}));
   const tile=(key,cls)=>h("button",{class:"tile "+cls,type:"button","aria-pressed":String(S.filter===key),onclick:()=>setFilter(key)},h("span",{class:"num",text:c[key]}),h("span",{class:"lab",text:LABEL[key]}));
   $("tiles").replaceChildren(tile("down","t-down"),tile("issues","t-issues"),tile("unknown","t-unknown"),tile("up","t-up"));
   const mini=(key,num,lab)=>h("button",{class:"mini",type:"button","aria-pressed":String(S.filter===key),onclick:()=>setFilter(key)},h("b",{text:num}),lab);
-  $("shoprow").replaceChildren(...[mini("field",c.down+c.issues+c.up+c.unknown,"in the field"),mini("shopAll",c.shop+c.shopOnline,"in the shop"),mini("shopOnline",c.shopOnline,"online in shop"), S.mode==="feeds" ? (c.excl ? mini("excl",c.excl,"marked do not use") : null) : mini("notin",c.notin,"not in mHelp")].filter(Boolean));
+  $("shoprow").replaceChildren(...[mini("field",c.down+c.issues+c.up+c.unknown,"in the field"),mini("shopAll",c.shop+c.shopOnline,"in the shop"),mini("shopOnline",c.shopOnline,"online in shop"), !S.mh ? (c.excl ? mini("excl",c.excl,"marked do not use") : null) : mini("notin",c.notin,"not in mHelp")].filter(Boolean));
   const fams=[["all","All"],["Alibi","Alibi"],["Avigilon","Avigilon"],["Recon II","Recon II"]];
   $("fam").replaceChildren(...fams.map(([k,l])=>h("button",{class:"chip",type:"button","aria-pressed":String(S.fam===k),onclick:()=>{S.fam=k;render();}},l)));
 
@@ -444,7 +444,8 @@ function drawPanel(){
     }
     fx.append(h("p",{class:"note",text:"A fix made by hand wins in COS and is saved with your name and the time. mHelp is the official count, so make the same change in mHelp."}));
   }
-  body.push(fx);
+  /* The fix comes first on the card, right under what is wrong. */
+  body.splice(2,0,fx);
   body.push(histBox(v));
 
   P.className="panel s-"+v.status;
@@ -639,6 +640,13 @@ function drawMap(vs){
   onWin("resize",()=>{ measureWide(); if(S.view==="map" || W.side){ sizeMap(); paint(); } });
 })();
 
+/* What a hand fix did to the count. The saved reading reaches the board a moment after the save, so the answer waits
+   for it, and says a plain "Saved." when the count did not move. */
+let savedTimer=null;
+function countNow(){ const c={down:0,issues:0,unknown:0,up:0}; if(S.meta) for(const v of allViews()) if(c[v.status]!==undefined) c[v.status]++; return c; }
+function saidSaved(){ if(!S.saved) return; const was=S.saved.was, said=S.saved.said; S.saved=null; clearTimeout(savedTimer);
+  const now=countNow(), moved=["down","issues","unknown","up"].filter(k=>was[k]!==now[k]).map(k=>LABEL[k]+" "+was[k]+" to "+now[k]);
+  toast(said+(moved.length ? " The count changed: "+moved.join(", ")+"." : ""), 9000); }
 /* ---------- saving a hand fix ---------- */
 /* The board sends nothing itself. It hands Fleet the edits in order, and Fleet saves each one through the same
    route as Camera status. An empty value clears a hand fix, and only where there is one to clear. */
@@ -658,7 +666,8 @@ async function save(v, ch){
   }
   if(!steps.length){ S.form=null; drawPanel(); return; }
   S.busy=true; drawPanel();
-  try{ const said = await hooks.onEdit(v.k, steps); S.form=null; toast(said || "Saved.", 7000); }
+  const was=countNow();
+  try{ const said = await hooks.onEdit(v.k, steps); S.form=null; S.saved={was, said: said || "Saved."}; clearTimeout(savedTimer); savedTimer=setTimeout(saidSaved, 1500); }
   catch(err){ S.form=null; toast("Not saved. "+((err && err.message) || "COS could not confirm the save."), 14000); }
   S.busy=false; render();
 }
@@ -1002,12 +1011,8 @@ function drawTv(vs, c){
   $("tvMinis").replaceChildren(mini(c.down+c.issues+c.up+c.unknown,"in the field"),mini(c.shop+c.shopOnline,"in the shop"),mini(c.shopOnline,"online in shop"));
   const byName=(a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true});
   TV.rows=[...vs.filter(v=>v.status==="down").sort(byName), ...vs.filter(v=>v.status==="issues").sort(byName)];
-  const feeds = S.mode==="feeds" || !S.mh;
+  const feeds = !S.mh;
   $("tvNote").textContent=(feeds ? "Counting what the camera systems see." : "Counting what mHelp lists.")+" A unit in the shop never counts as down. A reading that is missing or too old shows Unknown, never Down.";
-  const setMode=m=>{ S.mode=m; try{ localStorage.setItem("cos-count-mode",m); }catch(_){} render(); };
-  $("tvMode").replaceChildren("Count by",
-    h("button",{class:"chip",type:"button","aria-pressed":String(!feeds),disabled:!S.mh,onclick:()=>setMode("mhelp")},"mHelp (official)"),
-    h("button",{class:"chip",type:"button","aria-pressed":String(feeds),onclick:()=>setMode("feeds")},"Camera systems"));
   tvSize(); tvList();
   drawMap(vs); tvAreas(); tvTour();
 }
@@ -1083,9 +1088,10 @@ function update(data){
   S.meta = data.meta; S.units = units; S.feedNote = ""; S.changes = Array.isArray(data.changes) ? data.changes : [];
   render();
   announce();
+  saidSaved();
 }
 /* Whether this person may make a hand fix right now, and the reason when not. */
 function setEdit(state){ S.can = !!(state && state.can===true); S.canWhy = (state && state.why) || ""; if(S.meta) render(); }
-function destroy(){ for(const fn of cleanups.splice(0)){ try{ fn(); }catch(_){} } clearTimeout(toastTimer); clearTimeout(announceTimer); cancelAnimationFrame(M.raf); root.replaceChildren(); }
+function destroy(){ for(const fn of cleanups.splice(0)){ try{ fn(); }catch(_){} } clearTimeout(toastTimer); clearTimeout(announceTimer); clearTimeout(savedTimer); cancelAnimationFrame(M.raf); root.replaceChildren(); }
 return { update, setEdit, destroy, root, setTurn: tvTurn };
 }

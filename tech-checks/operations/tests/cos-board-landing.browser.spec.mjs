@@ -1,5 +1,5 @@
 import {test, expect} from '@playwright/test';
-import {mountFleet, fresh, units as fleetUnits} from './fleet-dashboard-fixtures.mjs';
+import {mountFleet, field, fresh, units as fleetUnits} from './fleet-dashboard-fixtures.mjs';
 import {countUnits} from '../shared/starUnitStatus.ts';
 
 const unit = (name, extra = {}) => ({
@@ -176,13 +176,49 @@ test('Refresh on the board reads the camera feed again and Fleet follows', async
   expect(state.errors).toEqual([]);
 });
 
+test('the board has one count: mHelp once its list has loaded, with no other way of counting to pick', async ({page}) => {
+  // A device that had picked the camera-systems count does not keep it.
+  await page.addInitScript(() => { try { localStorage.setItem('cos-count-mode', 'feeds'); } catch {} });
+  const record = (id, unitNumber, category, placement, customer) => ({recordId: 'mhelp_product:' + id, productId: String(id), unitNumber, category, placement, uploadLifecycle: 'UNFLAGGED', customer});
+  const value = structuredClone(field);
+  value.uploadInventory = {
+    contract: 'COS_MHELP_UPLOAD_INVENTORY_V1', source: 'mhelpdesk_api', countBasis: 'mhelp_product_records_not_unique_physical_units', sourceSha256: 'a'.repeat(64), receivedAt: fresh, lastApiReadAt: fresh,
+    // mHelp has Spotter 002 back in the shop and lists a Spotter 009 the camera systems do not see. It lists neither Spotter 004 nor the Sniper.
+    records: [record(1, 'Helios 001', 'Helios Solar Tower', 'FIELD', 'Fixture Homes'), record(2, 'Spotter 002', 'Spotter', 'SHOP', 'Shop'), record(3, 'Spotter 003', 'Spotter', 'FIELD', 'Fixture Homes: Lot 3'), record(9, 'Spotter 009', 'Spotter', 'FIELD', 'Fixture Homes: Lot 9')],
+    summary: {totalRecords: 4, fieldRecords: 3, shopRecords: 1, unflaggedFieldRecords: 3, doNotUseRecords: 0, missingRecords: 0},
+  };
+  const {app, state} = await mountFleet(page, false, {cameraStatus: report, field: value});
+  const host = app.locator('.cos-board-host');
+  await expect(host).toBeVisible();
+  // The count is mHelp's: the unit mHelp has in the shop is not down, the one only mHelp lists is counted, and the two it does not list are set aside.
+  await expect.poll(() => tiles(host)).toEqual({Down: '0', 'Camera issues': '1', Unknown: '1', Up: '1'});
+  expect(await minis(host)).toEqual(['3in the field', '1in the shop', '0online in shop', '2not in mHelp']);
+  const line = await inBoard(host, root => root.getElementById('modeRow').textContent);
+  expect(line).toMatch(/^One count: mHelp, the official list, read .+\. A unit is in the field, at the site mHelp gives, until mHelp shows it back in the shop or it is moved by hand here\.$/);
+  // There is nothing to pick, here or on the TV board, and the old choice is forgotten.
+  expect(await inBoard(host, root => [root.querySelectorAll('#modeRow button').length, root.getElementById('tvMode'), root.getElementById('cosb').textContent.includes('Camera systems')])).toEqual([0, null, false]);
+  expect(await app.locator('body').evaluate(() => localStorage.getItem('cos-count-mode'))).toBeNull();
+  expect(state.errors).toEqual([]);
+});
+
+test('until the mHelp list has loaded the board says its count is only what the camera systems see', async ({page}) => {
+  const {host, state} = await phoneBoard(page);
+  await expect.poll(() => tiles(host)).toEqual({Down: '1', 'Camera issues': '1', Unknown: '1', Up: '1'});
+  expect(await inBoard(host, root => [root.getElementById('modeRow').textContent, root.querySelectorAll('#modeRow button').length])).toEqual(['The mHelp list has not loaded, so this shows only what the camera systems can see. It is not the official count.', 0]);
+  expect(await minis(host)).toEqual(['4in the field', '1in the shop', '0online in shop']);
+  expect(state.errors).toEqual([]);
+});
+
 test('a hand fix on the board is saved through the Camera status route and shows who made it', async ({page}, info) => {
   test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');
   const {app, state, host, server} = await phoneBoard(page);
   await openUnit(host, 'Spotter 002');
   await expect.poll(() => fixButtons(host)).toEqual(['Move to shop', 'Change site', 'Rename', 'Correct IP']);
+  // The fix is the first thing on the card after what is wrong, not under everything else.
+  expect((await inBoard(host, root => [...root.querySelectorAll('#panel .box > h3')].map(head => head.textContent))).slice(0, 2)).toEqual(['Diagnosis', 'Fix it']);
   await pressFix(host, 'Move to shop');
-  await expect.poll(() => toastText(host)).toBe('Saved.');
+  // The save says what it did to the count, once the saved reading is on the board.
+  await expect.poll(() => toastText(host)).toBe('Saved. The count changed: Down 1 to 0.');
   // Exactly what Camera status sends: the unit's own key, one field, a fresh request id, and nothing about who is asking.
   expect(server.sent).toHaveLength(1);
   expect(Object.keys(server.sent[0]).sort()).toEqual(['field', 'requestId', 'unitKey', 'value']);
