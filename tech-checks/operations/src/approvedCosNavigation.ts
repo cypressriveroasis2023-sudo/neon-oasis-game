@@ -21,9 +21,10 @@ export function approvedWorkspaceLabel(workspace:string, fallback=workspace):str
 }
 
 // These are the original workspace keys, not replacement pages or data sources.
+// The tools in daily use come first and stand open. The older screens are kept, folded below them and found by search.
 export const approvedToolGroups = [
-  {label:'Fleet tools', items:['Camera Health','Units On Hand','Unit Tracker','InHand Routers','Victron VRM','Equipment']},
-  {label:'Daily review', items:['Today','Handoffs','Owner Review']},
+  {label:'In use', items:['Unit Tracker','InHand Routers','Victron VRM']},
+  {label:'Older screens', items:['Camera Health','Units On Hand','Equipment','Today','Handoffs','Owner Review']},
 ] as const;
 export function visibleApprovedTools(items:readonly string[],trackerVisible:boolean):string[] {
   return items.filter(workspace=>workspace!=='Unit Tracker'||trackerVisible);
