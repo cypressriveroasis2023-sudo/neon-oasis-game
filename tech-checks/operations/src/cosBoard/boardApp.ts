@@ -6,12 +6,13 @@
  *  - it draws inside a shadow root, so its styles and the app's styles cannot touch each other;
  *  - it is handed the app's camera feed and mHelp list (see boardData.ts) and never reads anything itself;
  *  - shop or field, and up or down, are the app's shared count's own calls, not a second set of rules;
- *  - it only reads: hand fixes, the work log, tech checks and the change list need a place to save and are off.
+ *  - a hand fix is handed to Fleet, which saves it through the same route as Camera status. The board itself
+ *    still sends nothing. The work log and the board's own tech check form need a place to save and are off.
  */
 import mapData from './boardMap.json';
 import {BOARD_CSS} from './boardStyle';
 
-const SHELL = "<div class=\"cosb\" id=\"cosb\"><header class=\"top\"><div class=\"wrap\">\n  <div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div>\n  <button class=\"refresh\" id=\"refresh\" type=\"button\">Refresh</button>\n</div></header>\n<div class=\"asof\" id=\"asof\"><div class=\"wrap\"><span id=\"asofMain\">Loading the camera reading…</span><span id=\"asofSub\"></span></div></div>\n\n<main class=\"wrap\">\n  <div class=\"tabs\" role=\"tablist\">\n    <button class=\"tab\" role=\"tab\" id=\"tabBoard\" aria-selected=\"true\" type=\"button\">Board</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabMap\" aria-selected=\"false\" type=\"button\">Map</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabTech\" aria-selected=\"false\" type=\"button\" hidden>Tech check</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabPunch\" aria-selected=\"false\" type=\"button\">Punch list</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabActivity\" aria-selected=\"false\" type=\"button\" hidden>Changes</button>\n  </div>\n\n  <section id=\"viewBoard\">\n    <div class=\"mode\" id=\"modeRow\"></div>\n    <div class=\"tiles\" id=\"tiles\"></div>\n    <div class=\"shoprow\" id=\"shoprow\"></div>\n    <div class=\"controls\">\n      <input class=\"search\" id=\"q\" type=\"search\" placeholder=\"Find a unit, site, A# or IP\" autocomplete=\"off\" aria-label=\"Find a unit, site, A number or IP\">\n      <div class=\"chips\" id=\"fam\"></div>\n    </div>\n    <div class=\"count\" id=\"count\"></div>\n    <div class=\"list\" id=\"list\"></div>\n    <ul class=\"foot\"><li>One unit counts once, however many cameras it has.</li><li>A unit in the shop never counts as down.</li><li>A reading that is missing or too old shows Unknown, never Down.</li><li>Router checks are a reference only. A router online does not prove the cameras work.</li><li>This screen only reads. It does not change mHelp, Star4Live or InHand.</li></ul>\n  </section>\n\n  <section id=\"viewMap\" hidden>\n    <div class=\"chips\" id=\"mapChips\"></div>\n    <div class=\"chips\" id=\"mapGo\" style=\"margin-top:8px\"></div>\n    <div class=\"mapwrap\" id=\"mapWrap\">\n      <svg id=\"mapSvg\" role=\"img\" aria-label=\"Map of field units\"><g id=\"mapBase\"></g><g id=\"mapLabels\"></g><g id=\"mapPins\"></g></svg>\n      <div class=\"mapbtns\"><button type=\"button\" id=\"zin\" aria-label=\"Zoom in\">+</button><button type=\"button\" id=\"zout\" aria-label=\"Zoom out\">&minus;</button></div>\n      <div class=\"mapmsg\" id=\"mapMsg\" hidden></div>\n      <div class=\"mapsel\" id=\"mapSel\" hidden></div>\n    </div>\n    <p class=\"note\" id=\"mapNote\" style=\"margin-top:10px\"></p>\n    <div class=\"list\" id=\"mapList\"></div>\n  </section>\n\n  <section id=\"viewTech\" hidden>\n    <div id=\"techForm\"></div>\n    <div id=\"techList\"></div>\n  </section>\n\n  <section id=\"viewPunch\" hidden>\n    <div class=\"box\" id=\"punchTop\"><p class=\"note\">Loading the mHelp list…</p></div>\n    <div class=\"chips\" id=\"punchChips\" style=\"margin-top:12px\"></div>\n    <div class=\"count\" id=\"punchCount\"></div>\n    <div class=\"list\" id=\"punchList\"></div>\n  </section>\n\n  <section id=\"viewActivity\" hidden>\n    <p class=\"note\" id=\"actNote\">Every change made by hand on this board, newest first.</p>\n    <ul class=\"hist\" id=\"activity\"></ul>\n  </section>\n</main>\n\n<div class=\"sheet\" id=\"sheet\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"pname\"><div class=\"panel\" id=\"panel\"></div></div>\n<div class=\"toast\" id=\"toast\" role=\"status\" aria-live=\"polite\"></div></div>";
+const SHELL = "<div class=\"cosb\" id=\"cosb\"><header class=\"top\"><div class=\"wrap\">\n  <div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div>\n  <button class=\"refresh\" id=\"refresh\" type=\"button\">Refresh</button>\n</div></header>\n<div class=\"asof\" id=\"asof\"><div class=\"wrap\"><span id=\"asofMain\">Loading the camera reading…</span><span id=\"asofSub\"></span></div></div>\n\n<main class=\"wrap\">\n  <div class=\"tabs\" role=\"tablist\">\n    <button class=\"tab\" role=\"tab\" id=\"tabBoard\" aria-selected=\"true\" type=\"button\">Board</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabMap\" aria-selected=\"false\" type=\"button\">Map</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabTech\" aria-selected=\"false\" type=\"button\">Tech check</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabPunch\" aria-selected=\"false\" type=\"button\">Punch list</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabActivity\" aria-selected=\"false\" type=\"button\">Changes</button>\n  </div>\n\n  <section id=\"viewBoard\">\n    <div class=\"mode\" id=\"modeRow\"></div>\n    <div class=\"tiles\" id=\"tiles\"></div>\n    <div class=\"shoprow\" id=\"shoprow\"></div>\n    <div class=\"controls\">\n      <input class=\"search\" id=\"q\" type=\"search\" placeholder=\"Find a unit, site, A# or IP\" autocomplete=\"off\" aria-label=\"Find a unit, site, A number or IP\">\n      <div class=\"chips\" id=\"fam\"></div>\n    </div>\n    <div class=\"count\" id=\"count\"></div>\n    <div class=\"list\" id=\"list\"></div>\n    <ul class=\"foot\"><li>One unit counts once, however many cameras it has.</li><li>A unit in the shop never counts as down.</li><li>A reading that is missing or too old shows Unknown, never Down.</li><li>Router checks are a reference only. A router online does not prove the cameras work.</li><li>Hand fixes made here are saved in COS with your name and the time. Nothing here changes mHelp, Star4Live or InHand.</li></ul>\n  </section>\n\n  <section id=\"viewMap\" hidden>\n    <div class=\"chips\" id=\"mapChips\"></div>\n    <div class=\"chips\" id=\"mapGo\" style=\"margin-top:8px\"></div>\n    <div class=\"mapwrap\" id=\"mapWrap\">\n      <svg id=\"mapSvg\" role=\"img\" aria-label=\"Map of field units\"><g id=\"mapBase\"></g><g id=\"mapLabels\"></g><g id=\"mapPins\"></g></svg>\n      <div class=\"mapbtns\"><button type=\"button\" id=\"zin\" aria-label=\"Zoom in\">+</button><button type=\"button\" id=\"zout\" aria-label=\"Zoom out\">&minus;</button></div>\n      <div class=\"mapmsg\" id=\"mapMsg\" hidden></div>\n      <div class=\"mapsel\" id=\"mapSel\" hidden></div>\n    </div>\n    <p class=\"note\" id=\"mapNote\" style=\"margin-top:10px\"></p>\n    <div class=\"list\" id=\"mapList\"></div>\n  </section>\n\n  <section id=\"viewTech\" hidden>\n    <div id=\"techForm\"></div>\n    <div id=\"techList\"></div>\n  </section>\n\n  <section id=\"viewPunch\" hidden>\n    <div class=\"box\" id=\"punchTop\"><p class=\"note\">Loading the mHelp list…</p></div>\n    <div class=\"chips\" id=\"punchChips\" style=\"margin-top:12px\"></div>\n    <div class=\"count\" id=\"punchCount\"></div>\n    <div class=\"list\" id=\"punchList\"></div>\n  </section>\n\n  <section id=\"viewActivity\" hidden>\n    <p class=\"note\" id=\"actNote\">Every change made by hand on this board, newest first.</p>\n    <ul class=\"hist\" id=\"activity\"></ul>\n  </section>\n</main>\n\n<div class=\"sheet\" id=\"sheet\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"pname\"><div class=\"panel\" id=\"panel\"></div></div>\n<div class=\"toast\" id=\"toast\" role=\"status\" aria-live=\"polite\"></div></div>";
 /* A shadow root can be attached to an element only once, so a host that is mounted again gets its first root back. */
 const ROOTS = new WeakMap();
 
@@ -132,13 +133,14 @@ const SRC = v => v.hand && v.hand.place ? "COS, by hand" : v.u.s==="v" ? "Star4L
 const ORDER = { down:0, issues:1, unknown:2, up:3, shopOnline:4, shop:5, notin:6, excl:7 };
 
 /* Turn one unit from the app's camera feed into what the board shows. Shop or field, and up or down, are the
-   app's own calls: the same ones its shared count makes, so a tile here always equals the headline. */
+   app's own calls: the same ones its shared count makes, so a tile here always equals the headline.
+   What the provider says and what a person set by hand in COS are kept apart, so the unit page can show both. */
 function view(u){
   const place = u.pl==="shop" ? "shop" : "field", site = u.st || "";
   const e = {}; if(u.hp) e.pin = {lat:u.hp[0],lng:u.hp[1]}; if((u.he||[]).includes("place")) e.place = place;
   const v = { u, id:u.id, k:u.k, fam:FAM[u.s]||"Other", type:typeOf(u.k,u.s), hand:{}, e };
-  v.name = u.nm || nameOf(u.k,u.s);
-  v.retired = false; v.feedPlace = place; v.feedSite = site; v.feedName = v.name; v.feedIp = u.ip;
+  v.feedName = nameOf(u.k,u.s); v.name = u.nm || v.feedName;
+  v.retired = false; v.feedPlace = u.fp || place; v.feedSite = u.fst!=null ? u.fst : site; v.feedIp = u.fip!=null ? u.fip : u.ip;
   for(const f of (u.he||[])) v.hand[f]=1;
   v.ip = u.ip; v.place = place; v.site = site; v.note = "";
   v.edited = Object.keys(v.hand).length>0;
@@ -215,7 +217,7 @@ function render(){
   if(S.view==="punch") drawPunch(vs);
   if(S.view==="map") drawMap(vs);
 }
-const PSEC = [["place","Placed differently","mHelp is official, so the board shows mHelp's placement. The other system says something different, and the other system is the one to fix. Never change mHelp or the tracker to match it. Each answer says who fixes it."],
+const PSEC = [["place","Placed differently","mHelp is official, so the board shows mHelp's placement. The other system says something different, and the other system is the one to fix. Never change mHelp or the tracker to match it."],
   ["mhField","Field, no camera feed","mHelp says these are in the field. COS has no camera record for them, so the board cannot show whether they are up."],
   ["bdField","Field feed, not in mHelp","Cameras are reporting from a site under this name, but mHelp has no equipment by that name. Not counted until mHelp has it."],
   ["name","Names differ","Same number, different name in each system. Worth making the names match."],
@@ -292,17 +294,17 @@ function steps(v){
     ? ["mHelp says this unit is in the field. COS has no camera record under this name.","Find out what name its cameras go by in Star4Live, the 2027 tracker or the Recon cloud, and make the names match.","If it is not out there, tell James. James makes any mHelp edit."]
     : ["In the shop per mHelp. No camera record, which is normal for a unit on the shelf."];
   if(v.status==="excl") return ["This unit is marked DO NOT USE, so it is left out of every total.","If that is wrong, the flag is on its mHelp record."];
-  if(v.status==="notin") return ["This has a camera record, but mHelp has no equipment by this name, so it is not counted.","If it is real equipment, tell James so it gets added in mHelp, or its name gets corrected to match mHelp.","If it is a test device or an old record, leave it."];
+  if(v.status==="notin") return ["This has a camera record, but mHelp has no equipment by this name, so it is not counted.","If it is real equipment, tell James so it gets added in mHelp, or rename it here to match mHelp.","If it is a test device or an old record, leave it."];
   const pre = v.srcDiff ? ["mHelp says "+v.place+", and mHelp is the official count. "+SRC(v)+" says "+v.feedPlace+". "+(v.u.s==="a" ? "That is a COS record for James to fix. Do not change mHelp or the tracker because of it." : "Fix it in "+SRC(v)+". Do not change mHelp to match it.")] : [];
   return pre.concat(steps0(v));
 }
 function steps0(v){
   const u=v.u, routerOn=u.rs==="on", routerOff=u.rs==="of";
-  if(v.status==="down") return [(routerOn ? "The router answers, so the unit likely has signal. Look at camera or recorder power and cabling." : routerOff ? "The router is not answering either. Check site power, then the SIM and signal." : u.rr ? "Start from the diagnosis above." : "COS has no router reading for this unit. Start with site power."),"Check mHelp for an open job on this unit before sending anyone."];
-  if(v.status==="issues") return ["Some cameras are off, listed above. The unit itself is reachable.","Check power and cabling on just those cameras.","When it is fixed, tap Refresh to confirm."];
-  if(v.status==="unknown") return ["No fresh reading. Do not treat this as down.","Tap Refresh. If it stays Unknown, check the unit directly."];
-  if(v.status==="shopOnline") return ["This unit is online but sits in the shop.","If it is really on a site, its placement needs correcting under Camera status.","If it is on the bench, nothing to do."];
-  if(v.status==="shop") return ["In the shop. Not counted as down."];
+  if(v.status==="down") return [(routerOn ? "The router answers, so the unit likely has signal. Look at camera or recorder power and cabling." : routerOff ? "The router is not answering either. Check site power, then the SIM and signal." : u.rr ? "Start from the diagnosis above." : "COS has no router reading for this unit. Start with site power."),"Check mHelp for an open job on this unit before sending anyone.","When it is fixed or moved, update it here with Fix it."];
+  if(v.status==="issues") return ["Some cameras are off, listed above. The unit itself is reachable.","Check power and cabling on just those cameras.","When it is fixed, tap Refresh on the board to confirm."];
+  if(v.status==="unknown") return ["No fresh reading. Do not treat this as down.","Tap Refresh on the board. If it stays Unknown, check the unit directly."];
+  if(v.status==="shopOnline") return ["This unit is online but sits in the shop.","If it is really on a site, use Move to field and set the site.","If it is on the bench, nothing to do."];
+  if(v.status==="shop") return ["In the shop. Not counted as down.","When it goes out, use Move to field and set the site."];
   return ["Nothing to do. All cameras are reporting."];
 }
 function routerRead(u){ return { on: u.rs==="on" || (u.rs!=="of" && u.rr==="on"), off: u.rs==="of" || (u.rs!=="on" && u.rr==="of") }; }
@@ -371,28 +373,8 @@ function openBox(v){
     h("div",{class:"links"},sys,show,copy),
     own.length ? h("p",{class:"note",style:"margin-top:10px",text:"This unit's own pages. They only open if the unit is online and your network can reach it."}) : null,
     own.length ? h("div",{class:"links"},own) : null); }
-const QUICK = ["Power cycled","Rebooted router","Checked SIM","Checked cabling","Called customer","Opened a job","Fixed"];
-function logBox(v){
-  const can = S.db && S.canWrite!==false; if(!can) return null;
-  const box=h("div",{class:"box"},h("h3",{text:"Log what you did"}),
-    h("div",{class:"links"}, QUICK.map(t=>h("button",{class:"lk",type:"button",disabled:S.busy,onclick:()=>logWork(v,t)},t)),
-      h("button",{class:"lk",type:"button",disabled:S.busy,onclick:()=>{ S.form="log"; drawPanel(); }},"Something else")));
-  if(S.form==="log"){ const inp=h("input",{id:"logInput",type:"text",autocomplete:"off"});
-    box.append(h("form",{class:"form",onsubmit:ev=>{ ev.preventDefault(); logWork(v, inp.value.trim()); }},h("label",{for:"logInput",text:"What did you do?"}),inp,
-      h("div",{class:"btns"},h("button",{class:"fixbtn",type:"submit",disabled:S.busy},"Log it"),h("button",{class:"fixbtn alt",type:"button",onclick:()=>{ S.form=null; drawPanel(); }},"Cancel"))));
-    setTimeout(()=>{ try{ inp.focus(); }catch(_){} },0); }
-  box.append(h("p",{class:"note",text:"One tap adds a line to this unit's history with your name and the time."}));
-  return box; }
-function histBox(v){ const hist=(v.e.hist||[]).slice().reverse(); return hist.length ? h("div",{class:"box"},h("h3",{text:"History on this unit"}),h("ul",{class:"hist"},hist.map(x=>histLi(x,null)))) : null; }
-async function logWork(v, text){
-  if(!S.db || S.busy || !text) return;
-  const cur = JSON.parse(JSON.stringify(S.edits[v.id]||{})); cur.k=v.k; const at=Date.now();
-  cur.hist = (cur.hist||[]).concat([{f:"log",a:"",b:String(text).slice(0,200),by:S.uid,at}]).slice(-60); cur.by=S.uid; cur.at=at;
-  S.busy=true; drawPanel();
-  try{ await S.db.doc("units/"+v.id).set(cur); S.edits[v.id]=cur; S.form=null; toast("Logged: "+text); }
-  catch(err){ if(err&&err.code==="invalid_argument") S.canWrite=false; toast("Not saved. "+(err&&err.code==="invalid_argument" ? "This sign-in can't change the board." : "The board couldn't be reached. Try again in a moment.")); }
-  S.busy=false; render();
-}
+function logBox(){ return null; }
+function histBox(v){ const hist=(v.u && v.u.hx)||[]; return hist.length ? h("div",{class:"box"},h("h3",{text:"Set by hand on this unit"}),h("ul",{class:"hist"},hist.map(x=>histLi(x,null)))) : null; }
 function drawMhPanel(v){
   const P=$("panel"), r=v.rec, dl=h("dl",{class:"kv"});
   for(const [a,b] of [["Where",(v.place==="field"?"Field":"Shop")+" · per mHelp"],["Site",v.site||"—"],["Type",v.type+" · "+v.fam],["mHelp","A# "+r.id+" · listed as "+r.label+(r.flag==="D"?" · marked DO NOT USE":"")],["Camera feed","None under this name"]]) dl.append(h("dt",{text:a}),h("dd",{text:b}));
@@ -403,7 +385,6 @@ function drawMhPanel(v){
       resBox(resFor(v.name, v.k)), locBox(v), openBox(v), logBox(v),
       h("div",{class:"box"},h("h3",{text:"Fix it"}),h("p",{class:"note",text:"This unit comes straight from mHelp. Change its name or placement in mHelp, then tap Refresh."})),
       histBox(v)));
-  fillNames();
 }
 function drawPanel(){
   const v = S.vmap && S.vmap[S.openId]; if(!v){ closeUnit(); return; }
@@ -436,50 +417,49 @@ function drawPanel(){
   if(v.type==="Helios") body.push(h("div",{class:"box"},h("h3",{text:"Power"}),h("p",{class:"note",text:"Victron solar and battery are not on this board yet."})));
 
   /* Fix it */
-  const can = S.db && S.canWrite!==false;
+  const can = S.can===true;
   const fx=h("div",{class:"box"},h("h3",{text:"Fix it"}));
-  if(!can) fx.append(h("p",{class:"note",text:"Hand fixes are not switched on for this screen yet. Correct a unit under Camera status."}));
+  if(!can) fx.append(h("p",{class:"note",text: S.canWhy || "Hand fixes are not available right now."}));
   else {
     const b=(label,key,alt)=>h("button",{class:"fixbtn"+(alt?" alt":""),type:"button",disabled:S.busy,onclick:()=>{S.form=key;drawPanel();}},label);
     fx.append(h("div",{class:"fix"},
       h("button",{class:"fixbtn",type:"button",disabled:S.busy,onclick:()=>{ if(v.place==="field") save(v,{place:"shop"}); else { S.form="tofield"; drawPanel(); } }}, v.place==="field"?"Move to shop":"Move to field"),
-      b("Change site","site"), b("Rename","name",true), b("Correct IP","ip",true), b("Add note","note",true),
-      v.edited ? h("button",{class:"fixbtn alt",type:"button",disabled:S.busy,onclick:()=>save(v,{__reset:true})},"Undo hand edits") : null));
-    if(S.form && S.form!=="log" && S.form!=="pin"){
-      const F={ site:["Site name",v.site,"site"], tofield:["Which site is it on?",v.site||v.feedSite,"site"], name:["Unit name",v.name,"name"], ip:["IP address",v.ip||"","ip"], note:["Note",v.note,"note"] }[S.form];
+      b("Change site","site"), b("Rename","name",true), u.s==="v" ? b("Correct IP","ip",true) : null,
+      v.edited ? b("Undo hand edits","undo",true) : null));
+    const F={ site:["Site name",v.site,"site"], tofield:["Which site is it on?",v.site||v.feedSite,"site"], name:["Unit name",v.name,"name"], ip:["IP address",v.ip||"","ip"] }[S.form];
+    if(S.form==="undo"){
+      fx.append(h("div",{class:"form"},
+        h("p",{class:"note",text:"This clears what was set by hand on "+v.name+": "+((u.hx||[]).map(x=>FIELD[x.f]||x.f).join(", ")||"nothing")+". The unit goes back to what "+(u.s==="v"?"Star4Live":u.s==="a"?"the COS record":"the Recon cloud")+" reports."}),
+        h("div",{class:"btns"},h("button",{class:"fixbtn",type:"button",disabled:S.busy,onclick:()=>save(v,{__reset:true})},"Clear them"),h("button",{class:"fixbtn alt",type:"button",onclick:()=>{S.form=null;drawPanel();}},"Cancel"))));
+    } else if(F){
       const inp=h("input",{id:"fixInput",type:"text",value:F[1]||"",autocomplete:"off"});
       const go=()=>{ const val=inp.value.trim(); const ch={}; ch[F[2]]=val; if(S.form==="tofield") ch.place="field"; if(S.form==="site" && val && v.place==="shop") ch.place="field"; save(v,ch); };
       fx.append(h("form",{class:"form",onsubmit:ev=>{ev.preventDefault();go();}},h("label",{for:"fixInput",text:F[0]}),inp,
-        h("p",{class:"note",text: S.form==="ip" ? "Saved exactly as typed. Leave empty to go back to the IP on record." : S.form==="note" ? "Leave empty to clear the note." : S.form==="name" ? "Leave empty to go back to the name on record." : "Saved exactly as typed."}),
+        h("p",{class:"note",text: S.form==="ip" ? "A public IP address. Leave empty to go back to the IP on record." : S.form==="name" ? "Leave empty to go back to the name on record." : S.form==="tofield" ? "Saved exactly as typed. Leave empty to move it without naming a site." : "Saved exactly as typed. Leave empty to go back to the site on record."}),
         h("div",{class:"btns"},h("button",{class:"fixbtn",type:"submit",disabled:S.busy},"Save"),h("button",{class:"fixbtn alt",type:"button",onclick:()=>{S.form=null;drawPanel();}},"Cancel"))));
       setTimeout(()=>{ try{ inp.focus(); }catch(_){} },0);
     }
-    fx.append(h("p",{class:"note",text:"A change made by hand wins on this board and is logged with who and when. mHelp is the official count, so make the same change in mHelp."}));
+    fx.append(h("p",{class:"note",text:"A fix made by hand wins in COS and is saved with your name and the time. mHelp is the official count, so make the same change in mHelp."}));
   }
   body.push(fx);
   body.push(histBox(v));
 
   P.className="panel s-"+v.status;
   P.replaceChildren(h("div",{class:"phead"},h("div",null,h("span",{class:"pill s-"+v.status,text:LABEL[v.status]}),h("h2",{id:"pname",text:v.name})),h("button",{class:"close",type:"button",onclick:closeUnit},"Close")),h("div",{class:"pbody"},body));
-  fillNames();
 }
-const FIELD = { place:"placement", site:"site", name:"name", ip:"IP", note:"note", reset:"hand edits" };
+const FIELD = { place:"placement", site:"site", name:"name", ip:"IP", address:"address" };
+/* A hand fix as it reads on a card: an IP by its last part only, and Shop or Field in plain words. */
+const handValue = x => x.f==="ip" ? ipShort(x.b) : x.f==="place" ? (x.b==="SHOP" ? "Shop" : x.b==="FIELD" ? "Field" : x.b) : x.b;
 function histLi(x, unitName){
-  const who=h("b",{"data-uid":x.by||"",text: x.by ? "Someone" : "Someone"});
-  const line = x.f==="log" ? [" logged: “"+(x.b||"")+"”"] : x.f==="pin" ? [x.b ? " dropped a pin at "+x.b : " removed the hand pin"] : x.f==="reset" ? [" cleared the hand edits"] : [" changed "+(FIELD[x.f]||x.f)+" from “"+((x.f==="ip"?ipShort(x.a):x.a)||"empty")+"” to “"+((x.f==="ip"?ipShort(x.b):x.b)||"empty")+"”"];
-  return h("li",null, unitName?h("b",{text:unitName+": "}):null, who, line, h("time",{text:when(Math.round((x.at||0)/1000))}));
+  return h("li",null, unitName?h("b",{text:unitName+": "}):null, h("b",{text:x.by||"Someone"}),
+    " set "+(FIELD[x.f]||x.f)+" to “"+(handValue(x)||"empty")+"”"+(x.why ? " · "+x.why : ""),
+    h("time",{text: x.at ? when(Math.round(x.at/1000)) : "no time on record"}));
 }
+/* Every hand fix that is in force, across the fleet. COS keeps who made each one and when. */
 function drawActivity(){
-  const all=[]; const names={}; for(const u of S.units) names[u.id]=(S.edits[u.id]&&S.edits[u.id].name)||nameOf(u.k,u.s);
-  for(const [id,e] of Object.entries(S.edits)) for(const x of (e.hist||[])) all.push([x, names[id]||e.k||id]);
-  all.sort((a,b)=>(b[0].at||0)-(a[0].at||0));
-  $("actNote").textContent = !S.db ? "The change log can't be reached in this view." : !S.editsReady ? "Loading the change log…" : all.length ? "Every change made by hand on this board, newest first." : "No changes made by hand yet. When someone moves, renames or fixes a unit, it shows here with who and when.";
-  $("activity").replaceChildren(...all.slice(0,200).map(([x,n])=>histLi(x,n)));
-  fillNames();
-}
-async function fillNames(){
-  const els=[...root.querySelectorAll("[data-uid]")].filter(e=>e.dataset.uid); if(!els.length || !S.user) return;
-  try{ const ps=await S.user.profiles([...new Set(els.map(e=>e.dataset.uid))]); for(const e of els){ const p=ps[e.dataset.uid]; e.textContent=(p&&p.name)||"Someone"; } }catch(_){}
+  const all=S.changes||[];
+  $("actNote").textContent = all.length ? "Every hand fix in force in COS, newest first." : "No hand fixes are in force. When someone moves, renames or fixes a unit, it shows here with who and when.";
+  $("activity").replaceChildren(...all.slice(0,300).map(x=>{ const v=S.vmap && S.vmap[unitId(x.k)]; return histLi(x, v ? v.name : (x.nm || x.k)); }));
 }
 
 
@@ -496,43 +476,33 @@ function pinOf(v){
   if(rec.lat && rec.lng) return {lat:rec.lat,lng:rec.lng,kind:rec.pk||"m"};
   const p=S.pins0 && S.pins0[rec.id]; return p ? {lat:p[0],lng:p[1],kind:p[2]} : null;
 }
-function parseLL(t){
-  t=String(t||"").trim();
-  const m = t.match(/!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)/) || t.match(/[?&](?:q|query|ll|destination|daddr)=(?:loc:)?(-?\d{1,2}\.\d+)(?:,|%2C)\s*(-?\d{1,3}\.\d+)/i) || t.match(/@(-?\d{1,2}\.\d+),\s*(-?\d{1,3}\.\d+)/) || t.match(/^\(?\s*(-?\d{1,2}(?:\.\d+)?)\s*[,\s]\s*(-?\d{1,3}(?:\.\d+)?)\s*\)?$/);
-  if(!m) return null; const lat=+m[1], lng=+m[2];
-  return (lat>=24 && lat<=50 && lng>=-125 && lng<=-66) ? {lat,lng} : null;
-}
 const llText = p => p.lat.toFixed(5)+", "+p.lng.toFixed(5);
-async function savePin(v, pin){
-  if(!S.db || S.busy) return false;
-  const cur = JSON.parse(JSON.stringify(S.edits[v.id]||{})); cur.k=v.k; const at=Date.now();
-  const old = cur.pin && isFinite(+cur.pin.lat) ? llText({lat:+cur.pin.lat,lng:+cur.pin.lng}) : "";
-  if(pin) cur.pin={lat:+pin.lat.toFixed(6),lng:+pin.lng.toFixed(6)}; else delete cur.pin;
-  cur.hist=(cur.hist||[]).concat([{f:"pin",a:old,b:pin?llText(pin):"",by:S.uid,at}]).slice(-60); cur.by=S.uid; cur.at=at;
-  S.busy=true; let ok=false;
-  try{ await S.db.doc("units/"+v.id).set(cur); S.edits[v.id]=cur; ok=true; toast(pin ? "Pin saved for "+v.name+"." : "Hand pin removed from "+v.name+"."); }
-  catch(err){ if(err&&err.code==="invalid_argument") S.canWrite=false; toast("Not saved. "+(err&&err.code==="invalid_argument" ? "This sign-in can't change the board." : "The board couldn't be reached. Try again in a moment.")); }
-  S.busy=false; S.form=null; render(); return ok;
-}
+/* Where a unit is. Inside COS a hand pin is an address a person typed: it is saved exactly as typed, and COS
+   looks it up only to place the pin. */
 function locBox(v){
-  const rec=recOf(v), pin=pinOf(v), can = S.db && S.canWrite!==false, hand = pin && pin.kind==="hand";
+  const rec=recOf(v), pin=pinOf(v), can = S.can===true && !v.mhOnly, hand = pin && pin.kind==="hand", typed = (v.u && v.u.ta) || "";
   if(v.place!=="field" && !hand) return null;
-  const addr = rec && rec.addr ? rec.addr : (v.u && v.u.ad) || "";
+  const addr = typed || (rec && rec.addr ? rec.addr : "") || (v.u && v.u.ad) || "";
   const dest = hand ? pin.lat+","+pin.lng : addr ? addr : pin ? pin.lat+","+pin.lng : "";
+  const says = hand ? "Pin is from the address typed by hand in COS, at "+llText(pin)+"."
+    : typed ? "This address was typed by hand in COS. COS could not place a pin for it"+(pin ? ", so the map still shows the mHelp address." : ", so it is not on the map.")
+    : !pin ? "No pin yet, so it is not on the map."
+    : pin.kind==="r" ? "Pin is from the mHelp address and is approximate."
+    : "Pin is from the mHelp address. It marks the address, not the unit's exact spot.";
   const box=h("div",{class:"box"},h("h3",{text:"Where it is"}),
     h("p",{style:"margin:0 0 6px;font-size:16px;font-weight:650",text: addr || (v.site ? v.site : "No address on record")}),
-    h("p",{class:"note",text: hand ? "Pin is from the address typed by hand in COS, at "+llText(pin)+"." : !pin ? "No pin yet, so it is not on the map." : pin.kind==="r" ? "Pin is from the mHelp address and is approximate." : "Pin is from the mHelp address. It marks the address, not the unit's exact spot."}),
+    h("p",{class:"note",text:says}),
     h("div",{class:"links",style:"margin-top:8px"},
       dest ? h("a",{class:"lk",href:"https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(dest),target:"_blank",rel:"noopener noreferrer"},"Directions") : null,
       pin ? h("button",{class:"lk",type:"button",onclick:()=>showOnMap(v)},"Show on map") : null,
-      can ? h("button",{class:"lk",type:"button",disabled:S.busy,onclick:()=>{ S.form = S.form==="pin" ? null : "pin"; drawPanel(); }}, pin ? "Move the pin" : "Drop a pin") : null));
+      can ? h("button",{class:"lk",type:"button",disabled:S.busy,onclick:()=>{ S.form = S.form==="pin" ? null : "pin"; drawPanel(); }}, typed ? "Change the address" : "Set the address") : null));
   if(S.form==="pin" && can){
-    const inp=h("input",{id:"pinInput",type:"text",autocomplete:"off",placeholder:"29.7604, -95.3698"});
-    box.append(h("form",{class:"form",onsubmit:ev=>{ ev.preventDefault(); const p=parseLL(inp.value); if(!p){ toast("Couldn't read that. It should look like 29.7604, -95.3698"); return; } savePin(v,p); }},
-      h("label",{for:"pinInput",text:"Paste the spot from Google Maps"}), inp,
-      h("p",{class:"note",text:"In Google Maps, press and hold on the unit's spot. Copy the two numbers it shows and paste them here. A copied Google Maps link works too."}),
-      h("div",{class:"btns"},h("button",{class:"fixbtn",type:"submit",disabled:S.busy},"Save pin"),h("button",{class:"fixbtn alt",type:"button",onclick:()=>startDrop(v)},"Tap the map instead")),
-      hand ? h("button",{class:"fixbtn alt",type:"button",disabled:S.busy,onclick:()=>savePin(v,null)},"Remove my pin") : null));
+    const inp=h("input",{id:"pinInput",type:"text",autocomplete:"off",value:typed,placeholder:"1200 Main St, Houston, TX 77002"});
+    box.append(h("form",{class:"form",onsubmit:ev=>{ ev.preventDefault(); const val=inp.value.trim(); if(!val && !typed){ toast("Type the site address first."); return; } save(v,{address:val}); }},
+      h("label",{for:"pinInput",text:"Site address"}), inp,
+      h("p",{class:"note",text:"Saved exactly as typed. COS looks the address up only to place the pin."+(typed ? " Leave empty to clear the address typed by hand." : "")}),
+      h("div",{class:"btns"},h("button",{class:"fixbtn",type:"submit",disabled:S.busy},"Save address"),h("button",{class:"fixbtn alt",type:"button",onclick:()=>{ S.form=null; drawPanel(); }},"Cancel"))));
+    setTimeout(()=>{ try{ inp.focus(); }catch(_){} },0);
   }
   return box;
 }
@@ -599,16 +569,7 @@ function drawSel(){
     h("div",{class:"list"},vs.map(rowEl)));
   el.hidden=false; el.scrollTop=0;
 }
-function drawMsg(){
-  const el=$("mapMsg"); if(!M.drop){ el.hidden=true; return; }
-  const d=M.drop;
-  el.replaceChildren(h("div",{text: d.ll ? "Put "+d.name+" here?" : "Tap where "+d.name+" is. Zoom in first with + or a pinch."}),
-    h("div",{class:"btns"}, d.ll ? h("button",{class:"fixbtn",type:"button",disabled:S.busy,onclick:async()=>{ const v=S.vmap&&S.vmap[d.id]; if(!v){ M.drop=null; drawMap(); return; } const ok=await savePin(v,d.ll); if(ok){ M.focus=d.id; M.drop=null; drawMap(); } }},"Save pin") : null,
-      h("button",{class:"fixbtn alt",type:"button",onclick:()=>{ M.drop=null; drawMap(); }},"Cancel")));
-  el.hidden=false;
-}
-function startDrop(v){ const pin=pinOf(v); closeUnit(); M.drop={id:v.id,name:v.name,ll:null}; M.sel=null; M.f="all"; setView("map");
-  if(pin){ const [x,y]=toXY(pin.lat,pin.lng); M.fitted=true; centerOn(x,y,Math.max(M.z,22)); } }
+function drawMsg(){ $("mapMsg").hidden=true; }
 function showOnMap(v){ const pin=pinOf(v); if(!pin) return; closeUnit(); M.focus=v.id; M.f="all"; M.sel=null; M.drop=null; setView("map");
   const [x,y]=toXY(pin.lat,pin.lng); M.fitted=true; centerOn(x,y,Math.max(M.z,40)); }
 const GO = [["All units",null],["Houston",29.80,-95.42,7.5],["Austin",30.22,-97.72,9],["San Antonio",29.45,-98.5,11],["Dallas–Fort Worth",32.7,-97.2,8]];
@@ -645,25 +606,27 @@ function drawMap(vs){
   onWin("resize",()=>{ if(S.view==="map"){ sizeMap(); paint(); } });
 })();
 
-/* ---------- saving a hand edit ---------- */
+/* ---------- saving a hand fix ---------- */
+/* The board sends nothing itself. It hands Fleet the edits in order, and Fleet saves each one through the same
+   route as Camera status. An empty value clears a hand fix, and only where there is one to clear. */
 async function save(v, ch){
-  if(!S.db || S.busy) return;
-  const cur = JSON.parse(JSON.stringify(S.edits[v.id]||{})); cur.k=v.k; const hist=cur.hist||[]; const at=Date.now(); let changed=false;
-  if(ch.__reset){ for(const f of ["name","site","place","ip","note","pin"]) delete cur[f]; hist.push({f:"reset",a:"",b:"",by:S.uid,at}); changed=true; }
-  else for(const [f,val] of Object.entries(ch)){
-    const before = f==="place"?v.place : f==="site"?v.site : f==="name"?v.name : f==="ip"?(v.ip||"") : v.note;
-    if(val===before) continue;
-    if(val==="") delete cur[f]; else cur[f]=val;
-    const after = val!=="" ? val : (f==="name"?v.feedName : f==="ip"?(v.feedIp||"") : f==="site"?v.feedSite : "");
-    if(after===before) { changed=true; continue; }
-    hist.push({f,a:String(before||""),b:String(after||""),by:S.uid,at}); changed=true;
+  if(S.can!==true || S.busy || v.mhOnly || !hooks || typeof hooks.onEdit!=="function") return;
+  const steps=[];
+  if(ch.__reset){ for(const [f,field] of [["address","address"],["site","site"],["name","name"],["ip","public_ip"],["place","placement"]]) if(v.hand[f]) steps.push({field, value:null}); }
+  else {
+    if(ch.place!==undefined && ch.place!==v.place) steps.push({field:"placement", value: ch.place==="field" ? "FIELD" : "SHOP"});
+    for(const [f,field] of [["site","site"],["name","name"],["ip","public_ip"],["address","address"]]){
+      if(ch[f]===undefined) continue;
+      const before = f==="site" ? v.site : f==="name" ? v.name : f==="ip" ? (v.ip||"") : (v.u.ta||"");
+      if(ch[f]===before) continue;
+      if(ch[f]===""){ if(v.hand[f]) steps.push({field, value:null}); }
+      else steps.push({field, value:ch[f]});
+    }
   }
-  if(!changed){ S.form=null; drawPanel(); return; }
-  cur.hist=hist.slice(-60); cur.by=S.uid; cur.at=at;
+  if(!steps.length){ S.form=null; drawPanel(); return; }
   S.busy=true; drawPanel();
-  try{ await S.db.doc("units/"+v.id).set(cur); S.edits[v.id]=cur; S.form=null; toast("Saved."); }
-  catch(err){ const code=err&&err.code; if(code==="invalid_argument") S.canWrite=false;
-    toast(code==="invalid_argument" ? "Not saved. This sign-in can't change the board. Ask James for edit access." : code==="quota_exceeded" ? "Not saved. The board's storage is full. Tell James." : "Not saved. The board couldn't be reached. Try again in a moment."); }
+  try{ const said = await hooks.onEdit(v.k, steps); S.form=null; toast(said || "Saved.", 7000); }
+  catch(err){ S.form=null; toast("Not saved. "+((err && err.message) || "COS could not confirm the save."), 14000); }
   S.busy=false; render();
 }
 
@@ -688,6 +651,9 @@ function setView(vw){ S.view=vw; for(const [k,[sec,tab]] of Object.entries(VIEWS
 $("tabBoard").addEventListener("click",()=>setView("board"));
 $("tabMap").addEventListener("click",()=>setView("map"));
 $("tabPunch").addEventListener("click",()=>setView("punch"));
+$("tabActivity").addEventListener("click",()=>setView("activity"));
+/* Tech checks are their own screen in COS. The tab goes there. */
+if(hooks && typeof hooks.onTechCheck==="function") $("tabTech").addEventListener("click",()=>hooks.onTechCheck()); else $("tabTech").hidden = true;
 $("q").addEventListener("input",ev=>{ S.q=ev.target.value; render(); });
 $("refresh").addEventListener("click",refresh);
 $("sheet").addEventListener("click",ev=>{ if(ev.target===$("sheet")) closeUnit(); });
@@ -703,10 +669,12 @@ function update(data){
   const units = data.units.map(u=>Object.assign({}, u, {id:unitId(u.k)}));
   S.dev = data.cameras || {}; S.devAt = data.meta.v;
   S.mh = data.mhelp || null;
-  S.meta = data.meta; S.units = units; S.feedNote = "";
+  S.meta = data.meta; S.units = units; S.feedNote = ""; S.changes = Array.isArray(data.changes) ? data.changes : [];
   render();
   announce();
 }
+/* Whether this person may make a hand fix right now, and the reason when not. */
+function setEdit(state){ S.can = !!(state && state.can===true); S.canWhy = (state && state.why) || ""; if(S.meta) render(); }
 function destroy(){ for(const fn of cleanups.splice(0)){ try{ fn(); }catch(_){} } clearTimeout(toastTimer); clearTimeout(announceTimer); cancelAnimationFrame(M.raf); root.replaceChildren(); }
-return { update, destroy, root };
+return { update, setEdit, destroy, root };
 }

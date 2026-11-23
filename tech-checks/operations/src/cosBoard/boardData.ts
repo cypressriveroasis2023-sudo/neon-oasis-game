@@ -23,6 +23,10 @@ export type BoardUnit = {
   o: string;
   pl: 'field' | 'shop';
   st: string;
+  /** What the provider itself says, before anything a person set by hand: place, site and IP. */
+  fp: 'field' | 'shop';
+  fst: string;
+  fip: string;
   n: number; on: number; off: number;
   /** Reading time and last-online time, in seconds. 0 when there is none. */
   t: number; lo: number;
@@ -36,13 +40,21 @@ export type BoardUnit = {
   so: boolean;
   /** Left out of every total: DO NOT USE or a named exception. */
   x: boolean;
-  /** Which parts a person set by hand in COS. */
+  /** Which parts a person set by hand in COS, and each of those edits with who made it and when. */
   he: string[];
+  hx: BoardHandEdit[];
+  /** The address a person typed for this unit, and the revision the next address edit must name. */
+  ta: string;
+  ar: string | null;
   /** The point COS matched to an address typed by hand. */
   hp?: [number, number];
   ad?: string;
   rs: string; rt: number; rr: string; ro: number; rm: string; ri: ''; rp: '';
 };
+
+/** One hand edit that is in force. `at` is in milliseconds, 0 when the record has no time. */
+export type BoardHandEdit = {f: string; b: string; by: string; role: string; at: number; why: string; pv: string};
+export type BoardChange = BoardHandEdit & {k: string; nm: string};
 
 export type BoardCamera = {name: string; type: string; model: string; fw: string; st: 1 | 0 | null; lo: number};
 
@@ -62,6 +74,8 @@ export type BoardData = {
   units: BoardUnit[];
   cameras: Record<string, BoardCamera[]>;
   mhelp: BoardMhelp | null;
+  /** Every hand edit in force across the fleet, newest first. */
+  changes: BoardChange[];
 };
 
 export type BoardTally = {up: number; issues: number; down: number; unknown: number; shop: number; shopOnline: number; excluded: number};
@@ -137,6 +151,19 @@ function routerFields(row: RouterRow | undefined, now: number) {
 
 const HAND: Record<string, string> = {placement: 'place', site: 'site', name: 'name', public_ip: 'ip', address: 'address', camera: 'camera'};
 
+function handEdits(unit: UnitCameraStatus): BoardHandEdit[] {
+  const list: BoardHandEdit[] = [];
+  for (const [field, edit] of Object.entries(unit.handEdits || {})) {
+    if (!edit) continue;
+    const time = edit.at ? Date.parse(edit.at) : NaN;
+    list.push({
+      f: HAND[field] || field, b: line(edit.value), by: line(edit.by) || 'Unknown', role: line(edit.role),
+      at: Number.isFinite(time) ? time : 0, why: line(edit.reason), pv: line(edit.providerValue),
+    });
+  }
+  return list.sort((left, right) => right.at - left.at || left.f.localeCompare(right.f));
+}
+
 /** mHelp counts stands, poles and skids, but they carry no cameras, so the board does not list them. */
 const STANDS = new Set(['Stand', 'Solar Stand 72', 'Solar Pole 72', 'Solar Skid 144']);
 
@@ -191,6 +218,7 @@ export function boardData({feed, census, now, routers, upload, addresses}: Board
     if (!held || seconds(router.checkedAt) > seconds(held.checkedAt)) routerByUnit.set(key, router);
   }
   const cameras: Record<string, BoardCamera[]> = {};
+  const changes: BoardChange[] = [];
   let newestStar = 0;
   const units = feed.map((unit, index): BoardUnit => {
     const counted = census[index] && census[index].name === unit.unit ? census[index] : undefined;
@@ -203,6 +231,8 @@ export function boardData({feed, census, now, routers, upload, addresses}: Board
     const point = unit.location && Number.isFinite(unit.location.latitude) && Number.isFinite(unit.location.longitude)
       ? [unit.location.latitude, unit.location.longitude] as [number, number] : undefined;
     const typed = line(unit.location?.matchedAddress) || line(unit.address);
+    const edits = handEdits(unit);
+    for (const edit of edits) changes.push({...edit, k: unit.unit, nm: line(unit.displayName)});
     return {
       k: unit.unit,
       ...(line(unit.displayName) ? {nm: line(unit.displayName)} : {}),
@@ -210,6 +240,9 @@ export function boardData({feed, census, now, routers, upload, addresses}: Board
       o: line(unit.providerSite),
       pl: decided.place,
       st: line(unit.site),
+      fp: (unit.providerPlacement ?? unit.placement) === 'SHOP' ? 'shop' : 'field',
+      fst: line(unit.providerSite !== undefined ? unit.providerSite : unit.site),
+      fip: line(unit.providerPublicIp !== undefined ? unit.providerPublicIp : unit.publicIp),
       n: decided.cameras, on: decided.online, off: decided.offline,
       t: observed, lo: 0,
       ip: line(unit.publicIp),
@@ -220,13 +253,18 @@ export function boardData({feed, census, now, routers, upload, addresses}: Board
       so: decided.place === 'shop' && (unit.onlineInShop === true || (unit.placement !== 'SHOP' && (unit.online || 0) > 0)),
       x: decided.excluded,
       he: Object.keys(unit.handEdits || {}).map(field => HAND[field] || field),
+      hx: edits,
+      // Exactly as the person typed it: this is what the address form opens with.
+      ta: typeof unit.address === 'string' ? unit.address.trim() : '',
+      ar: typeof unit.addressRevision === 'string' ? unit.addressRevision : null,
       ...(point && decided.place === 'field' ? {hp: point} : {}),
       ...(typed ? {ad: typed} : {}),
       ...routerFields(routerByUnit.get(exactUnitName(unit.unit)), now),
       ri: '', rp: '',
     };
   });
-  return {meta: {gen: Math.round(now / 1000), v: newestStar, rl: Array.isArray(routers)}, units, cameras, mhelp: boardMhelp(upload, addresses)};
+  changes.sort((left, right) => right.at - left.at || left.k.localeCompare(right.k, undefined, {numeric: true}) || left.f.localeCompare(right.f));
+  return {meta: {gen: Math.round(now / 1000), v: newestStar, rl: Array.isArray(routers)}, units, cameras, mhelp: boardMhelp(upload, addresses), changes};
 }
 
 /** The board's tiles when it counts by the camera systems. Checked against the shared count in the tests. */
