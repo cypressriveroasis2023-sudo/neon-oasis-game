@@ -34,7 +34,7 @@ for(const [name,data,status,error] of [
 test('protected technician preservation allows exactly the intended app replacement and rejects unrelated edits',()=>{
  const baseline=execFileSync('git',['show','f9725fc776f91b7920a7cfc59d3d07c5dd6b53d3:tech-checks/app.js'],{encoding:'utf8'});
  verifyAuthOnlyChange(baseline,app);
- for(const changed of [baseline,app+'\n// extra change',app.replace("role === 'pending'","role === 'allowed'")])assert.throws(()=>verifyAuthOnlyChange(baseline,changed));
+ for(const changed of [baseline,app+'\n// extra change',app.replace("role === 'pending'","role === 'allowed'"),app.replace("signOut({ scope: 'local' })","signOut()"),app.replace('      await db.auth.signOut();\n      return showAuth();',"      await db.auth.signOut({ scope: 'local' });\n      return showAuth();")])assert.throws(()=>verifyAuthOnlyChange(baseline,changed));
 });
 
 test('unchanged host reproduces logout on a temporary profile failure',async()=>{
@@ -53,4 +53,10 @@ test('standalone email settings retain one normal fallback client when the host 
  const source=readFileSync(new URL('../../team-email-settings.js',import.meta.url),'utf8').split('\n').slice(0,3).join('\n'),fallback={},calls=[];
  const context=vm.createContext({window:{},supabase:{createClient(...args){calls.push(args);return fallback;}}});
  vm.runInContext(source+'\nglobalThis.result=emailDb;',context);assert.equal(context.result,fallback);assert.equal(calls.length,1);assert.equal(calls[0][0],'https://goqrnolcvqnirjmzaeyk.supabase.co');
+});
+
+test('Sign out ends only this screen; every account-removed sign-out still ends all sessions',()=>{
+ assert.match(app,/async function logout\(\) \{\n  \/\/[^\n]*\n  await db\.auth\.signOut\(\{ scope: 'local' \}\);\n  showAuth\(\);\n\}/);
+ assert.equal(app.split("signOut({ scope: 'local' })").length,2);
+ assert.equal(app.split('db.auth.signOut();').length,4);
 });

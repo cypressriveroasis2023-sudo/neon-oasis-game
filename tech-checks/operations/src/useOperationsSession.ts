@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {api} from './api';
 import {createOperationsSessionRecovery, guardSessionCallback, type SessionRecoveryState} from './operationsSessionRecovery';
-import {tvSessionHold} from './tvSessionHold';
+import {boardSessionHold,tvSessionHold} from './tvSessionHold';
 
 export function useOperationsSession(onInvalidated: (reason?: unknown, detail?: {path?: string}) => void) {
   const [state, setState] = useState<SessionRecoveryState>({session:null, checking:true, error:'', reloadRequired:false, generation:0});
@@ -19,7 +19,7 @@ export function useOperationsSession(onInvalidated: (reason?: unknown, detail?: 
       const detail=(event as CustomEvent<{reason?: unknown; path?: string}>).detail;
       const reason=detail?.reason;
       const path=typeof detail?.path==='string'?detail.path:'';
-      if(tvSessionHold()&&reason==='authentication-denied'&&path&&path!=='/api/session'){
+      if((tvSessionHold()||boardSessionHold())&&reason==='authentication-denied'&&path&&path!=='/api/session'){
         current.quietRefresh();
         clearView.current(reason, detail);
         return;
