@@ -6,6 +6,7 @@ import type {CameraRow} from './cameraEvidence';
 import type {RouterRow} from '../../supabase/functions/cos-operations-pages/routers';
 import type {MhelpAddressMapResult} from './mhelpAddressMapPins';
 import {workspaceHash} from './workspaceNavigation';
+import {setBoardSessionHold} from './tvSessionHold';
 import {boardData} from './cosBoard/boardData';
 import {boardEditState, handFixRequest, type BoardEditFlags, type BoardEditState, type BoardFixStep} from './cosBoard/boardEdit';
 import {mountCosBoard} from './cosBoard/boardApp';
@@ -177,6 +178,8 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
     ready.current?.();
     return () => { board.current = null; mounted.destroy(); window.clearInterval(tvKeep.current); if (tvOn.current) { tvOn.current = false; showTv(false); } };
   }, []);
+  // While the board is up, a sign-in hiccup refreshes quietly instead of dropping it.
+  useEffect(() => { setBoardSessionHold(true); return () => setBoardSessionHold(false); }, []);
   useEffect(() => { if (data) board.current?.update(data); }, [data]);
   // COS has a bar across the bottom of a phone. Tell the board how much room it takes, so its messages sit above it.
   useEffect(() => {
