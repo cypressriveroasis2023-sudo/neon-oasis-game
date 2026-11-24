@@ -291,6 +291,7 @@ function rowEl(v){
   if(v.status==="down"){ const r=routerRead(v.u); if(r.off) sub.push(h("span",{class:"tag",text:"Router down too"})); else if(r.on) sub.push(h("span",{class:"tag",text:"Router up"})); }
   if(v.srcDiff) sub.push(h("span",{class:"tag",text:SRC(v)+": "+v.feedPlace}));
   if(v.u.fl.includes("x")) sub.push(h("span",{class:"tag",text:"Do not use"}));
+  if(v.u.pw) sub.push(powerChip(v.u.pw));
   return h("button",{class:"row s-"+v.status,type:"button",onclick:()=>openUnit(v.id)},
     h("span",{class:"name",text:v.name}),
     h("span",{class:"side"}, v.side, h("small",{text: v.side ? "online" : v.type})),
@@ -323,6 +324,12 @@ function steps0(v){
   if(v.status==="shop") return ["In the shop. Not counted as down.","When it goes out, use Move to field and set the site."];
   return ["Nothing to do. All cameras are reporting."];
 }
+/* Victron power for a Helios: one reading, never an average of separate batteries. Older than 45 min draws grey. */
+const PWQ = { good:"ok", fair:"warn", low:"bad", stale:"unk", none:"unk", off:"unk" };
+function powerText(p){ if(!p) return ""; if(p.q==="off") return "Victron: not in the latest sync";
+  return (p.b!==null ? p.b+"% battery" : "No battery reading")+(p.w!==null ? " · "+p.w+" W solar" : "")+(p.q==="stale" ? " · old reading" : ""); }
+function powerChip(p){ if(!p) return null;
+  return h("span",{class:"pwr q-"+p.q,title:powerText(p)},h("i",{"aria-hidden":"true"}),p.q==="off" ? "Victron off" : (p.b!==null ? p.b+"%" : "—"),p.w!==null && p.q!=="off" ? h("small",{text:"☀ "+p.w+" W"}) : null); }
 function routerRead(u){ return { on: u.rs==="on" || (u.rs!=="of" && u.rr==="on"), off: u.rs==="of" || (u.rs!=="on" && u.rr==="of") }; }
 const WORD = { ok:"OK", warn:"Check", bad:"Problem", unk:"Unknown" }, RW = { on:"Online", of:"Offline", un:"Unknown" };
 /* Read the signs we have and say what is most likely wrong. A router reading is a hint only, never proof the cameras work. */
@@ -335,6 +342,7 @@ function diagnose(v){
   if(u.rs) ck.push({k:"Router, COS check", s: u.rs==="on"?"ok":u.rs==="of"?"bad":"unk", t:(RW[u.rs]||u.rs)+(u.rt ? " · "+when(u.rt) : "")});
   if(u.rr) ck.push({k:"Router, InHand says", s: u.rr==="on"?"ok":u.rr==="of"?"bad":"unk", t:(RW[u.rr]||u.rr)+(u.ro ? " · "+when(u.ro) : " · no time given")});
   if(!u.rs && !u.rr) ck.push({k:"Router", s:"unk", t: S.meta && S.meta.rl===false ? "Router readings have not loaded yet" : "No router on record for this unit"});
+  if(u.pw) ck.push({k:"Battery, Victron", s:PWQ[u.pw.q]||"unk", t:powerText(u.pw)+(u.pw.t ? " · "+when(u.pw.t) : "")});
   if(u.lo && fs!=="up") ck.push({k:"Last online", s:"info", t:when(u.lo)+" · "+ago(u.lo)+" ago"});
   const m = S.mh && S.rec ? S.rec.match[v.id] : null;
   if(S.mh){
@@ -346,6 +354,7 @@ function diagnose(v){
   let cause;
   if(v.status==="notin") cause="This has a camera record but is not in mHelp, so it is not counted.";
   else if(v.place==="shop") cause = (fs==="up"||fs==="issues") ? "Online, but filed under shop. If it is really on a site, the placement is what needs fixing." : "In the shop. Nothing to troubleshoot unless it should be on a site.";
+  else if(fs==="down" && u.pw && u.pw.q==="low") cause = "Victron shows the battery at "+u.pw.b+"%"+(u.pw.w!==null ? " with "+u.pw.w+" W of solar coming in" : "")+". The unit is most likely out of power. Check the panels and the charge controller before anything else."
   else if(fs==="down") cause = r.off ? "The whole unit looks dark. Cameras and router are both not answering. Think site power, SIM or signal first."
     : r.on ? "The router answers, but nothing behind it is reporting. Think power to the cameras or recorder, the switch, or cabling."
     : "Cameras are not reporting and there is no router reading to narrow it down. Start with site power.";
@@ -402,6 +411,17 @@ function drawMhPanel(v){
       h("div",{class:"box"},h("h3",{text:"Fix it"}),h("p",{class:"note",text:"This unit comes straight from mHelp. Change its name or placement in mHelp, then tap Refresh."})),
       histBox(v)));
 }
+function powerBox(v){
+  const p=v.u.pw, go = hooks && typeof hooks.onScreen==="function" ? h("button",{class:"lk",type:"button",onclick:()=>hooks.onScreen("Victron VRM")},"Open Victron Power") : null;
+  if(!p) return h("div",{class:"box"},h("h3",{text:"Power"}),h("p",{class:"note",text:S.meta ? "No Victron installation matches this Helios number, or the Victron reading has not loaded yet." : "Loading the Victron reading…"}),go?h("div",{class:"links"},go):null);
+  const fill = h("b"); fill.style.width = (p.b!==null ? Math.max(0,Math.min(100,p.b)) : 0)+"%"; const bar = h("span",{class:"pwbar"},fill);
+  const tiles = h("div",{class:"pwtiles"},
+    h("div",{class:"pwt q-"+p.q},h("span",{text:"Battery"}),h("b",{text:p.b!==null ? p.b+"%" : "—"}),bar),
+    h("div",{class:"pwt"},h("span",{text:"Solar"}),h("b",{text:p.w!==null ? p.w+" W" : "—"})),
+    h("div",{class:"pwt"},h("span",{text:"Voltage"}),h("b",{text:p.v!==null ? p.v+" V" : "—"})));
+  const note = p.q==="off" ? "This installation was not in the latest Victron sync." : p.q==="stale" ? "This reading is more than 45 minutes old"+(p.t ? " ("+when(p.t)+")" : "")+", so it is not called current." : p.q==="none" ? "Victron has no battery reading for this unit." : "Victron reading"+(p.t ? " · "+when(p.t) : "")+". Cameras come from Star4Live; power comes from Victron. A low battery is not the same as a camera being down.";
+  return h("div",{class:"box pwbox"},h("h3",{text:"Power"}),tiles,h("p",{class:"note",text:note}),go?h("div",{class:"links"},go):null);
+}
 function drawPanel(){
   const v = S.vmap && S.vmap[S.openId]; if(!v){ closeUnit(); return; }
   if(v.mhOnly){ drawMhPanel(v); return; }
@@ -430,7 +450,7 @@ function drawPanel(){
     h("div",{class:"box"},h("h3",{text:"What to do"}),h("ol",{class:"steps"},steps(v).map(s=>h("li",{text:s})))),
     camsBox(v), locBox(v), openBox(v), logBox(v),
     h("div",{class:"box"},h("h3",{text:"Details"}),dl, v.why?h("p",{class:"note",text:v.why}):null) ];
-  if(v.type==="Helios") body.push(h("div",{class:"box"},h("h3",{text:"Power"}),h("p",{class:"note",text:"Victron solar and battery are not on this board yet."})));
+  if(v.type==="Helios") body.push(powerBox(v));
 
   /* Fix it */
   const can = S.can===true;

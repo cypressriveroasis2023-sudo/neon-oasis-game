@@ -23,7 +23,7 @@ test('exact unique Helios card contains numeric dashboard and approved matching 
 });
 test('stale, failed and zero readings never animate; missing stays unreported',()=>{
  const flow=props=>render(VrmEnergyFlow,{row:power,now,...props});
- assert.doesNotMatch(flow({now:now+31*60000}),/is-flowing/);
+ assert.doesNotMatch(flow({now:now+46*60000}),/is-flowing/);
  assert.doesNotMatch(flow({paused:true}),/is-flowing/);
  assert.doesNotMatch(flow({row:{...power,errorCode:'provider'}}),/is-flowing/);
  assert.doesNotMatch(flow({row:{...power,measurements:[measurement('solar_power',0)]}}),/is-flowing/);
