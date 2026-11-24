@@ -3,13 +3,39 @@ const EMAIL_SUPABASE_KEY='sb_publishable__URX6fCOr6KVvGsUsGS7wA_a1AmU7Rw';
 const emailDb=window.TechCheckDB || supabase.createClient(EMAIL_SUPABASE_URL,EMAIL_SUPABASE_KEY);
 
 function emailEsc(v=''){return String(v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+// Bounded profile read: one request at a time, a recent answer is reused for a
+// minute, and a failure waits 5 seconds, doubling to 5 minutes, before the next
+// attempt. Access rules are unchanged; this only limits how often we ask.
+const teamEmailRead={flight:null,rows:null,at:0,failures:0,retryAt:0};
+function readTeamEmailProfiles(){
+  const now=Date.now();
+  if(teamEmailRead.rows && now-teamEmailRead.at<60000) return Promise.resolve(teamEmailRead.rows);
+  if(teamEmailRead.flight) return teamEmailRead.flight;
+  if(now<teamEmailRead.retryAt) return Promise.resolve(null);
+  teamEmailRead.flight=(async()=>{
+    try{
+      const {data,error}=await emailDb.from('profiles').select('user_id,notification_email,email_job_assignments,email_handoff_updates,email_owner_copies,role');
+      if(error || !data) throw error || new Error('No profiles');
+      Object.assign(teamEmailRead,{rows:data,at:Date.now(),failures:0,retryAt:0});
+      return data;
+    }catch(_){
+      teamEmailRead.failures+=1;
+      teamEmailRead.retryAt=Date.now()+Math.min(300000,5000*2**(teamEmailRead.failures-1));
+      return null;
+    }finally{teamEmailRead.flight=null;}
+  })();
+  return teamEmailRead.flight;
+}
 async function loadTeamEmailSettings(){
   const app=document.getElementById('appView');
   if(!app || app.classList.contains('hidden')) return;
   const owner=document.getElementById('view-owner');
   if(!owner || owner.classList.contains('hidden')) return;
-  const {data:profiles,error}=await emailDb.from('profiles').select('user_id,notification_email,email_job_assignments,email_handoff_updates,email_owner_copies,role');
-  if(error || !profiles) return;
+  // Nothing to fill in means nothing to read. Page changes alone never start a request.
+  const pending=[...document.querySelectorAll('.teamMemberCard')].some(card=>card.querySelector('input[id^="name_"]') && !card.querySelector('[data-team-email-box]'));
+  if(!pending) return;
+  const profiles=await readTeamEmailProfiles();
+  if(!profiles) return;
   const byId=new Map(profiles.map(p=>[p.user_id,p]));
   document.querySelectorAll('.teamMemberCard').forEach(card=>{
     const nameInput=card.querySelector('input[id^="name_"]');
@@ -45,6 +71,7 @@ async function loadTeamEmailSettings(){
         email_owner_copies:Boolean(box.querySelector('[data-email-owner]')?.checked)
       }});
       if(error || data?.error) return alert(error?.message || data.error);
+      teamEmailRead.at=0;
       alert('Email settings saved.');
     });
   });
