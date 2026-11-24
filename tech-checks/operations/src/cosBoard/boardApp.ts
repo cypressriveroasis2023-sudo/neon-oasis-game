@@ -924,7 +924,7 @@ function mgTools(){
     h("div",{class:"links"},h("button",{class:"lk",type:"button","aria-expanded":String(MG.tools),onclick:()=>{ MG.tools=!MG.tools; mgDraw("tools"); }},MG.tools ? "Hide the Tech Check screens" : "Other Tech Check screens"),
       h("button",{class:"lk",type:"button",disabled:MG.state==="loading",onclick:()=>mgLoad(true)},MG.state==="loading" ? "Reading…" : "Read trucks again")),
     MG.tools ? h("div",{class:"links mgmore"},...tools.map(([r,l])=>mgTool(r,l))) : null,
-    hooks && typeof hooks.onScreen==="function" ? h("div",{class:"links mgmore"},...SCREENS.map(([workspace,label])=>h("button",{class:"lk",type:"button",onclick:()=>hooks.onScreen(workspace)},label))) : null,
+    hooks && typeof hooks.onScreen==="function" ? h("div",{class:"links mgapps"},...SCREENS.map(([workspace,label])=>h("button",{class:"lk",type:"button",onclick:()=>hooks.onScreen(workspace)},label))) : null,
     h("p",{class:"note",text:(MG.err ? MG.err+" " : "")+(MG.at ? "Trucks and inspections read "+fmtClock.format(new Date(MG.at))+"." : "")}));
 }
 
