@@ -3,8 +3,11 @@ import {canonicalCameraUnit} from '../fieldCameraHealth';
 import {readDashboardPower, unitTileSummary, type TileTone} from '../vrmReadOnlyModel';
 
 /** One Helios unit's Victron reading as the COS Board draws it.
- * b = battery %, w = solar W, v = battery volts, t = reading time in seconds (0 = none), q = tone. */
-export type BoardPower = {b: number | null; w: number | null; v: number | null; t: number; q: Exclude<TileTone, 'unavailable'> | 'off'};
+ * b = battery %, w = solar W, v = battery volts, t = reading time in seconds (0 = none), q = tone,
+ * f = charging/draining now (with watts), al = Victron's own alarm ("Low voltage", level 1 warning / 2 alarm),
+ * ls = when the installation last sent Victron anything, in seconds (0 = never). */
+export type BoardPower = {b: number | null; w: number | null; v: number | null; t: number; q: Exclude<TileTone, 'unavailable'> | 'off';
+  f?: {s: 'charging' | 'draining' | 'idle'; w: number | null}; al?: {k: string; l: 1 | 2}; ls: number};
 
 const seconds = (value?: string) => {
   const time = value ? Date.parse(value) : NaN;
@@ -39,6 +42,9 @@ export function boardPowerByUnit(fleetData: unknown, now: number): Map<string, B
       v: volts ? Math.round(volts.value * 10) / 10 : null,
       t: seconds(tile.soc?.observedAt ?? tile.solar?.observedAt),
       q: tile.tone === 'unavailable' ? 'off' : tile.tone,
+      ...(tile.flow ? {f: {s: tile.flow.state, w: tile.flow.watts}} : {}),
+      ...(tile.alarms[0] ? {al: {k: tile.alarms[0].kind, l: tile.alarms[0].level}} : {}),
+      ls: seconds(tile.lastSeen),
     });
   }
   return out;

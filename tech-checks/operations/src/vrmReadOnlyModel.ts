@@ -33,7 +33,7 @@ export type TileTone = 'good' | 'fair' | 'low' | 'stale' | 'none' | 'unavailable
 /** One glanceable reading per unit tile. Prefers the system SOC; otherwise the
  * lowest single battery monitor (never an average). Stale readings stay grey. */
 export function unitTileSummary(unit: VrmUnit, rows: SafeVrmPower[], now: number) {
-  if (unit.available === false) return { tone: 'unavailable' as TileTone, soc: undefined, solar: undefined, fresh: false };
+  if (unit.available === false) return { tone: 'unavailable' as TileTone, soc: undefined, solar: undefined, fresh: false, flow: undefined, alarms: [] as VictronAlarm[], lastSeen: lastConnected(unit, undefined) };
   const row = dashboardPowerFor(unit, rows);
   const charges = chargeReadings(row, now);
   const fresh = charges.filter(reading => readingIsFresh(reading, now));
@@ -41,6 +41,51 @@ export function unitTileSummary(unit: VrmUnit, rows: SafeVrmPower[], now: number
   const soc = pool.find(reading => reading.source === 'system') ?? [...pool].sort((a, b) => a.value - b.value)[0];
   const solar = selectReading(row, 'solar_power', now);
   const isFresh = Boolean(soc && readingIsFresh(soc, now)) && !row?.errorCode;
-  const tone: TileTone = !soc ? 'none' : !isFresh ? 'stale' : soc.value < 20 ? 'low' : soc.value < 50 ? 'fair' : 'good';
-  return { tone, soc, solar, fresh: isFresh };
+  const alarms = victronAlarms(row, now);
+  const worst = Math.max(0, ...alarms.map(alarm => alarm.level));
+  let tone: TileTone = !soc ? 'none' : !isFresh ? 'stale' : soc.value < 20 ? 'low' : soc.value < 50 ? 'fair' : 'good';
+  // Victron's own alarm outranks our colors: an alarm is red, a warning is at least amber.
+  if (worst === 2 && (tone === 'good' || tone === 'fair')) tone = 'low';
+  else if (worst === 1 && tone === 'good') tone = 'fair';
+  return { tone, soc, solar, fresh: isFresh, flow: powerFlow(row, now), alarms, lastSeen: lastConnected(unit, row) };
+}
+
+export type PowerFlow = {state: 'charging' | 'draining' | 'idle'; watts: number | null; amps: number | null};
+/** Charging or draining from a current reading only: the system battery power, else battery current. Stale = none. */
+export function powerFlow(row: SafeVrmPower | undefined, now: number): PowerFlow | undefined {
+  const fresh = (metric: PowerMetric) => (row?.measurements ?? []).filter(m => m.metric === metric && readingIsFresh(m, now))
+    .sort((a, b) => Number(b.source === 'system') - Number(a.source === 'system') || a.instance - b.instance)[0];
+  const power = fresh('battery_power'), current = fresh('battery_current');
+  if (!power && !current) return undefined;
+  const watts = power ? Math.round(power.value) : null, amps = current ? Math.round(current.value * 10) / 10 : null;
+  const sign = power ? (Math.abs(power.value) < 3 ? 0 : Math.sign(power.value)) : (Math.abs(current!.value) < 0.2 ? 0 : Math.sign(current!.value));
+  return {state: sign > 0 ? 'charging' : sign < 0 ? 'draining' : 'idle', watts, amps};
+}
+
+export type VictronAlarm = {kind: 'Low battery' | 'Low voltage' | 'High voltage'; level: 1 | 2};
+const ALARM_KIND: Partial<Record<PowerMetric, VictronAlarm['kind']>> = {low_soc_alarm: 'Low battery', low_voltage_alarm: 'Low voltage', high_voltage_alarm: 'High voltage'};
+/** Victron's own alarms on current readings (1 = warning, 2 = alarm), one per kind, worst level kept. */
+export function victronAlarms(row: SafeVrmPower | undefined, now: number): VictronAlarm[] {
+  const out = new Map<VictronAlarm['kind'], 1 | 2>();
+  for (const m of row?.measurements ?? []) {
+    const kind = ALARM_KIND[m.metric];
+    if (!kind || !readingIsFresh(m, now) || m.value < 1) continue;
+    const level: 1 | 2 = m.value >= 2 ? 2 : 1;
+    out.set(kind, Math.max(out.get(kind) ?? 0, level) as 1 | 2);
+  }
+  return [...out].map(([kind, level]) => ({kind, level})).sort((a, b) => b.level - a.level || a.kind.localeCompare(b.kind));
+}
+
+/** When this installation last sent Victron anything: its newest reading, or the sync's last-seen time. */
+export function lastConnected(unit: VrmUnit, row: SafeVrmPower | undefined): string | undefined {
+  const times = [...(row?.measurements ?? []).map(m => Date.parse(m.observedAt)), unit.lastSeenAt ? Date.parse(unit.lastSeenAt) : NaN].filter(Number.isFinite);
+  return times.length ? new Date(Math.max(...times)).toISOString() : undefined;
+}
+
+export function shortDate(value: string | undefined, now: number): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '';
+  const sameDay = new Date(now).toDateString() === date.toDateString();
+  return sameDay ? date.toLocaleTimeString(undefined, {hour: 'numeric', minute: '2-digit'}) : date.toLocaleDateString(undefined, {month: 'short', day: 'numeric'});
 }
