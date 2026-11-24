@@ -234,7 +234,7 @@ test('what is fixed by hand is off the punch list and stays off', async ({page},
   await inBoard(host, root => root.getElementById('tabPunch').click());
   const chips = () => inBoard(host, root => [...root.querySelectorAll('#punchChips .chip')].map(chip => chip.textContent));
   // Only the unit nobody has settled is open. The one set by hand is under its own heading, with what mHelp still says.
-  await expect.poll(chips).toEqual(['Placed differently · 1', 'Field, no camera feed · 0', 'Field feed, not in mHelp · 0', 'Names differ · 0', 'Shop, no camera feed · 0', 'Shop feed, not in mHelp · 0', 'Fixed by hand · 1']);
+  await expect.poll(chips).toEqual(['Placed differently · 1', 'Field, no IP in COS · 0', 'Field, no camera feed · 0', 'Field feed, not in mHelp · 0', 'Names differ · 0', 'Shop, no camera feed · 0', 'Shop feed, not in mHelp · 0', 'Fixed by hand · 1']);
   expect(await inBoard(host, root => [root.querySelector('#punchTop .big').textContent, ...[...root.querySelectorAll('#punchList .prow .name')].map(name => name.textContent)])).toEqual(['1 place where the camera systems disagree with mHelp', 'Spotter 002']);
   await inBoard(host, root => [...root.querySelectorAll('#punchChips .chip')].find(chip => chip.textContent.startsWith('Fixed by hand')).click());
   expect(await inBoard(host, root => [root.getElementById('punchCount').textContent, ...[...root.querySelectorAll('#punchList .prow')].map(row => row.textContent)])).toEqual([
@@ -748,6 +748,34 @@ test('the other COS screens open from the board, by the names IT sees', async ({
   expect(await inBoard(host, root => root.querySelector('.foot').textContent)).toContain('counts stands and poles as well');
   await inBoard(host, root => { [...root.querySelectorAll('#screensLinks button')].find(button => button.textContent === 'Camera Health').click(); });
   await expect.poll(() => host.evaluate(element => element.ownerDocument.defaultView.location.hash)).toBe('#camera-health');
+});
+
+test('a field unit COS cannot check at all is a job on the punch list', async ({page}, info) => {
+  test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');
+  const record = (id, unitNumber, category, placement, customer) => ({recordId: 'mhelp_product:' + id, productId: String(id), unitNumber, category, placement, uploadLifecycle: 'UNFLAGGED', customer});
+  const value = structuredClone(field);
+  value.uploadInventory = {
+    contract: 'COS_MHELP_UPLOAD_INVENTORY_V1', source: 'mhelpdesk_api', countBasis: 'mhelp_product_records_not_unique_physical_units', sourceSha256: 'b'.repeat(64), receivedAt: fresh, lastApiReadAt: fresh,
+    records: [record(1, 'Helios 001', 'Helios Solar Tower', 'FIELD', 'Fixture Homes'), record(2, 'Spotter 002', 'Spotter', 'FIELD', 'Fixture Homes: Lot 2'),
+      record(9, 'Sniper 401', 'Sniper 2', 'FIELD', 'Fixture Homes: Lot 9')],
+    summary: {totalRecords: 3, fieldRecords: 3, shopRecords: 0, unflaggedFieldRecords: 3, doNotUseRecords: 0, missingRecords: 0},
+  };
+  // COS checks a Sniper by pinging a saved address. This one has none, so it can only ever show Unknown.
+  const rows = [units[0], units[1], unit('SNIPER 401', {state: 'UNKNOWN', online: 0, unknown: 1, source: 'ip_check', publicIp: null,
+    site: 'Fixture yard', observedAt: '2026-10-01T00:00:00Z', cameraList: [{name: 'SNIPER 401 / Cam 1', status: 'unknown', atSite: true}]})];
+  const {app, state} = await mountFleet(page, false, {cameraStatus: reportOf(rows), field: value});
+  const host = app.locator('.cos-board-host');
+  await expect(host).toBeVisible();
+  await inBoard(host, root => root.getElementById('tabPunch').click());
+  const chips = () => inBoard(host, root => [...root.querySelectorAll('#punchChips .chip')].map(chip => chip.textContent));
+  await expect.poll(chips).toContain('Field, no IP in COS \u00b7 1');
+  await inBoard(host, root => [...root.querySelectorAll('#punchChips .chip')].find(chip => chip.textContent.startsWith('Field, no IP in COS')).click());
+  const shown = await inBoard(host, root => root.getElementById('viewPunch').textContent);
+  expect(shown).toContain('Sniper 401');
+  expect(shown).toContain('no IP address saved, so this unit has never been checked');
+  expect(shown).toContain('open the unit and add the IP under Fix it');
+  expect(shown).not.toContain('Helios 001');
+  expect(state.errors).toEqual([]);
 });
 
 test('a Sniper with no IP saved says why it is Unknown and sends you to the fix', async ({page}, info) => {

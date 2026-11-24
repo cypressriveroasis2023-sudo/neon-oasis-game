@@ -119,6 +119,12 @@ function reconcile(vs, mh){
       text:[["mHelp: ",pl(r.place)+(r.cust?" at "+r.cust:"")+(m.fuzzy?" (listed as "+r.label+")":"")],[SRC(v)+": ",pl(v.place)+(v.site?" at "+v.site:"")]] });
     else if(m.fuzzy) out.items.push({ id:"name~"+v.id, sec:"name", fixed:!!v.hand.name, unit:v.id, name:v.name, st:v.status, text:[["mHelp: ",r.label+" (A# "+r.id+")"],[SRC(v)+": ",v.name]] });
   }
+  /* Field units COS checks itself with no address saved: Unknown for good until someone types the IP. */
+  for(const v of sorted){
+    if(v.mhOnly || v.place!=="field" || v.u.s!=="a" || v.ip) continue;
+    out.items.push({ id:"noip~"+v.id, sec:"noip", fixed:!!v.hand.ip, unit:v.id, name:v.name, st:v.status,
+      text:[["COS: ","no IP address saved, so this unit has never been checked"],["What to do: ","open the unit and add the IP under Fix it"]] });
+  }
   const seen={}; for(const v of sorted){ if(out.match[v.id]) { const k=bk.get(v.id).join("|"); seen[k]=1; } }
   for(const v of still){ const k=bk.get(v.id); const dup = k[0] && seen[k.join("|")];
     out.items.push({ id:"bd~"+v.id, sec: v.place==="field"?"bdField":"bdShop", unit:v.id, name:v.name, st:v.status,
@@ -221,6 +227,7 @@ function render(){
   if(S.view==="manager") mgDraw("feed");
 }
 const PSEC = [["place","Placed differently","mHelp is official, so the board shows mHelp's placement. The other system says something different, and the other system is the one to fix. Never change mHelp or the tracker to match it."],
+  ["noip","Field, no IP in COS","COS tells whether these are up by pinging an address it has on record, and there is none, so they can only show Unknown. Open the unit and add the IP under Fix it. Only a tech or the 2027 tracker has it: mHelp does not hold it and no camera system reports it."],
   ["mhField","Field, no camera feed","mHelp says these are in the field. COS has no camera record for them, so the board cannot show whether they are up."],
   ["bdField","Field feed, not in mHelp","Cameras are reporting from a site under this name, but mHelp has no equipment by that name. Not counted until mHelp has it."],
   ["name","Names differ","Same number, different name in each system. Worth making the names match."],
