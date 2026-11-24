@@ -34,6 +34,8 @@ export type CosBoardLandingProps = {
   addresses: MhelpAddressMapResult | null | undefined;
   /** Hands a newer camera feed back to Fleet, so the headline and the board move together. */
   onFeed: (units: UnitCameraStatus[]) => void;
+  /** Re-reads Fleet's saved board: the mHelp list, Field/Shop and sites the board counts with. */
+  onFleetRefresh?: () => Promise<unknown> | void;
   /** Called once the board is on screen. */
   onReady?: () => void;
   /** Called when the board was opened ahead of the camera feed and the feed then could not be read. */
@@ -62,7 +64,7 @@ function checked(value: unknown): Reading {
  * holds and is counted by the shared count's own unit list, so its tiles are a
  * split of the Fleet headline and never a second count.
  */
-export default function CosBoardLanding({feed, recorderRows, now, fieldMap, routers, upload, addresses, onFeed, onReady, onNone}: CosBoardLandingProps) {
+export default function CosBoardLanding({feed, recorderRows, now, fieldMap, routers, upload, addresses, onFeed, onFleetRefresh, onReady, onNone}: CosBoardLandingProps) {
   const host = useRef<HTMLDivElement>(null), board = useRef<Board | null>(null), tvOn = useRef(false), tvKeep = useRef(0);
   const deliver = useRef(onFeed);
   deliver.current = onFeed;
@@ -72,6 +74,15 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
   ready.current = onReady;
   const none = useRef(onNone);
   none.current = onNone;
+  const fleetRefresh = useRef(onFleetRefresh);
+  fleetRefresh.current = onFleetRefresh;
+  // When Fleet last re-read the mHelp list for the board.
+  const fleetReadAt = useRef(Date.now());
+  const readFleet = useRef(async () => {});
+  readFleet.current = async () => {
+    fleetReadAt.current = Date.now();
+    try { await fleetRefresh.current?.(); } catch { /* Fleet keeps its last good reading and says so itself. */ }
+  };
   const [flags, setFlags] = useState<BoardEditFlags | null>(null), [locked, setLocked] = useState(false);
   const writing = useRef(false);
   const data = useMemo(() => {
@@ -140,6 +151,8 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
       // The person asked for a new reading. A good one also lifts the hold a failed save left.
       onRefresh: async () => {
         if (writing.current) throw new Error('A save is still in progress.');
+        // Refresh means everything the board shows: the camera feed and the mHelp list (Field/Shop, sites).
+        void readFleet.current();
         const started = generation.current;
         const result = checked((await api.get('/api/unit-camera-status')).data);
         if (started !== generation.current) return;
@@ -215,6 +228,19 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
     const timer = window.setTimeout(() => { void reread.current(); }, SETTLE_MS);
     return () => window.clearTimeout(timer);
   }, [now]);
+  // mHelp is read at :05, :20, :35 and :50. Two minutes after each read, while the board is in view, pick up the new
+  // mHelp list so a unit moved to the Field in mHelp shows on the board without reloading the page.
+  useEffect(() => {
+    const check = () => {
+      if (document.visibilityState !== 'visible') return;
+      const slot = 15 * 60 * 1000, offset = 7 * 60 * 1000, at = Date.now();
+      const latest = Math.floor((at - offset) / slot) * slot + offset;
+      if (fleetReadAt.current < latest) void readFleet.current();
+    };
+    const timer = window.setInterval(check, 60 * 1000);
+    document.addEventListener('visibilitychange', check);
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', check); };
+  }, []);
   // Star4Live is read every fifteen minutes. While this screen is in view, pick the new reading up without a tap.
   useEffect(() => {
     const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void reread.current(); }, REREAD_MS);
