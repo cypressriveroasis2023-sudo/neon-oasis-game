@@ -1,0 +1,36 @@
+name: Verify Full COS mHelpDesk Census Coverage
+on:
+  pull_request:
+    paths:
+      - 'tech-checks/operations/db/cos_full_mhelp_census_*.sql'
+      - 'tech-checks/operations/tests/cos-full-mhelp-census-*.mjs'
+      - '.github/workflows/cos-full-mhelp-census-coverage.yml'
+permissions:
+  contents: read
+jobs:
+  census-coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        shell: bash
+        working-directory: tech-checks/operations
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tech-checks/operations/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify all 1001 source Product IDs, private Census, immutable GPS/history
+        run: |
+          set -o pipefail
+          node --no-wasm-code-gc --import tsx --test tests/cos-full-mhelp-census-database.test.mjs | tee census-coverage-test-receipt.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cos-full-census-coverage-tests
+          path: tech-checks/operations/census-coverage-test-receipt.txt
