@@ -1,0 +1,882 @@
+TAP version 13
+# Subtest: a verified exact Product-ID endpoint with separately admitted membership is ONLINE
+ok 1 - a verified exact Product-ID endpoint with separately admitted membership is ONLINE
+  ---
+  duration_ms: 4.489503
+  type: 'test'
+  ...
+# Subtest: one complete valid no-response scan is OFFLINE regardless of outage/failure counter
+ok 2 - one complete valid no-response scan is OFFLINE regardless of outage/failure counter
+  ---
+  duration_ms: 0.354544
+  type: 'test'
+  ...
+# Subtest: a pending/partial/technically invalid check is UNKNOWN, never falsely OFFLINE
+ok 3 - a pending/partial/technically invalid check is UNKNOWN, never falsely OFFLINE
+  ---
+  duration_ms: 2.17951
+  type: 'test'
+  ...
+# Subtest: a provider name or suffix collision cannot influence independent product proof
+ok 4 - a provider name or suffix collision cannot influence independent product proof
+  ---
+  duration_ms: 0.227586
+  type: 'test'
+  ...
+# Subtest: duplicate tracker IP claimed by Shop or another Field product is held
+ok 5 - duplicate tracker IP claimed by Shop or another Field product is held
+  ---
+  duration_ms: 0.332602
+  type: 'test'
+  ...
+# Subtest: more than one legacy camera resource at the IP cannot claim one Product ID without a verified group
+ok 6 - more than one legacy camera resource at the IP cannot claim one Product ID without a verified group
+  ---
+  duration_ms: 0.15553
+  type: 'test'
+  ...
+# Subtest: missing tracker IP, missing saved endpoint, stale results and stale workbook are unknown or fail closed
+ok 7 - missing tracker IP, missing saved endpoint, stale results and stale workbook are unknown or fail closed
+  ---
+  duration_ms: 0.339101
+  type: 'test'
+  ...
+# Subtest: all 2027 product identities and placements must reconcile before using any check
+ok 8 - all 2027 product identities and placements must reconcile before using any check
+  ---
+  duration_ms: 0.241687
+  type: 'test'
+  ...
+# Subtest: inactive Product IDs and held placements cannot be colored by a successful saved IP check
+ok 9 - inactive Product IDs and held placements cannot be colored by a successful saved IP check
+  ---
+  duration_ms: 0.481111
+  type: 'test'
+  ...
+# Subtest: browser-facing source receipt must cover every exact Product ID and retain the original check time
+ok 10 - browser-facing source receipt must cover every exact Product ID and retain the original check time
+  ---
+  duration_ms: 0.942903
+  type: 'test'
+  ...
+# Subtest: a first complete TCP timeout or refusal remains a valid OFFLINE result, but routing errors do not
+ok 11 - a first complete TCP timeout or refusal remains a valid OFFLINE result, but routing errors do not
+  ---
+  duration_ms: 0.429705
+  type: 'test'
+  ...
+# Subtest: live saved port schema requires measured attempt evidence, not invented Boolean port state
+ok 12 - live saved port schema requires measured attempt evidence, not invented Boolean port state
+  ---
+  duration_ms: 0.34554
+  type: 'test'
+  ...
+# Subtest: a stale reviewed mHelp source cannot authorize currently online camera product claims
+ok 13 - a stale reviewed mHelp source cannot authorize currently online camera product claims
+  ---
+  duration_ms: 0.201428
+  type: 'test'
+  ...
+# Subtest: cached pre-attribution V1 positives and negatives are rejected without renewing proof time
+ok 14 - cached pre-attribution V1 positives and negatives are rejected without renewing proof time
+  ---
+  duration_ms: 0.329878
+  type: 'test'
+  ...
+# Subtest: complete exact-ID census isolates one conflicting placement without relocating it or blocking other products
+ok 15 - complete exact-ID census isolates one conflicting placement without relocating it or blocking other products
+  ---
+  duration_ms: 10.289472
+  type: 'test'
+  ...
+# Subtest: the equipment import verifier remains all-or-nothing for a changed physical placement
+ok 16 - the equipment import verifier remains all-or-nothing for a changed physical placement
+  ---
+  duration_ms: 1.213783
+  type: 'test'
+  ...
+# Subtest: held records still reserve IP ownership across Field and Shop
+ok 17 - held records still reserve IP ownership across Field and Shop
+  ---
+  duration_ms: 2.432294
+  type: 'test'
+  ...
+# Subtest: missing/extra/duplicate Product IDs, shifted rows/columns and inconsistent source index fail the entire source
+ok 18 - missing/extra/duplicate Product IDs, shifted rows/columns and inconsistent source index fail the entire source
+  ---
+  duration_ms: 2.175495
+  type: 'test'
+  ...
+# Subtest: source identity/customer/restriction changes hold that exact Product ID
+ok 19 - source identity/customer/restriction changes hold that exact Product ID
+  ---
+  duration_ms: 3.805412
+  type: 'test'
+  ...
+# Subtest: safe A1 quoting and trailing empty cells are allowed, row indices remain stable
+ok 20 - safe A1 quoting and trailing empty cells are allowed, row indices remain stable
+  ---
+  duration_ms: 0.641127
+  type: 'test'
+  ...
+# Subtest: a malformed V2 hold cannot permit status under an unmatched placement or checksum
+ok 21 - a malformed V2 hold cannot permit status under an unmatched placement or checksum
+  ---
+  duration_ms: 1.297477
+  type: 'test'
+  ...
+# Subtest: protected owner route returns current exact-ID statuses while holding mismatched product
+ok 22 - protected owner route returns current exact-ID statuses while holding mismatched product
+  ---
+  duration_ms: 60.139001
+  type: 'test'
+  ...
+# Subtest: protected it route returns current exact-ID statuses while holding mismatched product
+ok 23 - protected it route returns current exact-ID statuses while holding mismatched product
+  ---
+  duration_ms: 8.4136
+  type: 'test'
+  ...
+# Subtest: unauthorized service active=true cannot read source or endpoint configuration
+ok 24 - unauthorized service active=true cannot read source or endpoint configuration
+  ---
+  duration_ms: 1.564341
+  type: 'test'
+  ...
+# Subtest: unauthorized owner active=false cannot read source or endpoint configuration
+ok 25 - unauthorized owner active=false cannot read source or endpoint configuration
+  ---
+  duration_ms: 0.651302
+  type: 'test'
+  ...
+# Subtest: unauthorized it active=false cannot read source or endpoint configuration
+ok 26 - unauthorized it active=false cannot read source or endpoint configuration
+  ---
+  duration_ms: 0.592115
+  type: 'test'
+  ...
+# Subtest: corrupted full source remains unavailable through the authenticated route, never partly certified
+ok 27 - corrupted full source remains unavailable through the authenticated route, never partly certified
+  ---
+  duration_ms: 2.994614
+  type: 'test'
+  ...
+# Subtest: full 1,001-ID membership stays intact while only three assignment conflicts are held
+ok 28 - full 1,001-ID membership stays intact while only three assignment conflicts are held
+  ---
+  duration_ms: 17.984491
+  type: 'test'
+  ...
+# Subtest: mounted native proof route remains disabled after existing Owner/IT authentication and denies service accounts
+ok 29 - mounted native proof route remains disabled after existing Owner/IT authentication and denies service accounts
+  ---
+  duration_ms: 4.81216
+  type: 'test'
+  ...
+# Subtest: preview flag is independent of proof/overlay and preserves existing Owner/IT/service gates
+ok 30 - preview flag is independent of proof/overlay and preserves existing Owner/IT/service gates
+  ---
+  duration_ms: 16.512636
+  type: 'test'
+  ...
+# Subtest: existing connection route reports only bounded failed stage without extra reads or raw errors
+ok 31 - existing connection route reports only bounded failed stage without extra reads or raw errors
+  ---
+  duration_ms: 17.797789
+  type: 'test'
+  ...
+# Subtest: exact connection route preserves every recognized exception status while hiding its raw message
+ok 32 - exact connection route preserves every recognized exception status while hiding its raw message
+  ---
+  duration_ms: 11.496785
+  type: 'test'
+  ...
+# Subtest: identity RPC denial is a failed source, never IP-only status fallback
+ok 33 - identity RPC denial is a failed source, never IP-only status fallback
+  ---
+  duration_ms: 3.014473
+  type: 'test'
+  ...
+# Subtest: incoming status cancellation aborts guarded source transport and cannot return late status
+ok 34 - incoming status cancellation aborts guarded source transport and cannot return late status
+  ---
+  duration_ms: 5.216717
+  type: 'test'
+  ...
+# Subtest: zero-match labels do not infer any link; exact Owner confirmation is a distinct provenance
+ok 35 - zero-match labels do not infer any link; exact Owner confirmation is a distinct provenance
+  ---
+  duration_ms: 20.87424
+  type: 'test'
+  ...
+# Subtest: changed native label denies the link and retains UUID/resource/key quarantine
+ok 36 - changed native label denies the link and retains UUID/resource/key quarantine
+  ---
+  duration_ms: 2.027505
+  type: 'test'
+  ...
+# Subtest: missing native source denies the link and retains UUID/resource/key quarantine
+ok 37 - missing native source denies the link and retains UUID/resource/key quarantine
+  ---
+  duration_ms: 1.222186
+  type: 'test'
+  ...
+# Subtest: missing resource denies the link and retains UUID/resource/key quarantine
+ok 38 - missing resource denies the link and retains UUID/resource/key quarantine
+  ---
+  duration_ms: 2.004762
+  type: 'test'
+  ...
+# Subtest: resource serial changed denies the link and retains UUID/resource/key quarantine
+ok 39 - resource serial changed denies the link and retains UUID/resource/key quarantine
+  ---
+  duration_ms: 1.625201
+  type: 'test'
+  ...
+# Subtest: resource type changed denies the link and retains UUID/resource/key quarantine
+ok 40 - resource type changed denies the link and retains UUID/resource/key quarantine
+  ---
+  duration_ms: 1.774391
+  type: 'test'
+  ...
+# Subtest: source changed denies the link and retains UUID/resource/key quarantine
+ok 41 - source changed denies the link and retains UUID/resource/key quarantine
+  ---
+  duration_ms: 1.836904
+  type: 'test'
+  ...
+# Subtest: external ID changed denies the link and retains UUID/resource/key quarantine
+ok 42 - external ID changed denies the link and retains UUID/resource/key quarantine
+  ---
+  duration_ms: 3.546429
+  type: 'test'
+  ...
+# Subtest: raw key changed denies the link and retains UUID/resource/key quarantine
+ok 43 - raw key changed denies the link and retains UUID/resource/key quarantine
+  ---
+  duration_ms: 1.87501
+  type: 'test'
+  ...
+# Subtest: epoch changed and fields restored denies the link and retains UUID/resource/key quarantine
+ok 44 - epoch changed and fields restored denies the link and retains UUID/resource/key quarantine
+  ---
+  duration_ms: 1.755414
+  type: 'test'
+  ...
+# Subtest: epoch missing denies the link and retains UUID/resource/key quarantine
+ok 45 - epoch missing denies the link and retains UUID/resource/key quarantine
+  ---
+  duration_ms: 6.409971
+  type: 'test'
+  ...
+# Subtest: owner-confirmed native epoch missing denies the link and retains UUID/resource/key quarantine
+ok 46 - owner-confirmed native epoch missing denies the link and retains UUID/resource/key quarantine
+  ---
+  duration_ms: 3.577005
+  type: 'test'
+  ...
+# Subtest: extra group member denies the link and retains UUID/resource/key quarantine
+ok 47 - extra group member denies the link and retains UUID/resource/key quarantine
+  ---
+  duration_ms: 4.850576
+  type: 'test'
+  ...
+# Subtest: duplicate resource ID denies the link and retains UUID/resource/key quarantine
+ok 48 - duplicate resource ID denies the link and retains UUID/resource/key quarantine
+  ---
+  duration_ms: 1.690107
+  type: 'test'
+  ...
+# Subtest: revoked denies the link and retains UUID/resource/key quarantine
+ok 49 - revoked denies the link and retains UUID/resource/key quarantine
+  ---
+  duration_ms: 1.045224
+  type: 'test'
+  ...
+# Subtest: competing provider link denies the link and retains UUID/resource/key quarantine
+ok 50 - competing provider link denies the link and retains UUID/resource/key quarantine
+  ---
+  duration_ms: 3.74286
+  type: 'test'
+  ...
+# Subtest: duplicate crosswalk native/resource claim denies the link and retains UUID/resource/key quarantine
+ok 51 - duplicate crosswalk native/resource claim denies the link and retains UUID/resource/key quarantine
+  ---
+  duration_ms: 6.701811
+  type: 'test'
+  ...
+# Subtest: same serial claimed elsewhere denies the link and retains UUID/resource/key quarantine
+ok 52 - same serial claimed elsewhere denies the link and retains UUID/resource/key quarantine
+  ---
+  duration_ms: 1.159503
+  type: 'test'
+  ...
+# Subtest: duplicate target label denies the link and retains UUID/resource/key quarantine
+ok 53 - duplicate target label denies the link and retains UUID/resource/key quarantine
+  ---
+  duration_ms: 2.22019
+  type: 'test'
+  ...
+# Subtest: source key normalized collision denies the link and retains UUID/resource/key quarantine
+ok 54 - source key normalized collision denies the link and retains UUID/resource/key quarantine
+  ---
+  duration_ms: 1.213924
+  type: 'test'
+  ...
+# Subtest: never infers related alias SNIPER 987654
+ok 55 - never infers related alias SNIPER 987654
+  ---
+  duration_ms: 1.23199
+  type: 'test'
+  ...
+# Subtest: never infers related alias SPOTTER 98765
+ok 56 - never infers related alias SPOTTER 98765
+  ---
+  duration_ms: 3.717672
+  type: 'test'
+  ...
+# Subtest: never infers related alias SPOTTER 987654.1
+ok 57 - never infers related alias SPOTTER 987654.1
+  ---
+  duration_ms: 1.167515
+  type: 'test'
+  ...
+# Subtest: never infers related alias Spotter987654HDC4
+ok 58 - never infers related alias Spotter987654HDC4
+  ---
+  duration_ms: 3.698965
+  type: 'test'
+  ...
+# Subtest: never infers related alias SOLARSPOTTER 987655
+ok 59 - never infers related alias SOLARSPOTTER 987655
+  ---
+  duration_ms: 4.562741
+  type: 'test'
+  ...
+# Subtest: benign IP/ports/status/location updates do not change physical digest or identity
+ok 60 - benign IP/ports/status/location updates do not change physical digest or identity
+  ---
+  duration_ms: 1.591832
+  type: 'test'
+  ...
+# Subtest: identity alone preserves existing pin; FIELD and SHOP moves use existing audit and one native UUID
+ok 61 - identity alone preserves existing pin; FIELD and SHOP moves use existing audit and one native UUID
+  ---
+  duration_ms: 2.652699
+  type: 'test'
+  ...
+# Subtest: revocation before any move removes stale current pin while preserving historical coordinates
+ok 62 - revocation before any move removes stale current pin while preserving historical coordinates
+  ---
+  duration_ms: 0.876505
+  type: 'test'
+  ...
+# Subtest: frontend health and existing editor accept exact owner-confirmed capability, not fabricated provider proof
+ok 63 - frontend health and existing editor accept exact owner-confirmed capability, not fabricated provider proof
+  ---
+  duration_ms: 5.187364
+  type: 'test'
+  ...
+# Subtest: preview token is stale on any source epoch or registry revision change
+ok 64 - preview token is stale on any source epoch or registry revision change
+  ---
+  duration_ms: 1.339319
+  type: 'test'
+  ...
+# Subtest: review handler blocks client-forged proof and never replays uncertain confirmation
+ok 65 - review handler blocks client-forged proof and never replays uncertain confirmation
+  ---
+  duration_ms: 6.64007
+  type: 'test'
+  ...
+# Subtest: unconfirmed SHOP model/suffix concern blocks a shadow; truly unmapped SHOP remains movable
+ok 66 - unconfirmed SHOP model/suffix concern blocks a shadow; truly unmapped SHOP remains movable
+  ---
+  duration_ms: 1.835572
+  type: 'test'
+  ...
+# Subtest: additive Owner identity contract leaves the original cached-client envelope valid for unrelated units
+ok 67 - additive Owner identity contract leaves the original cached-client envelope valid for unrelated units
+  ---
+  duration_ms: 9.114366
+  type: 'test'
+  ...
+# Subtest: native pre-confirmation incarnation is included in the review token
+ok 68 - native pre-confirmation incarnation is included in the review token
+  ---
+  duration_ms: 4.235238
+  type: 'test'
+  ...
+# Subtest: reviewed native membership permits exact TCP positive and completed negative without producer-family admission
+ok 69 - reviewed native membership permits exact TCP positive and completed negative without producer-family admission
+  ---
+  duration_ms: 23.858429
+  type: 'test'
+  ...
+# Subtest: unlinked never supplies conclusive product status
+ok 70 - unlinked never supplies conclusive product status
+  ---
+  duration_ms: 6.762561
+  type: 'test'
+  ...
+# Subtest: stale binding never supplies conclusive product status
+ok 71 - stale binding never supplies conclusive product status
+  ---
+  duration_ms: 2.899083
+  type: 'test'
+  ...
+# Subtest: wrong resource never supplies conclusive product status
+ok 72 - wrong resource never supplies conclusive product status
+  ---
+  duration_ms: 4.035813
+  type: 'test'
+  ...
+# Subtest: unreviewed never supplies conclusive product status
+ok 73 - unreviewed never supplies conclusive product status
+  ---
+  duration_ms: 8.168008
+  type: 'test'
+  ...
+# Subtest: deactivated never supplies conclusive product status
+ok 74 - deactivated never supplies conclusive product status
+  ---
+  duration_ms: 8.283879
+  type: 'test'
+  ...
+# Subtest: disabled never supplies conclusive product status
+ok 75 - disabled never supplies conclusive product status
+  ---
+  duration_ms: 6.836431
+  type: 'test'
+  ...
+# Subtest: retired never supplies conclusive product status
+ok 76 - retired never supplies conclusive product status
+  ---
+  duration_ms: 4.826696
+  type: 'test'
+  ...
+# Subtest: missing resource epoch never supplies conclusive product status
+ok 77 - missing resource epoch never supplies conclusive product status
+  ---
+  duration_ms: 7.792764
+  type: 'test'
+  ...
+# Subtest: wrong epoch members never supplies conclusive product status
+ok 78 - wrong epoch members never supplies conclusive product status
+  ---
+  duration_ms: 1.762624
+  type: 'test'
+  ...
+# Subtest: duplicate epoch never supplies conclusive product status
+ok 79 - duplicate epoch never supplies conclusive product status
+  ---
+  duration_ms: 1.482891
+  type: 'test'
+  ...
+# Subtest: missing represented native never supplies conclusive product status
+ok 80 - missing represented native never supplies conclusive product status
+  ---
+  duration_ms: 2.156636
+  type: 'test'
+  ...
+# Subtest: Shop competing IP never supplies conclusive product status
+ok 81 - Shop competing IP never supplies conclusive product status
+  ---
+  duration_ms: 5.788152
+  type: 'test'
+  ...
+# Subtest: ambiguous endpoints never supplies conclusive product status
+ok 82 - ambiguous endpoints never supplies conclusive product status
+  ---
+  duration_ms: 1.159072
+  type: 'test'
+  ...
+# Subtest: DNU never supplies conclusive product status
+ok 83 - DNU never supplies conclusive product status
+  ---
+  duration_ms: 3.219236
+  type: 'test'
+  ...
+# Subtest: source digest mismatch and incomplete source fail rather than assign Offline
+ok 84 - source digest mismatch and incomplete source fail rather than assign Offline
+  ---
+  duration_ms: 1.733191
+  type: 'test'
+  ...
+# Subtest: membership is required by default even with otherwise valid exact endpoint
+ok 85 - membership is required by default even with otherwise valid exact endpoint
+  ---
+  duration_ms: 2.143718
+  type: 'test'
+  ...
+# Subtest: exact read-only tracker plus native representation preserves reviewed native proof with no native epoch requirement for native_provider
+ok 86 - exact read-only tracker plus native representation preserves reviewed native proof with no native epoch requirement for native_provider
+  ---
+  duration_ms: 8.330087
+  type: 'test'
+  ...
+# Subtest: tracker-only cannot certify TCP status
+ok 87 - tracker-only cannot certify TCP status
+  ---
+  duration_ms: 1.742084
+  type: 'test'
+  ...
+# Subtest: mutable tracker cannot certify TCP status
+ok 88 - mutable tracker cannot certify TCP status
+  ---
+  duration_ms: 9.264358
+  type: 'test'
+  ...
+# Subtest: renamed tracker cannot certify TCP status
+ok 89 - renamed tracker cannot certify TCP status
+  ---
+  duration_ms: 1.847019
+  type: 'test'
+  ...
+# Subtest: duplicate representation cannot certify TCP status
+ok 90 - duplicate representation cannot certify TCP status
+  ---
+  duration_ms: 4.197101
+  type: 'test'
+  ...
+# Subtest: 100 Product IDs share one bracketed read: constant RPC count; epoch drift and abort fail closed
+ok 91 - 100 Product IDs share one bracketed read: constant RPC count; epoch drift and abort fail closed
+  ---
+  duration_ms: 8.412218
+  type: 'test'
+  ...
+# Subtest: customer organization names never substitute for resource lifecycle or reviewed identity
+ok 92 - customer organization names never substitute for resource lifecycle or reviewed identity
+  ---
+  duration_ms: 35.95745
+  type: 'test'
+  ...
+# Subtest: resource epochs must cover exactly every nonempty reviewed key and member once
+ok 93 - resource epochs must cover exactly every nonempty reviewed key and member once
+  ---
+  duration_ms: 0.40588
+  type: 'test'
+  ...
+# Subtest: competing native provider membership cannot lend a resource to a Product
+ok 94 - competing native provider membership cannot lend a resource to a Product
+  ---
+  duration_ms: 4.750288
+  type: 'test'
+  ...
+# Subtest: future or expired independent identity-read clocks are rejected
+ok 95 - future or expired independent identity-read clocks are rejected
+  ---
+  duration_ms: 2.515337
+  type: 'test'
+  ...
+# Subtest: successful exact-source group receipts enter the CURRENT envelope and existing browser verifier
+ok 96 - successful exact-source group receipts enter the CURRENT envelope and existing browser verifier
+  ---
+  duration_ms: 57.283982
+  type: 'test'
+  ...
+# Subtest: foreign, incomplete, stale, forged revision/guard and technical statuses cannot replace Unknown
+ok 97 - foreign, incomplete, stale, forged revision/guard and technical statuses cannot replace Unknown
+  ---
+  duration_ms: 49.320127
+  type: 'test'
+  ...
+# Subtest: post-receipt source/config/epoch/lifecycle/disabled drift fails closed
+ok 98 - post-receipt source/config/epoch/lifecycle/disabled drift fails closed
+  ---
+  duration_ms: 53.068165
+  type: 'test'
+  ...
+# (node:51879) ExperimentalWarning: The MockTimers API is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: conclusive baseline and all other source holds cannot be overridden; outages retain baseline
+ok 99 - conclusive baseline and all other source holds cannot be overridden; outages retain baseline
+  ---
+  duration_ms: 3.874665
+  type: 'test'
+  ...
+# Subtest: mounted legacy host defaults disabled; inactive/foreign/unapproved users never reach source or RPC
+ok 100 - mounted legacy host defaults disabled; inactive/foreign/unapproved users never reach source or RPC
+  ---
+  duration_ms: 24.016243
+  type: 'test'
+  ...
+# Subtest: optional deadline releases baseline even when slow census ignores cancellation; no late reads
+ok 101 - optional deadline releases baseline even when slow census ignores cancellation; no late reads
+  ---
+  duration_ms: 23.511857
+  type: 'test'
+  ...
+# Subtest: request cancellation returns baseline and rejects late receipts without rereading authority
+ok 102 - request cancellation returns baseline and rejects late receipts without rereading authority
+  ---
+  duration_ms: 3.448375
+  type: 'test'
+  ...
+# Subtest: late proof after presentation boundary succeeds within remaining request budget
+ok 103 - late proof after presentation boundary succeeds within remaining request budget
+  ---
+  duration_ms: 11.247116
+  type: 'test'
+  ...
+# Subtest: slow baseline leaves no enrichment budget; absolute cutoff wins over a new window
+ok 104 - slow baseline leaves no enrichment budget; absolute cutoff wins over a new window
+  ---
+  duration_ms: 2.09831
+  type: 'test'
+  ...
+# Subtest: 100 eligible fleet candidates: one RPC and four complete authority reads; budget preserved
+ok 105 - 100 eligible fleet candidates: one RPC and four complete authority reads; budget preserved
+  ---
+  duration_ms: 692.134765
+  type: 'test'
+  ...
+# Subtest: final census timeout retains mixed baseline including valid existing positive proof
+ok 106 - final census timeout retains mixed baseline including valid existing positive proof
+  ---
+  duration_ms: 2.514305
+  type: 'test'
+  ...
+# Subtest: legacy receipt consumer cancels a hung authority read and never starts RPC or second census
+ok 107 - legacy receipt consumer cancels a hung authority read and never starts RPC or second census
+  ---
+  duration_ms: 1.77375
+  type: 'test'
+  ...
+# Subtest: 100-member remote snapshot transport is bounded, complete and matches the real planner
+ok 108 - 100-member remote snapshot transport is bounded, complete and matches the real planner
+  ---
+  duration_ms: 101.598353
+  type: 'test'
+  ...
+# Subtest: batch response rejects missing, duplicate, foreign and malformed entries before consumption
+ok 109 - batch response rejects missing, duplicate, foreign and malformed entries before consumption
+  ---
+  duration_ms: 2.378283
+  type: 'test'
+  ...
+# Subtest: batch source drift holds statuses and cancellation during RPC stops final authority read
+ok 110 - batch source drift holds statuses and cancellation during RPC stops final authority read
+  ---
+  duration_ms: 5.342113
+  type: 'test'
+  ...
+# Subtest: full validated Product/native/group proof admits four channels, not bare normalized-name matches
+ok 111 - full validated Product/native/group proof admits four channels, not bare normalized-name matches
+  ---
+  duration_ms: 25.690677
+  type: 'test'
+  ...
+# Subtest: missing/stale binding, aliases, partial identity and changed native inventory remain held
+ok 112 - missing/stale binding, aliases, partial identity and changed native inventory remain held
+  ---
+  duration_ms: 16.281184
+  type: 'test'
+  ...
+# Subtest: conflicting/foreign/disabled/incomplete/replaced groups and second Product-IP claims remain held
+ok 113 - conflicting/foreign/disabled/incomplete/replaced groups and second Product-IP claims remain held
+  ---
+  duration_ms: 23.844759
+  type: 'test'
+  ...
+# Subtest: accepted receipt cannot survive remote authority drift; pending is never displayable
+ok 114 - accepted receipt cannot survive remote authority drift; pending is never displayable
+  ---
+  duration_ms: 3.872361
+  type: 'test'
+  ...
+# Subtest: protected reader brackets source and crosswalk, paginates complete unfiltered endpoints, rejects drift/truncation
+ok 115 - protected reader brackets source and crosswalk, paginates complete unfiltered endpoints, rejects drift/truncation
+  ---
+  duration_ms: 6.373676
+  type: 'test'
+  ...
+# Subtest: TCP adapter handles success/refusal, rejects technical errors, closes late sockets and aborts pending work
+ok 116 - TCP adapter handles success/refusal, rejects technical errors, closes late sockets and aborts pending work
+  ---
+  duration_ms: 8.428272
+  type: 'test'
+  ...
+# Subtest: entrypoint is disabled without any IO; enabled requests still need existing authorization
+ok 117 - entrypoint is disabled without any IO; enabled requests still need existing authorization
+  ---
+  duration_ms: 14.585629
+  type: 'test'
+  ...
+# Subtest: two-project source transport pins origin, forwards only existing bearer, validates complete exact groups
+ok 118 - two-project source transport pins origin, forwards only existing bearer, validates complete exact groups
+  ---
+  duration_ms: 10.366836
+  type: 'test'
+  ...
+# Subtest: separate preview defaults off, rejects >8/duplicate/action scope before source IO, only reads complete authority
+ok 119 - separate preview defaults off, rejects >8/duplicate/action scope before source IO, only reads complete authority
+  ---
+  duration_ms: 14.943018
+  type: 'test'
+  ...
+# Subtest: preview cancellation ends a hung protected read without producing evidence
+ok 120 - preview cancellation ends a hung protected read without producing evidence
+  ---
+  duration_ms: 1.864054
+  type: 'test'
+  ...
+# Subtest: preview diagnostics are authorized, bounded and cannot convert source errors to scope
+ok 121 - preview diagnostics are authorized, bounded and cannot convert source errors to scope
+  ---
+  duration_ms: 2.671046
+  type: 'test'
+  ...
+# Subtest: incoming writer cancellation reaches sockets and replay opens no extra sockets
+ok 122 - incoming writer cancellation reaches sockets and replay opens no extra sockets
+  ---
+  duration_ms: 4.823256
+  type: 'test'
+  ...
+# Subtest: binding diagnostic describes existing failure without admitting a group or exposing raw binding
+ok 123 - binding diagnostic describes existing failure without admitting a group or exposing raw binding
+  ---
+  duration_ms: 1.234193
+  type: 'test'
+  ...
+# Subtest: diagnostics-only candidate retains deployed single-representation hold and identifies it precisely
+ok 124 - diagnostics-only candidate retains deployed single-representation hold and identifies it precisely
+  ---
+  duration_ms: 1.079164
+  type: 'test'
+  ...
+# Subtest: review scope contains exactly 76 opaque native commitments and one Owner commitment
+ok 125 - review scope contains exactly 76 opaque native commitments and one Owner commitment
+  ---
+  duration_ms: 3.121061
+  type: 'test'
+  ...
+# Subtest: one explicit four-resource admission preserves every previous opaque commitment
+ok 126 - one explicit four-resource admission preserves every previous opaque commitment
+  ---
+  duration_ms: 18.277544
+  type: 'test'
+  ...
+# Subtest: 65 actual-shaped complete groups prove 110 unique resources without exposing serials
+ok 127 - 65 actual-shaped complete groups prove 110 unique resources without exposing serials
+  ---
+  duration_ms: 104.805261
+  type: 'test'
+  ...
+# Subtest: 75 reviewed groups expose 120 resources; additional recorders never become camera-channel proof
+ok 128 - 75 reviewed groups expose 120 resources; additional recorders never become camera-channel proof
+  ---
+  duration_ms: 56.087524
+  type: 'test'
+  ...
+# Subtest: reviewed single-recorder cohort keeps authentication failures, stale evidence and inactive inventory unknown
+ok 129 - reviewed single-recorder cohort keeps authentication failures, stale evidence and inactive inventory unknown
+  ---
+  duration_ms: 285.796096
+  type: 'test'
+  ...
+# Subtest: reviewed single-recorder membership still rejects extra, reassigned and replaced resources
+ok 130 - reviewed single-recorder membership still rejects extra, reassigned and replaced resources
+  ---
+  duration_ms: 116.807845
+  type: 'test'
+  ...
+# Subtest: only pre-reviewed complete mapping tuples are accepted, with no alias/name/IP inference
+ok 131 - only pre-reviewed complete mapping tuples are accepted, with no alias/name/IP inference
+  ---
+  duration_ms: 1.552234
+  type: 'test'
+  ...
+# Subtest: partial, extra, duplicate and reassigned identity evidence all fail closed
+ok 132 - partial, extra, duplicate and reassigned identity evidence all fail closed
+  ---
+  duration_ms: 14.04414
+  type: 'test'
+  ...
+# Subtest: missing and partial mappings warn the previously reviewed resources, even without any current link
+ok 133 - missing and partial mappings warn the previously reviewed resources, even without any current link
+  ---
+  duration_ms: 1.968889
+  type: 'test'
+  ...
+# Subtest: a missing approved native equipment row still quarantines its surviving source without inventing a UUID
+ok 134 - a missing approved native equipment row still quarantines its surviving source without inventing a UUID
+  ---
+  duration_ms: 1.170709
+  type: 'test'
+  ...
+# Subtest: source-group warnings cover partial, new and replacement inventory without claiming extra IDs
+ok 135 - source-group warnings cover partial, new and replacement inventory without claiming extra IDs
+  ---
+  duration_ms: 2.900315
+  type: 'test'
+  ...
+# Subtest: cross-assigned mappings never leak the newly associated unit resources into warnings
+ok 136 - cross-assigned mappings never leak the newly associated unit resources into warnings
+  ---
+  duration_ms: 2.069768
+  type: 'test'
+  ...
+# Subtest: Owner control and latest reviewed audit bind four cameras despite generic model; unlinked native remains unresolved
+ok 137 - Owner control and latest reviewed audit bind four cameras despite generic model; unlinked native remains unresolved
+  ---
+  duration_ms: 3.176914
+  type: 'test'
+  ...
+# Subtest: changed Owner membership and newer conflicting/unreviewed history cannot reuse the old proof
+ok 138 - changed Owner membership and newer conflicting/unreviewed history cannot reuse the old proof
+  ---
+  duration_ms: 8.298661
+  type: 'test'
+  ...
+# Subtest: the same Owner database IDs cannot admit changed physical provider, kind, serial or external identities
+ok 139 - the same Owner database IDs cannot admit changed physical provider, kind, serial or external identities
+  ---
+  duration_ms: 20.146405
+  type: 'test'
+  ...
+# Subtest: Owner membership and newer audit warnings remain pinned to the previously reviewed source
+ok 140 - Owner membership and newer audit warnings remain pinned to the previously reviewed source
+  ---
+  duration_ms: 6.303633
+  type: 'test'
+  ...
+# Subtest: fully absent Owner audit history still quarantines its reviewed source without inventing a control UUID
+ok 141 - fully absent Owner audit history still quarantines its reviewed source without inventing a control UUID
+  ---
+  duration_ms: 1.74663
+  type: 'test'
+  ...
+# Subtest: Owner control reuse for an unrelated newer group revokes the old identity without warning foreign IDs or keys
+ok 142 - Owner control reuse for an unrelated newer group revokes the old identity without warning foreign IDs or keys
+  ---
+  duration_ms: 1.789744
+  type: 'test'
+  ...
+# Subtest: v3 reuses the IP/revision/actual-port-bound projector and never borrows provider time
+ok 143 - v3 reuses the IP/revision/actual-port-bound projector and never borrows provider time
+  ---
+  duration_ms: 1.566745
+  type: 'test'
+  ...
+# Subtest: the single 20-minute freshness boundary agrees between backend variants and never changes observation time
+ok 144 - the single 20-minute freshness boundary agrees between backend variants and never changes observation time
+  ---
+  duration_ms: 1.148177
+  type: 'test'
+  ...
+# Subtest: v3 projections query only allowlisted identity columns using existing fixed organization/auth flow
+ok 145 - v3 projections query only allowlisted identity columns using existing fixed organization/auth flow
+  ---
+  duration_ms: 0.436275
+  type: 'test'
+  ...
+1..145
+# tests 145
+# suites 0
+# pass 145
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 20914.971638

@@ -1,0 +1,28 @@
+{
+  "baseline": "24e2dc78a8b8d08f72daf3fcd5aaa3861519482c",
+  "version": 133,
+  "old": {
+    "serve": "324ac3c0b82a207b074dafec48fe5b55c88c39cf033179ac9889a2008954e158",
+    "runtime": "457d49f4296f67cf0123ff68b7f8270c60704db7612d2101559e3602029d04c5",
+    "config": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "files": [
+    {
+      "name": "cos-operations-pages/serve.ts",
+      "sha256": "d946e036682663566766314a7bea423ea43921ca33b253134adc62d5f78d4e12"
+    },
+    {
+      "name": "cos-operations-pages/productTcpRuntime.ts",
+      "sha256": "613fc3dc4ea79f8072b5f4aa295af870ebfc743920bb0f6f9700f3e08384b2db"
+    },
+    {
+      "name": "cos-operations-pages/deno.json",
+      "sha256": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+    }
+  ],
+  "outsideRouteUnchanged": true,
+  "cpuHelperUnchanged": true,
+  "originalRuntimeRebuildExact": true,
+  "configUnchanged": true,
+  "flagsUnchanged": true
+}
