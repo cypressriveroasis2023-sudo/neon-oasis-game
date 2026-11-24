@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouters } from './useRouters';
 import { type RouterRow } from '../../supabase/functions/cos-operations-pages/routers';
 import { api } from './api';
@@ -56,10 +56,30 @@ export function RouterOverview({ openWorkspace }: { openWorkspace: (name: string
     <div className='purchase-actions'><button onClick={() => openWorkspace('InHand Routers')}>View routers</button><button className='secondary' onClick={() => openWorkspace('Field Map')}>Open location map</button></div>
   </section>;
 }
+const FILTERS: Array<[string, string]> = [['all', 'All'], ['online', 'Online'], ['offline', 'Offline'], ['unknown', 'Unknown'], ['in_shop', 'In Shop'], ['needs_link', 'No COS match']];
+/** Short, phone-friendly age of an InHand reading: "4 min ago", "2 days ago". */
+export function routerAge(value: string | null | undefined, now: number) {
+  const at = value ? Date.parse(value) : NaN;
+  if (!Number.isFinite(at)) return 'No InHand time';
+  const minutes = Math.max(0, Math.round((now - at) / 60000));
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return minutes + ' min ago';
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return hours + ' hr ago';
+  const days = Math.round(hours / 24);
+  return days + (days === 1 ? ' day ago' : ' days ago');
+}
+function newestReading(rows: RouterRow[]) {
+  let best = NaN;
+  for (const row of rows) { const at = row.reportedAt ? Date.parse(row.reportedAt) : NaN; if (Number.isFinite(at) && !(at <= best)) best = at; }
+  return Number.isFinite(best) ? best : null;
+}
+const matchNote = (row: RouterRow) => row.match === 'exact_name' ? null : row.match === 'ambiguous' ? 'Duplicate name · review' : 'No COS unit match';
 export default function RouterWorkspace({ openMap }: { openMap: (unitId: string) => void }) {
   const { data, error, loading, refresh, now } = useRouters();
   const placements = useExactPlacements();
   const [query, setQuery] = useState(''), [filter, setFilter] = useState('all'), [selectedId, setSelectedId] = useState('');
+  const detailRef = useRef<HTMLElement>(null);
   const items = data?.items || [];
   const readingOf = (row: RouterRow) => routerLiveReading(row, placementFor(row, placements.byId), now);
   const filtered = items.filter(row => {
@@ -70,21 +90,34 @@ export default function RouterWorkspace({ openMap }: { openMap: (unitId: string)
   });
   const selected = filtered.find(row => row.id === selectedId) || filtered[0];
   const selectedReading = selected ? readingOf(selected) : null;
+  const ready = Boolean(data && placements.ready);
+  const summary = ready ? summarizeLive(items, placements.byId, now) : null;
+  const newest = ready ? newestReading(items) : null;
+  const feedStale = ready && items.length > 0 && (newest === null || now - newest > INHAND_ROUTER_FRESHNESS_MS);
+  const freshMinutes = Math.round(INHAND_ROUTER_FRESHNESS_MS / 60000);
+  const choose = (id: string) => {
+    setSelectedId(id);
+    if (typeof window !== 'undefined' && window.matchMedia?.('(max-width: 700px)').matches) requestAnimationFrame(() => detailRef.current?.scrollIntoView({behavior: 'smooth', block: 'start'}));
+  };
+  const tiles: Array<[string, string, number | undefined]> = [['online', 'Online', summary?.online], ['offline', 'Offline', summary?.offline], ['unknown', 'Unknown', summary?.unknown], ['in_shop', 'In Shop', summary?.inShop]];
   return <section className='panel module router-workspace' aria-label='InHand Routers workspace'>
-    <div className='panelhead'><div><h2>InHand router status</h2><span>{data ? items.length + ' router records' : 'InHand feed'}</span></div><button disabled={loading} onClick={() => void refresh()}>{loading ? 'Refreshing routers…' : 'Refresh routers'}</button></div>
-    <div className='router-notice'><b>Live InHand status</b><p>Online and Offline come from the InHand feed. A MOFI or Cradlepoint router, a unit with no exact InHand match, and a reading older than {Math.round(INHAND_ROUTER_FRESHNESS_MS / 60000)} minutes show Unknown. Shop units show In Shop and are not outages. Refresh only reads the saved feed.</p></div>
+    <div className='panelhead'><div><h2>InHand router status</h2><span>{data ? items.length + ' router records' : 'InHand feed'}{newest !== null ? ' · last reading ' + routerAge(new Date(newest).toISOString(), now).toLowerCase() : ''}</span></div><button disabled={loading} onClick={() => void refresh()}>{loading ? 'Refreshing routers…' : 'Refresh routers'}</button></div>
     {error && <p className='operations-error' role='alert'>{error}{data && ' Showing the last successful inventory.'}</p>}
-    {data && <p className='router-caption'>Inventory loaded {routerTime(data.generatedAt)}. Status is aged from each InHand reported time. A missing or stale time is Unknown, never Offline.</p>}
-    <div className='router-toolbar'><input aria-label='Search routers' value={query} onChange={e => setQuery(e.target.value)} placeholder='Search router, unit, or model…'/><select aria-label='Router status filter' value={filter} onChange={e => setFilter(e.target.value)}><option value='all'>All router records</option><option value='online'>Online</option><option value='offline'>Offline</option><option value='unknown'>Unknown</option><option value='in_shop'>In Shop</option><option value='needs_link'>No unique same-name COS unit</option></select></div>
+    {feedStale && <div className='router-stale' role='status'><b>InHand feed is behind</b><span>{newest === null ? 'No router has an InHand time yet.' : 'Newest reading is from ' + routerTime(new Date(newest).toISOString()) + ' (' + routerAge(new Date(newest).toISOString(), now) + ').'} Routers show Unknown until a reading less than {freshMinutes} minutes old comes in. Unknown is not Offline.</span></div>}
+    {summary && <div className='router-tiles' role='group' aria-label='Router status counts'>{tiles.map(([key, label, count]) => <button type='button' key={key} className={'router-tile router-tile-' + key + (filter === key ? ' on' : '')} aria-pressed={filter === key} onClick={() => setFilter(filter === key ? 'all' : key)}><b>{count ?? '—'}</b><span>{label}</span></button>)}</div>}
+    <div className='router-toolbar'><input aria-label='Search routers' enterKeyHint='search' value={query} onChange={e => setQuery(e.target.value)} placeholder='Search unit, router, or model'/><select aria-label='Router status filter' value={filter} onChange={e => setFilter(e.target.value)}>{FILTERS.map(([value, label]) => <option key={value} value={value}>{value === 'all' ? 'All routers' : value === 'needs_link' ? 'No unique same-name COS unit' : label}</option>)}</select></div>
     {(!data && !error || data && !placements.ready) && <p role='status'>Loading router inventory…</p>}
-    {data && placements.ready && <div className='router-layout'><div className='router-list' aria-label='Router records'>
-      {filtered.map(row => <button className={selected?.id === row.id ? 'selected' : ''} key={row.id} onClick={() => setSelectedId(row.id)} aria-pressed={selected?.id === row.id}><div><strong>{row.unitKey}</strong><RouterBadge row={row} now={now} placement={placementFor(row, placements.byId)}/></div><small>{row.model || 'Model not recorded'}</small><small>InHand time: {routerTime(row.reportedAt)}</small><small>{row.match === 'exact_name' ? 'Exact unit key' : row.match === 'ambiguous' ? 'Ambiguous unit name · review needed' : 'No exact COS unit name'} · No GPS</small></button>)}
-      {!filtered.length && <p>No router records match this filter.</p>}
-    </div><section className='router-detail' aria-label='Selected router details'>{selected && selectedReading ? <>
-      <div className='router-detail-title'><h3>{selected.name}</h3><RouterBadge row={selected} now={now} placement={placementFor(selected, placements.byId)}/></div>
-      <dl><div><dt>Unit label</dt><dd>{selected.unitKey}</dd></div><div><dt>Model</dt><dd>{selected.model || 'Not recorded'}</dd></div><div><dt>InHand status</dt><dd style={selectedReading.color ? {color: selectedReading.color} : undefined}>{selectedReading.label}</dd></div><div><dt>InHand time</dt><dd>{routerTime(selected.reportedAt)}</dd></div><div><dt>Feed</dt><dd>{selected.reportedSource || 'Not recorded'}</dd></div><div><dt>GPS coordinates</dt><dd>Not available from this source</dd></div></dl>
-      <p className='router-caption'>Shop counts as 0. A router-offline to-do is only for a field unit. This page does not show network addresses.</p>
-      <section className='router-notice'><b>COS unit association</b><p>{selected.match === 'exact_name' ? 'A unique COS unit has the same key (ignoring case and whitespace). Partial names are not used.' : selected.match === 'ambiguous' ? 'This name is duplicated. No unit is selected automatically.' : 'No exact same-name COS unit was found. Nothing is guessed from a partial name.'}</p>{selected.candidateUnit && <button className='secondary' onClick={() => openMap(selected.candidateUnit!.id)}>View same-name COS unit</button>}</section>
-    </> : <p>Select a router record.</p>}</section></div>}
+    {ready && <div className='router-layout'><div className='router-list' aria-label='Router records'>
+      {filtered.map(row => { const reading = readingOf(row), note = matchNote(row); return <button type='button' className={'router-row router-row-' + reading.state + (selected?.id === row.id ? ' selected' : '')} key={row.id} onClick={() => choose(row.id)} aria-pressed={selected?.id === row.id}>
+        <span className='router-row-main'><strong>{row.unitKey}</strong><small>{row.model || 'Model not recorded'} · {routerAge(row.reportedAt, now)}</small>{note && <small className='router-row-note'>{note}</small>}</span>
+        <RouterBadge row={row} now={now} placement={placementFor(row, placements.byId)}/>
+      </button>; })}
+      {!filtered.length && <p className='router-empty'>No routers match this search or filter.</p>}
+    </div><section ref={detailRef} className={'router-detail router-detail-' + (selectedReading?.state || 'none')} aria-label='Selected router details'>{selected && selectedReading ? <>
+      <div className='router-detail-title'><div><h3>{selected.unitKey}</h3><small>{selected.name}</small></div><RouterBadge row={selected} now={now} placement={placementFor(selected, placements.byId)}/></div>
+      <dl><div><dt>Model</dt><dd>{selected.model || 'Not recorded'}</dd></div><div><dt>InHand status</dt><dd>{selectedReading.label}</dd></div><div><dt>InHand time</dt><dd>{routerTime(selected.reportedAt)} <small>({routerAge(selected.reportedAt, now)})</small></dd></div><div><dt>Feed</dt><dd>{selected.reportedSource || 'Not recorded'}</dd></div><div><dt>GPS</dt><dd>Not available from this source</dd></div></dl>
+      <section className='router-match'><b>COS unit</b><p>{selected.match === 'exact_name' ? 'Matched to the COS unit with the same name.' : selected.match === 'ambiguous' ? 'This name is duplicated. No unit is selected automatically.' : 'No exact same-name COS unit was found. Nothing is guessed from a partial name.'}</p>{selected.candidateUnit && <button className='secondary' onClick={() => openMap(selected.candidateUnit!.id)}>View same-name COS unit</button>}</section>
+    </> : <p>Select a router.</p>}</section></div>}
+    <details className='router-help'><summary><b>Live InHand status</b><span>How these colors work</span></summary><ul><li>Online and Offline come straight from the InHand feed.</li><li>Unknown means the reading is older than {freshMinutes} minutes, the router is MOFI or Cradlepoint, or no single COS unit has the same name. Unknown is never counted as Offline.</li><li>Shop units show In Shop and are not outages. Only a field unit can be Offline.</li><li>Router status is not camera health. Refresh only re-reads the saved feed; this page does not show network addresses.</li></ul>{data && <p className='router-caption'>Inventory loaded {routerTime(data.generatedAt)}.</p>}</details>
   </section>;
 }
