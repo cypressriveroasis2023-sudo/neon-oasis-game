@@ -5,6 +5,7 @@ import { readVrmFleetConfig, type VrmUnit } from '../../supabase/functions/cos-o
 import './vrm.css';
 import VrmReadOnlyDashboard from './VrmReadOnlyDashboard';
 import { readDashboardPower, unitTileSummary } from './vrmReadOnlyModel';
+import { heliosPlacement, placementLabel, victronNeedsAttention } from './victronAttention';
 
 type FleetSync = ReturnType<typeof readVrmFleetConfig>['sync'];
 type SelectionHint = { initialUnit?:number; initialInstallationId?:number };
@@ -56,6 +57,8 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
   const [expanded, setExpanded] = useState(false);
+  // Field or Shop per mHelp, read once. Until it loads (or if it fails) every unit stays "Placement unknown" and nothing is flagged.
+  const [inventory, setInventory] = useState<{unitNumber?: string}[] | null>(null);
   const mounted = useRef(false);
   const running = useRef(false);
   const request = useRef(0);
@@ -108,6 +111,12 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
     // Defer the initial read so StrictMode's setup/cleanup probe cannot create
     // an orphaned request or leave the single-flight guard locked.
     queueMicrotask(() => { if (active) void refresh(); });
+    api.get('/api/field-map').then(response => {
+      if (!active) return;
+      const data = response.data as {inventoryItems?: unknown; items?: unknown};
+      const items = Array.isArray(data?.inventoryItems) ? data.inventoryItems : Array.isArray(data?.items) ? data.items : null;
+      setInventory(items ? items.filter((item): item is {unitNumber?: string} => Boolean(item) && typeof item === 'object') : null);
+    }).catch(() => { if (active) setInventory(null); });
     const timer = window.setInterval(() => {
       setNow(Date.now());
       if (workspaceVisible()) void refresh();
@@ -127,6 +136,9 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
   const enabled = units.filter(item => item.embedUrl).length;
   const nameCounts = new Map<string,number>();
   for (const item of units) nameCounts.set(item.name, (nameCounts.get(item.name) ?? 0) + 1);
+  const attention = victronNeedsAttention(units, power.rows, inventory, now);
+  // Only speak about Field power once at least one unit's Field/Shop is known from mHelp.
+  const placed = units.filter(item => heliosPlacement(item.name, inventory) !== 'unknown').length;
   const tiles = new Map(units.map(item => [item.installationId, unitTileSummary(item, power.rows, now)]));
   const tally = (tones:string[]) => [...tiles.values()].filter(tile => tones.includes(tile.tone)).length;
   const summary = [
@@ -148,10 +160,14 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
       <p className='vrm-sync-times'>{lastSuccess ? <span title={lastSuccess}>Synced {shortTime(sync.lastSuccessAt ?? null)}</span> : <span>No successful sync yet</span>}{nextSync && <span title={nextSync}>Next {shortTime(sync.nextSyncAt ?? null)}</span>}<span>{sync.scheduleActive ? 'Auto every 15 min' : 'Auto sync off'}</span></p>
     </div>}
     {units.length > 0 && <ul className='vrm-fleet-summary' aria-label='Fleet power summary'>{summary.map(item => <li key={item.key} className={'vrm-tone-'+item.key}><strong>{item.value}</strong><span>{item.label}</span></li>)}</ul>}
+    {units.length > 0 && placed > 0 && <section className={'vrm-attention' + (attention.length ? '' : ' vrm-attention-clear')} aria-label='Needs attention'>
+      <h3>{attention.length ? 'Needs attention · Field units' : 'No Field power issues'}</h3>
+      {attention.length > 0 && <ul>{attention.map(item => <li key={item.installationId}><button type='button' className={'vrm-attn-'+item.kind} onClick={() => select(item.installationId)}><strong>{item.name}</strong><span>{item.line}</span></button></li>)}</ul>}
+    </section>}
     {!loaded && loading && <p role='status'>Loading your Victron installations…</p>}
     {loaded && units.length === 0 && <div className='vrm-awaiting' role='status'><h3>No installations in the saved fleet</h3><p>{canDiscover ? 'Refresh the fleet to check the connected Victron account.' : 'No saved installations are available. Ask an Owner to check the fleet sync.'} No installation IDs or dashboards are assumed.</p></div>}
     {units.length > 0 && <nav className='tabs vrm-unit-grid' aria-label='Helios installations'>{units.map(item => <button key={item.installationId} className={(selected === item.installationId ? 'selected' : 'secondary') + ' vrm-tone-' + tiles.get(item.installationId)!.tone} aria-pressed={selected === item.installationId} onClick={() => select(item.installationId)}>
-      <strong>{item.name}</strong>{(nameCounts.get(item.name) ?? 0) > 1 && <small>Installation {item.installationId}</small>}<small className={item.available === false ? 'vrm-tile-status' : 'vrm-sr-only'}>{item.available === false ? 'Unavailable in latest sync' : item.embedUrl ? 'Dashboard enabled' : 'Read-only power'}</small>
+      <span className='vrm-tile-head'><strong>{item.name}</strong>{heliosPlacement(item.name, inventory) !== 'unknown' && <em aria-hidden='true' className={'vrm-place vrm-place-'+heliosPlacement(item.name, inventory)}>{placementLabel(heliosPlacement(item.name, inventory))}</em>}</span>{(nameCounts.get(item.name) ?? 0) > 1 && <small>Installation {item.installationId}</small>}<small className={item.available === false ? 'vrm-tile-status' : 'vrm-sr-only'}>{item.available === false ? 'Unavailable in latest sync' : item.embedUrl ? 'Dashboard enabled' : 'Read-only power'}</small>
       {(() => { const tile = tiles.get(item.installationId)!; if (tile.tone === 'unavailable') return null; return <span className='vrm-tile-reading' aria-hidden='true' title={toneLabel[tile.tone]}>
         <span className='vrm-tile-soc'><i/>{tile.soc ? Math.round(tile.soc.value) + '%' : '—'}</span>
         <span className='vrm-tile-bar'><b style={{width: (tile.soc ? Math.max(0, Math.min(100, tile.soc.value)) : 0) + '%'}}/></span>

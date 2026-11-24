@@ -106,3 +106,17 @@ html[data-theme='light'] .vrm-native-dashboard{background:#f4f8fb;color:#182d40;
  .vrm-native-dashboard{padding:12px}
 }
 html[data-theme='light'] .vrm-fleet-summary li,html[data-theme='light'] .vrm-workspace .vrm-sync-status{background:#fff;border-color:#b9cbd8}html[data-theme='light'] .vrm-fleet-summary strong,html[data-theme='light'] .vrm-sync-line{color:#182d40}
+/* Needs attention (Field units only) + Field/Shop tag on tiles */
+.vrm-attention{margin:10px 0 4px;padding:12px;border:1px solid #5a2029;border-left:3px solid var(--vt-low);border-radius:10px;background:#1a0d12}
+.vrm-attention.vrm-attention-clear{border-color:var(--vt-line);border-left-color:var(--vt-good);background:var(--vt-panel);padding:9px 12px}
+.vrm-attention h3{margin:0;font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:#ffb3ba}.vrm-attention-clear h3{color:#9ff0c0}
+.vrm-attention ul{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:6px}
+#root#root .operations-shell .vrm-workspace .vrm-attention button{display:flex;width:100%;justify-content:space-between;align-items:center;gap:10px;min-height:0;padding:8px 10px!important;border-radius:8px;border:1px solid #3a1820!important;background:#12080c!important;color:#e6edf7!important;text-align:left;box-shadow:none!important}
+.vrm-attention button strong{font-size:13px;letter-spacing:.03em}.vrm-attention button span{font-size:12px;color:#c8d4e3}
+.vrm-attention .vrm-attn-low span{color:#ff8a93;font-weight:650}.vrm-attention .vrm-attn-fair span{color:var(--vt-fair)}.vrm-attention .vrm-attn-unknown span,.vrm-attention .vrm-attn-off span{color:#8a99ad}
+.vrm-tile-head{display:flex;align-items:center;justify-content:space-between;gap:4px;min-width:0}
+.vrm-place{font-style:normal;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:1px 5px;border-radius:4px;border:1px solid var(--vt-line);color:#8a99ad;flex:none}
+.vrm-place-field{color:#9ff0c0;border-color:#2b6b45}.vrm-place-shop{color:#93c5fd;border-color:#2b4f7a}
+.vrm-tile-head{flex-wrap:wrap;justify-content:flex-start;gap:3px 6px}
+#root#root .operations-shell .vrm-workspace .vrm-unit-grid .vrm-tile-head strong{white-space:nowrap}
+.vrm-attention button strong{white-space:nowrap;flex:none}.vrm-attention button span{text-align:right}
