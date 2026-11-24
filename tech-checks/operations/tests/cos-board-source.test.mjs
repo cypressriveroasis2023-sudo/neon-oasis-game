@@ -217,8 +217,20 @@ test('the board counts one way, and a hand fix comes first on the card and says 
   assert.ok(app.includes('body.splice(2,0,fx);'));
   assert.equal(app.includes('body.push(fx);'), false);
   assert.match(app, /S\.saved=\{was, said: said \|\| "Saved\.", unit:v\.id, ip:steps\.some\(x=>x\.field==="public_ip"\)\}; clearTimeout\(savedTimer\); savedTimer=setTimeout\(saidSaved, 1500\);/);
-  // A corrected IP is kept, and the save says that Up or Down still comes from Star4Live.
-  assert.match(app, /still = !moved\.length && ip && v && v\.u\.s==="v" && \["down","issues","unknown"\]\.includes\(v\.status\);/);
+  // A corrected IP is kept for every unit, and the save names the system that still decides Up or Down.
+  assert.match(app, /still = !moved\.length && ip && v && \["down","issues","unknown"\]\.includes\(v\.status\);/);
+  assert.ok(app.includes('b("Correct IP","ip",true),'));
+  assert.equal(app.includes('u.s==="v" ? b("Correct IP","ip",true) : null'), false);
+  assert.ok(app.includes("Up or Down comes from COS's own check of this unit, so it clears at the next check that finds its cameras online."));
+  assert.ok(app.includes("Up or Down comes from the Recon cloud's own reading, so it clears when Recon sees the cameras online."));
+  // The other COS screens open from the board itself, named as IT sees them.
+  assert.ok(app.includes('const SCREENS = [["Camera Health","Camera Health"],["InHand Routers","InHand Routers"],["Victron VRM","Victron Power"],["Unit Tracker","2027 Unit Tracker"]];'));
+  assert.match(app, /function screensRow\(\)\{[\s\S]*?hooks\.onScreen\(workspace\)/);
+  assert.ok(app.includes('<div class=\\"screens\\" id=\\"screensRow\\">'));
+  // The Tech check tab goes where this sign-in's checks are: an IT sign-in, known by its refused manager read, goes to its own.
+  assert.ok(app.includes('$("tabTech").addEventListener("click",()=>hooks.onTechCheck(MG.on===true || MG.state!=="failed"))'));
+  // The board says in one line why the three counts in COS differ.
+  assert.ok(app.includes('mHelp\u2019s own field total is higher because it counts stands and poles as well.'));
   // What a person set by hand is settled: off the open punch list for as long as the hand fix stands.
   assert.match(app, /sec:"place", fixed:!!v\.hand\.place,/);
   assert.match(app, /sec:"name", fixed:!!v\.hand\.name,/);
