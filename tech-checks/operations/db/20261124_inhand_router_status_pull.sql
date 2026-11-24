@@ -68,7 +68,7 @@ $$;
 
 create or replace function public.cos_inhand_pull_failed(p_error_code text)
 returns void language sql security definer set search_path = '' as $$
-  insert into inhand_private.pull_runs (ok, error_code) values (false, left(p_error_code, 60))
+  insert into inhand_private.pull_runs (ok, error_code) values (false, left(p_error_code, 120))
 $$;
 
 -- p_readings: [{"serial": "RF3...", "online": 0|1}, ...] exactly as InHand reported them.
@@ -129,6 +129,23 @@ begin
 end $$;
 
 -- Readable by the Owner app later; status counts only, no tokens.
+-- One-time connect links. A state is issued by the owner (SQL), lasts 30 minutes, works once.
+create table if not exists inhand_private.connect_states (
+  state text primary key check (state ~ '^[A-Za-z0-9_-]{20,100}$'),
+  expires_at timestamptz not null default now() + interval '30 minutes',
+  used_at timestamptz
+);
+revoke all on inhand_private.connect_states from public, anon, authenticated;
+
+create or replace function public.cos_inhand_connect_take(p_state text)
+returns boolean language sql security definer set search_path = '' as $$
+  with taken as (
+    update inhand_private.connect_states set used_at = now()
+     where state = p_state and used_at is null and expires_at > now()
+    returning 1)
+  select exists (select 1 from taken)
+$$;
+
 create or replace function public.cos_inhand_pull_recent(p_limit integer default 20)
 returns setof inhand_private.pull_runs language sql security definer set search_path = '' as $$
   select * from inhand_private.pull_runs order by started_at desc limit greatest(1, least(p_limit, 200))
@@ -143,7 +160,8 @@ begin
     'public.cos_inhand_oauth_clear()',
     'public.cos_inhand_pull_failed(text)',
     'public.cos_inhand_router_status_apply(jsonb, timestamptz)',
-    'public.cos_inhand_pull_recent(integer)'
+    'public.cos_inhand_pull_recent(integer)',
+    'public.cos_inhand_connect_take(text)'
   ] loop
     execute format('revoke all on function %s from public, anon, authenticated', f);
     execute format('grant execute on function %s to service_role', f);
@@ -165,5 +183,5 @@ $$;
 -- $cron$);
 --
 -- Rollback: select cron.unschedule('inhand-router-status-pull');
--- then drop the six public.cos_inhand_* functions and schema inhand_private cascade.
+-- then drop the seven public.cos_inhand_* functions and schema inhand_private cascade.
 -- Router rows keep their last written status, which simply ages into Unknown.
