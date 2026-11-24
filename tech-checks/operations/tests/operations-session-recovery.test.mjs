@@ -184,3 +184,14 @@ test('extended offline period uses one verification read per retry interval and 
  }
  f.requests[6].resolve({...owner,features:{...owner.features,vrmRead:false}});await flush();assert.equal(f.state.reloadRequired,true);assert.equal(f.state.session,null);f.controller.stop();
 });
+
+test('the COS Board holds its sign-in through a hiccup without becoming a TV', async () => {
+ const hold=await import('../src/tvSessionHold.ts');
+ assert.equal(hold.boardSessionHold(),false);
+ hold.setBoardSessionHold(true);assert.equal(hold.boardSessionHold(),true);assert.equal(hold.tvSessionHold(),false);
+ hold.setBoardSessionHold(false);assert.equal(hold.boardSessionHold(),false);
+ const hook=readFileSync(new URL('../src/useOperationsSession.ts',import.meta.url),'utf8');
+ assert.match(hook,/if\(\(tvSessionHold\(\)\|\|boardSessionHold\(\)\)&&reason==='authentication-denied'&&path&&path!=='\/api\/session'\)\{\s*current\.quietRefresh\(\);/);
+ const landing=readFileSync(new URL('../src/CosBoardLanding.tsx',import.meta.url),'utf8');
+ assert.match(landing,/useEffect\(\(\) => \{ setBoardSessionHold\(true\); return \(\) => setBoardSessionHold\(false\); \}, \[\]\);/);
+});
