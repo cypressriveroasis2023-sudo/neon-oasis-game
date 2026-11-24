@@ -39,3 +39,70 @@ html[data-theme='light'] .vrm-native-dashboard{background:#f4f8fb;color:#182d40;
 /* Keep multiple battery monitors together without stretching the solar tile. */
 .vrm-native-embedded .vrm-native-grid{align-items:start}.vrm-native-embedded .vrm-native-battery{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;order:-1}.vrm-native-embedded .vrm-native-battery>h5,.vrm-native-embedded .vrm-native-battery>.vrm-native-multiple{grid-column:1/-1;margin:0}.vrm-native-embedded .vrm-native-battery .vrm-native-reading{min-width:0;margin:0;padding:10px 0 0;border-top:1px solid #3b5061}.vrm-native-embedded .vrm-native-battery .vrm-native-reading p{overflow-wrap:anywhere}.vrm-native-embedded .vrm-native-battery .vrm-native-value{font-size:22px}
 @media(max-width:480px){.vrm-native-embedded .vrm-native-battery{gap:8px}.vrm-native-embedded .vrm-native-battery .vrm-native-value{font-size:19px}}
+
+/* ---- 2026-11 Victron Power refresh: glanceable tiles, COS red/black, dark energy flow ---- */
+.vrm-workspace{--vt-good:#3ddc84;--vt-fair:#f5b942;--vt-low:#ff4d5e;--vt-stale:#7b8ba0;--vt-red:#e0283a;--vt-panel:#0d1622;--vt-line:#253447}
+.vrm-sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+#root .operations-shell .vrm-workspace{border-top:3px solid var(--vt-red)!important}
+/* Sync: one status line + time chips instead of two paragraphs */
+.vrm-workspace .vrm-sync-status{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 14px;margin:14px 0 12px;padding:10px 12px;border:1px solid var(--vt-line);border-radius:10px;background:var(--vt-panel)}
+.vrm-workspace .vrm-sync-status p{margin:0}
+.vrm-sync-line{display:flex;align-items:center;gap:8px;color:#e6edf7;font-size:13px}.vrm-sync-line strong{font-weight:650}
+.vrm-sync-line i{width:9px;height:9px;border-radius:50%;flex:none;background:var(--vt-stale)}
+.vrm-sync-status.vrm-tone-good .vrm-sync-line i{background:var(--vt-good);box-shadow:0 0 9px var(--vt-good)}.vrm-sync-status.vrm-tone-low .vrm-sync-line i{background:var(--vt-low);box-shadow:0 0 9px var(--vt-low)}
+.vrm-sync-times{display:flex;flex-wrap:wrap;gap:6px}.vrm-sync-times span{padding:4px 9px;border:1px solid var(--vt-line);border-radius:20px;font-size:11px;color:#a3b3ca;white-space:nowrap}
+/* Fleet summary strip */
+.vrm-fleet-summary{list-style:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 4px;padding:0}
+.vrm-fleet-summary li{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border:1px solid var(--vt-line);border-left:3px solid var(--vt-stale);border-radius:9px;background:var(--vt-panel);min-width:0}
+.vrm-fleet-summary strong{font-size:22px;line-height:1.1;color:#fff;font-variant-numeric:tabular-nums}.vrm-fleet-summary span{font-size:11px;color:#a3b3ca}
+.vrm-fleet-summary .vrm-tone-good{border-left-color:var(--vt-good)}.vrm-fleet-summary .vrm-tone-low{border-left-color:var(--vt-low)}.vrm-fleet-summary .vrm-tone-unavailable{border-left-color:#4b5a6e}
+/* Unit tiles: battery %, bar and solar at a glance */
+.vrm-workspace .tabs.vrm-unit-grid{border-bottom:0;padding-bottom:0}
+#root#root .operations-shell .vrm-workspace .vrm-unit-grid button{position:relative;align-items:stretch;justify-content:flex-start;gap:6px;min-height:86px;padding:10px 10px 9px!important;text-align:left;background:var(--vt-panel)!important;border:1px solid var(--vt-line)!important;border-radius:10px;color:#e6edf7!important;box-shadow:none!important}
+#root#root .operations-shell .vrm-workspace .vrm-unit-grid button strong{font-size:12px;letter-spacing:.04em;color:#c8d4e3}
+#root#root .operations-shell .vrm-workspace .vrm-unit-grid button.selected{background:linear-gradient(180deg,#2a0d13,#12090d)!important;border-color:var(--vt-red)!important;box-shadow:0 0 0 1px var(--vt-red),0 0 18px #e0283a40!important}
+#root#root .operations-shell .vrm-workspace .vrm-unit-grid button.selected strong{color:#ff8a93}
+.vrm-tile-reading{display:flex;flex-direction:column;gap:5px}
+.vrm-tile-soc{display:flex;align-items:center;gap:6px;font-size:20px;font-weight:750;line-height:1;color:#fff;font-variant-numeric:tabular-nums}
+.vrm-tile-soc i{width:8px;height:8px;border-radius:50%;background:var(--vt-tone,var(--vt-stale));flex:none}
+.vrm-tile-bar{display:block;height:4px;border-radius:4px;background:#1d2a3a;overflow:hidden}.vrm-tile-bar b{display:block;height:100%;border-radius:4px;background:var(--vt-tone,var(--vt-stale))}
+.vrm-tile-solar{font-size:10.5px;color:#a3b3ca;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vrm-unit-grid .vrm-tile-status{font-size:10px;color:#7b8ba0!important}
+.vrm-unit-grid .vrm-tone-good{--vt-tone:var(--vt-good)}.vrm-unit-grid .vrm-tone-fair{--vt-tone:var(--vt-fair)}.vrm-unit-grid .vrm-tone-low{--vt-tone:var(--vt-low)}
+.vrm-unit-grid .vrm-tone-stale .vrm-tile-soc,.vrm-unit-grid .vrm-tone-none .vrm-tile-soc{color:#8a99ad}
+#root#root .operations-shell .vrm-workspace .vrm-unit-grid button.vrm-tone-low:not(.selected){border-color:#6b2430!important}
+#root#root .operations-shell .vrm-workspace .vrm-unit-grid button.vrm-tone-unavailable{opacity:.6;border-style:dashed!important}
+@media(min-width:1200px){.vrm-workspace .tabs.vrm-unit-grid{grid-template-columns:repeat(auto-fill,minmax(118px,1fr))}}
+/* Selected unit: tighter header + info chips */
+.vrm-dashboard-heading{margin:20px 0 12px;padding-top:16px;border-top:1px solid var(--vt-line)}
+.vrm-dashboard-stage{padding:14px;background:#070d15;border-color:var(--vt-line)}
+.vrm-installation-info{gap:8px;margin-bottom:14px}.vrm-installation-info>div{padding:8px 6px;background:var(--vt-panel);border-color:var(--vt-line)}
+.vrm-workspace .vrm-installation-info dt{font-size:10px;letter-spacing:.06em;text-transform:uppercase}.vrm-installation-info dd{font-size:13px;margin-top:4px}
+/* Power overview cards */
+.vrm-native-dashboard{background:var(--vt-panel,#0d1622);border-color:#253447;padding:18px}
+.vrm-native-heading h4{font-size:20px}
+.vrm-native-status{background:#0f2a1c;border-color:#2b6b45;color:#9ff0c0}.vrm-native-status.vrm-native-warning{background:#2c220c;border-color:#7a5d1d}
+.vrm-native-card{background:#111c2a;border-color:#253447;border-radius:10px;padding:14px}
+.vrm-native-card h5{margin-bottom:10px;text-transform:uppercase;font-size:10.5px;letter-spacing:.08em;color:#a3b3ca}
+.vrm-native-card p{margin-top:8px;font-size:10.5px}
+.vrm-native-solar{border-top-color:#f5b942}.vrm-native-battery{border-top-color:#3ddc84}.vrm-native-load{border-top-color:#e0283a}
+.vrm-native-dashboard:not(.vrm-native-embedded) .vrm-native-battery{grid-column:1/-1;order:-1}
+.vrm-native-dashboard:not(.vrm-native-embedded) .vrm-native-multi{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:4px 16px}
+.vrm-native-multi>h5,.vrm-native-multi>.vrm-native-multiple{grid-column:1/-1;margin:0 0 4px}
+.vrm-native-multi .vrm-native-reading+.vrm-native-reading{margin-top:0;padding-top:0;border-top:0}
+.vrm-native-dashboard .vrm-native-caption{font-size:11px;color:#8a99ad;line-height:1.5}
+/* Energy flow: dark, matching the rest of COS */
+.cos-energy-flow{background:linear-gradient(135deg,#0f1a27,#0a121c);border:1px solid #253447;color:#e6edf7;border-radius:14px}
+.cos-energy-node>span{background:#111c2a;border-color:#2c3b51;color:#f5b942;width:44px;height:44px}
+.cos-energy-node:last-child>span,.cos-energy-node:nth-child(5)>span{color:#ff6b78}
+.cos-energy-hub>span{background:#e0283a;border-color:#ff6b78;color:#fff;box-shadow:0 0 16px #e0283a55}
+.cos-energy-node small,.cos-energy-flow-caption{color:#8a99ad}.cos-energy-node strong{font-size:16px;color:#fff}
+.cos-energy-line{background:#253447}.cos-energy-line i{background:#f5b942}
+@media(max-width:700px){
+ .vrm-fleet-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .vrm-workspace .vrm-sync-status{padding:9px 10px}
+ #root#root .operations-shell .vrm-workspace .vrm-unit-grid button{min-height:80px;padding:9px 8px 8px!important}
+ .vrm-tile-soc{font-size:18px}
+ .vrm-native-dashboard{padding:12px}
+}
+html[data-theme='light'] .vrm-fleet-summary li,html[data-theme='light'] .vrm-workspace .vrm-sync-status{background:#fff;border-color:#b9cbd8}html[data-theme='light'] .vrm-fleet-summary strong,html[data-theme='light'] .vrm-sync-line{color:#182d40}

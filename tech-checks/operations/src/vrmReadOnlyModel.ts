@@ -28,3 +28,19 @@ export function dashboardPowerFor(unit: VrmUnit, rows: SafeVrmPower[]) {
   const matches = rows.filter(row => row.installationId === unit.installationId && row.name === unit.name);
   return matches.length === 1 ? matches[0] : undefined;
 }
+
+export type TileTone = 'good' | 'fair' | 'low' | 'stale' | 'none' | 'unavailable';
+/** One glanceable reading per unit tile. Prefers the system SOC; otherwise the
+ * lowest single battery monitor (never an average). Stale readings stay grey. */
+export function unitTileSummary(unit: VrmUnit, rows: SafeVrmPower[], now: number) {
+  if (unit.available === false) return { tone: 'unavailable' as TileTone, soc: undefined, solar: undefined, fresh: false };
+  const row = dashboardPowerFor(unit, rows);
+  const charges = chargeReadings(row, now);
+  const fresh = charges.filter(reading => readingIsFresh(reading, now));
+  const pool = fresh.length ? fresh : charges;
+  const soc = pool.find(reading => reading.source === 'system') ?? [...pool].sort((a, b) => a.value - b.value)[0];
+  const solar = selectReading(row, 'solar_power', now);
+  const isFresh = Boolean(soc && readingIsFresh(soc, now)) && !row?.errorCode;
+  const tone: TileTone = !soc ? 'none' : !isFresh ? 'stale' : soc.value < 20 ? 'low' : soc.value < 50 ? 'fair' : 'good';
+  return { tone, soc, solar, fresh: isFresh };
+}
