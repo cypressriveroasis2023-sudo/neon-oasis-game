@@ -30,7 +30,7 @@ export function victronNeedsAttention(units: readonly VrmUnit[], rows: SafeVrmPo
     const pct = tile.soc ? Math.round(tile.soc.value) + '%' : '';
     if (tile.tone === 'low') out.push({installationId: unit.installationId, name: unit.name, kind: 'low', line: 'Low battery · ' + pct});
     else if (tile.tone === 'fair' && tile.soc && tile.soc.value < 35) out.push({installationId: unit.installationId, name: unit.name, kind: 'fair', line: 'Getting low · ' + pct});
-    else if (tile.tone === 'stale') out.push({installationId: unit.installationId, name: unit.name, kind: 'unknown', line: 'Power unknown · reading over 30 min old'});
+    else if (tile.tone === 'stale') out.push({installationId: unit.installationId, name: unit.name, kind: 'unknown', line: 'Power unknown · reading over 45 min old'});
     else if (tile.tone === 'none') out.push({installationId: unit.installationId, name: unit.name, kind: 'unknown', line: 'Power unknown · no battery reading'});
     else if (tile.tone === 'unavailable') out.push({installationId: unit.installationId, name: unit.name, kind: 'off', line: 'Not in the latest Victron sync'});
   }

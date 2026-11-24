@@ -324,7 +324,7 @@ function steps0(v){
   if(v.status==="shop") return ["In the shop. Not counted as down.","When it goes out, use Move to field and set the site."];
   return ["Nothing to do. All cameras are reporting."];
 }
-/* Victron power for a Helios: one reading, never an average of separate batteries. Older than 30 min draws grey. */
+/* Victron power for a Helios: one reading, never an average of separate batteries. Older than 45 min draws grey. */
 const PWQ = { good:"ok", fair:"warn", low:"bad", stale:"unk", none:"unk", off:"unk" };
 function powerText(p){ if(!p) return ""; if(p.q==="off") return "Victron: not in the latest sync";
   return (p.b!==null ? p.b+"% battery" : "No battery reading")+(p.w!==null ? " · "+p.w+" W solar" : "")+(p.q==="stale" ? " · old reading" : ""); }
@@ -419,7 +419,7 @@ function powerBox(v){
     h("div",{class:"pwt q-"+p.q},h("span",{text:"Battery"}),h("b",{text:p.b!==null ? p.b+"%" : "—"}),bar),
     h("div",{class:"pwt"},h("span",{text:"Solar"}),h("b",{text:p.w!==null ? p.w+" W" : "—"})),
     h("div",{class:"pwt"},h("span",{text:"Voltage"}),h("b",{text:p.v!==null ? p.v+" V" : "—"})));
-  const note = p.q==="off" ? "This installation was not in the latest Victron sync." : p.q==="stale" ? "This reading is more than 30 minutes old"+(p.t ? " ("+when(p.t)+")" : "")+", so it is not called current." : p.q==="none" ? "Victron has no battery reading for this unit." : "Victron reading"+(p.t ? " · "+when(p.t) : "")+". Cameras come from Star4Live; power comes from Victron. A low battery is not the same as a camera being down.";
+  const note = p.q==="off" ? "This installation was not in the latest Victron sync." : p.q==="stale" ? "This reading is more than 45 minutes old"+(p.t ? " ("+when(p.t)+")" : "")+", so it is not called current." : p.q==="none" ? "Victron has no battery reading for this unit." : "Victron reading"+(p.t ? " · "+when(p.t) : "")+". Cameras come from Star4Live; power comes from Victron. A low battery is not the same as a camera being down.";
   return h("div",{class:"box pwbox"},h("h3",{text:"Power"}),tiles,h("p",{class:"note",text:note}),go?h("div",{class:"links"},go):null);
 }
 function drawPanel(){

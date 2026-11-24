@@ -15,7 +15,7 @@ const fleet = {
     {installationId: 1, name: 'HELIOS 001', lastAttemptAt: at(1), errorCode: null, measurements: [m('battery_soc', 86.4, '%', at(2)), m('solar_power', 380, 'W', at(2)), m('battery_voltage', 26.31, 'V', at(2))]},
     // Two separate battery monitors and no system reading: the lowest one, never the average.
     {installationId: 2, name: 'HELIOS 002', lastAttemptAt: at(1), errorCode: null, measurements: [m('battery_soc', 90, '%', at(2), 'battery', 278), m('battery_soc', 15, '%', at(2), 'battery', 512)]},
-    {installationId: 3, name: 'HELIOS 003', lastAttemptAt: at(1), errorCode: null, measurements: [m('battery_soc', 70, '%', at(45))]},
+    {installationId: 3, name: 'HELIOS 003', lastAttemptAt: at(1), errorCode: null, measurements: [m('battery_soc', 70, '%', at(50))]},
     {installationId: 5, name: 'HELIOS 005', lastAttemptAt: at(1), errorCode: null, measurements: [m('battery_soc', 99, '%', at(2))]},
     {installationId: 6, name: 'HELIOS 005', lastAttemptAt: at(1), errorCode: null, measurements: [m('battery_soc', 5, '%', at(2))]},
   ],
@@ -26,7 +26,7 @@ test('Victron power matches a Helios by exact number and never averages batterie
   assert.deepEqual(boardPowerFor(power, 'Helios 001'), {b: 86, w: 380, v: 26.3, t: Math.round(Date.parse(at(2)) / 1000), q: 'good'});
   assert.equal(boardPowerFor(power, 'HELIOS 002').b, 15);
   assert.equal(boardPowerFor(power, 'HELIOS 002').q, 'low');
-  // A 45-minute-old reading is not called current.
+  // A 50-minute-old reading is not called current (cutoff 45).
   assert.equal(boardPowerFor(power, 'HELIOS 003').q, 'stale');
   assert.equal(boardPowerFor(power, 'HELIOS 004').q, 'off');
   // Two installations named HELIOS 005: no guess.

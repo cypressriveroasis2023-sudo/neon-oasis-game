@@ -14,7 +14,7 @@ test('010, 011 and any later discovered Helios installation use exact identity w
  assert.equal(dashboardPowerFor({...units[0],available:false},rows),undefined);
 });
 test('zero is reported, missing remains missing, stale has a separate freshness flag',()=>{
- const r=row(units[0],[measurement('solar_power',0),measurement('battery_soc',70,{observedAt:new Date(now-31*60000).toISOString()})]);
+ const r=row(units[0],[measurement('solar_power',0),measurement('battery_soc',70,{observedAt:new Date(now-46*60000).toISOString()})]);
  assert.equal(selectReading(r,'solar_power',now).value,0);
  assert.equal(selectReading(r,'load_power',now),undefined);
  assert.equal(readingIsFresh(selectReading(r,'battery_soc',now),now),false);
@@ -22,7 +22,7 @@ test('zero is reported, missing remains missing, stale has a separate freshness 
 test('system and charger values are not double-counted and fresh readings take priority',()=>{
  const r=row(units[0],[measurement('solar_power',20,{source:'solarcharger',instance:277}),measurement('solar_power',19)]);
  assert.equal(selectReading(r,'solar_power',now).value,19);
- r.measurements[1].observedAt=new Date(now-31*60000).toISOString();
+ r.measurements[1].observedAt=new Date(now-46*60000).toISOString();
  assert.equal(selectReading(r,'solar_power',now).value,20);
 });
 test('malformed telemetry fails closed without changing fleet; absent telemetry is a waiting state',()=>{
@@ -39,7 +39,7 @@ test('read-only component renders current, stale, unavailable and failure states
  const render=props=>renderToStaticMarkup(React.createElement(VrmReadOnlyDashboard,{unit:u,rows:[r],now,...props}));
  assert.match(render({}),/Recent saved readings/);assert.match(render({}),/Not reported/);
  assert.doesNotMatch(render({}),/<(?:button|iframe|script|form)\b/);
- assert.match(render({now:now+31*60000}),/Saved readings · some are stale/);
+ assert.match(render({now:now+46*60000}),/Saved readings · some are stale/);
  assert.match(render({readFailed:true}),/Readings could not be refreshed/);
  assert.match(render({invalid:true,rows:[]}),/Readings could not be refreshed/);
  assert.match(render({rows:[]}),/Waiting for readings/);
@@ -48,7 +48,7 @@ test('read-only component renders current, stale, unavailable and failure states
 });
 
 test('charge sources stay separate even when a system value is higher or another bank is stale',()=>{
- const u=units[0],r=row(u,[measurement('battery_soc',100),measurement('battery_soc',92.7,{source:'battery',instance:278}),measurement('battery_soc',83,{source:'battery',instance:512,observedAt:new Date(now-31*60000).toISOString()})]);
+ const u=units[0],r=row(u,[measurement('battery_soc',100),measurement('battery_soc',92.7,{source:'battery',instance:278}),measurement('battery_soc',83,{source:'battery',instance:512,observedAt:new Date(now-46*60000).toISOString()})]);
  assert.deepEqual(chargeReadings(r,now).map(x=>[x.source,x.instance,x.value]),[['battery',278,92.7],['system',0,100],['battery',512,83]]);
  const markup=renderToStaticMarkup(React.createElement(VrmReadOnlyDashboard,{unit:u,rows:[r],now}));
  for(const text of ['92.7','100','83','battery · instance 278','battery · instance 512','system · instance 0','Separate source readings · no combined charge','Stale'])assert.ok(markup.includes(text),text);

@@ -34,7 +34,7 @@ export default function VrmReadOnlyDashboard({unit,rows,invalid=false,readFailed
       </div>) : <><strong className='vrm-native-value'>—</strong><p>Not reported</p></>}
     </article>)}</div>
     {alarms.length > 0 && <p className='vrm-native-warning' role='status'>Reported alarms: {alarms.map(reading => reading.metric.replaceAll('_',' ')+' ('+(readingIsFresh(reading,now)?'reported':'stale')+' '+time(reading.observedAt)+')').join('; ')}.</p>}
-    <p className='vrm-native-caption'>{row?.lastAttemptAt ? 'Last telemetry check: '+time(row.lastAttemptAt)+'. ' : ''}Readings older than 30 minutes are marked stale. Missing measurements stay blank.</p>
+    <p className='vrm-native-caption'>{row?.lastAttemptAt ? 'Last telemetry check: '+time(row.lastAttemptAt)+'. ' : ''}Readings older than 45 minutes are marked stale. Missing measurements stay blank.</p>
     <p className='vrm-native-caption'>Solar and DC system power show one labeled source, preferring recent system readings when available. DC system power may be an estimate. Battery charge keeps each reported source separate. Signed battery power/current are shown as supplied by Victron; DC system power is not total site consumption. Use Open in VRM for history, grid/AC details, inverter state and Remote Console.</p>
   </section>;
 }
