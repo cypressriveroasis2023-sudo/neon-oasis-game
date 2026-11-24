@@ -1,6 +1,11 @@
 /**
  * Tying a COS unit to its mHelp row by name, so the A# can be saved.
  *
+ * The A# is mHelpDesk's equipment id. mHelp shows it on the equipment record
+ * as the Barcode ID, written A#1998523, and prints it on the unit's barcode
+ * label. mHelp's own API calls it equipmentId; COS stores it as
+ * mhelp_product_id. One number, three names.
+ *
  * James, Mon 11/23/2026: "cos will check mhelp and it should auto populate ...
  * we have all mhelp inventory on cos so back and forth shoul dbe a snap."
  *
