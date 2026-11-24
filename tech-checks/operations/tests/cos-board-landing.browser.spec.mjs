@@ -308,8 +308,8 @@ test('moving a shop unit to a site sends the placement, then the site', async ({
   const {state, host, server} = await phoneBoard(page);
   await inBoard(host, root => [...root.querySelectorAll('.mini')].find(mini => /in the shop/.test(mini.textContent)).click());
   await openUnit(host, 'Sniper 4-100');
-  // An Avigilon unit has no Star4Live IP to correct, so the board does not offer it.
-  await expect.poll(() => fixButtons(host)).toEqual(['Move to field', 'Change site', 'Rename']);
+  // Every unit can have its IP put right by hand, an Avigilon unit included: COS checks it at that address.
+  await expect.poll(() => fixButtons(host)).toEqual(['Move to field', 'Change site', 'Rename', 'Correct IP']);
   await pressFix(host, 'Move to field');
   expect(await panel(host)).toContain('Which site is it on?');
   await typeAndSave(host, 'fixInput', 'Fixture yard 2');
@@ -404,6 +404,14 @@ test('the Tech check tab opens the Tech Check screen COS already has', async ({p
   await inBoard(host, root => root.getElementById('tabTech').click());
   await expect.poll(() => app.locator('body').evaluate(() => location.hash)).toBe('#tech-check');
   await expect(app.locator('.cos-board-host')).toHaveCount(0);
+});
+
+test('the Tech check tab hands an IT sign-in to its own tech checks', async ({page}, info) => {
+  test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');
+  const {app, host} = await phoneBoard(page);
+  // An IT sign-in is the one whose manager read is refused. The board then sends the tab to the Tech Check app.
+  await inBoard(host, root => root.getElementById('tabTech').click());
+  await expect.poll(() => app.locator('body').evaluate(() => location.hash)).toBe('#tech-check');
 });
 
 test('a unit asked for from another screen that cannot be opened is explained above the board', async ({page}, info) => {
@@ -728,3 +736,33 @@ test('with no camera feed Fleet shows as before', async ({page}) => {
   await expect(app.locator('.cos-board-host')).toHaveCount(0);
   expect(state.errors).toEqual([]);
 });
+
+test('the other COS screens open from the board, by the names IT sees', async ({page}) => {
+  const {app} = await mountFleet(page, false, {cameraStatus: report});
+  const host = app.locator('.cos-board-host');
+  await expect(host).toBeVisible();
+  const screens = root => [...root.querySelectorAll('#screensLinks button')].map(button => button.textContent);
+  await expect.poll(() => inBoard(host, screens)).toEqual(['Camera Health', 'InHand Routers', 'Victron Power', '2027 Unit Tracker']);
+  expect(await inBoard(host, root => root.getElementById('screensRow').hidden)).toBe(false);
+  // The board says why COS's three counts differ, so nobody has to ask.
+  expect(await inBoard(host, root => root.querySelector('.foot').textContent)).toContain('counts stands and poles as well');
+  await inBoard(host, root => { [...root.querySelectorAll('#screensLinks button')].find(button => button.textContent === 'Camera Health').click(); });
+  await expect.poll(() => host.evaluate(element => element.ownerDocument.defaultView.location.hash)).toBe('#camera-health');
+});
+
+test('a corrected IP can be saved on any unit, and the save names the system that still decides Up or Down', async ({page}, info) => {
+  test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');
+  // A Sniper's reading is COS's own check of the address, so the IP is the one fix that matters most on it.
+  const rows = [...units, unit('SNIPER 200', {state: 'RED', online: 0, offline: 1, source: 'ip_check', publicIp: '203.0.113.9',
+    cameraList: [{name: 'SNIPER 200 / Cam 1', status: 'offline', atSite: true}]})];
+  const {host, server, state} = await phoneBoard(page, rows);
+  await openUnit(host, 'Sniper 200');
+  expect(await fixButtons(host)).toContain('Correct IP');
+  await pressFix(host, 'Correct IP');
+  await typeAndSave(host, 'fixInput', '203.0.113.77');
+  await expect.poll(() => server.sent.length).toBe(1);
+  expect(server.sent[0]).toMatchObject({unitKey: 'SNIPER 200', field: 'public_ip', value: '203.0.113.77'});
+  await expect.poll(() => toastText(host)).toBe("Saved. Sniper 200 still shows Down: Up or Down comes from COS's own check of this unit, so it clears at the next check that finds its cameras online.");
+  expect(state.errors).toEqual([]);
+});
+

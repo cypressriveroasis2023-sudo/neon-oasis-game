@@ -147,7 +147,16 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
       },
       onEdit: (unitKey: string, steps: BoardFixStep[]) => fix.current(unitKey, steps),
       // Tech checks are their own screen in COS.
-      onTechCheck: () => { window.location.hash = workspaceHash({workspace: 'Tech Check', jobId: '', detail: false}); },
+      // An IT sign-in keeps its tech checks in the Tech Check app around this frame, so the tab opens them there.
+      // James: "i clicked tech check on the IT board and it is showing return to my IT tech checks."
+      onTechCheck: (manager?: boolean) => {
+        // An IT sign-in keeps its checks in the Tech Check app around this frame. The board knows an IT sign-in by
+        // its refused manager read, and hands it straight there instead of the app screen that only pointed back.
+        if (manager === false) { openLegacy('it'); return; }
+        window.location.hash = workspaceHash({workspace: 'Tech Check', jobId: '', detail: false});
+      },
+      // The board is the screen James works from, so the other COS screens open from it, not only from More.
+      onScreen: (workspace: string) => { window.location.hash = workspaceHash({workspace, jobId: '', detail: false}); },
       // The owner's manager view. The signed-in Tech Check app around this frame reads the trucks, inspections and
       // handoffs; the board only draws them. A sign-in with no manager view never gets an answer, and never a tab.
       manager: managerHost() ? {
