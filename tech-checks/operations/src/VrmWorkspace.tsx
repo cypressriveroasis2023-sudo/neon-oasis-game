@@ -4,7 +4,7 @@ import { getVrmFleet } from './vrmFleetApi';
 import { readVrmFleetConfig, type VrmUnit } from '../../supabase/functions/cos-operations-pages/vrm';
 import './vrm.css';
 import VrmReadOnlyDashboard from './VrmReadOnlyDashboard';
-import { readDashboardPower } from './vrmReadOnlyModel';
+import { readDashboardPower, unitTileSummary } from './vrmReadOnlyModel';
 
 type FleetSync = ReturnType<typeof readVrmFleetConfig>['sync'];
 type SelectionHint = { initialUnit?:number; initialInstallationId?:number };
@@ -31,6 +31,12 @@ function workspaceVisible() {
   const frame = window.frameElement;
   return !frame || (frame.getClientRects().length > 0 && getComputedStyle(frame).visibility !== 'hidden');
 }
+function shortTime(value:string|null) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toLocaleTimeString(undefined, {hour:'numeric',minute:'2-digit'}) : null;
+}
+const toneLabel = {good:'Charged',fair:'Half or less',low:'Low battery',stale:'Stale reading',none:'No reading',unavailable:'Unavailable'};
 function readableTime(value:string|null) {
   if (!value) return null;
   const date = new Date(value);
@@ -121,6 +127,15 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
   const enabled = units.filter(item => item.embedUrl).length;
   const nameCounts = new Map<string,number>();
   for (const item of units) nameCounts.set(item.name, (nameCounts.get(item.name) ?? 0) + 1);
+  const tiles = new Map(units.map(item => [item.installationId, unitTileSummary(item, power.rows, now)]));
+  const tally = (tones:string[]) => [...tiles.values()].filter(tile => tones.includes(tile.tone)).length;
+  const summary = [
+    {key:'good', label:'Reporting', value:tally(['good','fair','low'])},
+    {key:'low', label:'Low battery', value:tally(['low'])},
+    {key:'stale', label:'Stale / no reading', value:tally(['stale','none'])},
+    {key:'unavailable', label:'Unavailable', value:tally(['unavailable'])},
+  ];
+  const syncTone = !sync ? 'stale' : error || sync.state === 'error' ? 'low' : sync.state === 'current' ? 'good' : 'stale';
   const lastSuccess = readableTime(sync?.lastSuccessAt ?? null);
   const nextSync = readableTime(sync?.nextSyncAt ?? null);
   return <section className={'panel module vrm-workspace' + (expanded ? ' vrm-expanded' : '')} aria-label='Victron VRM Helios fleet'>
@@ -128,11 +143,20 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
       <div className='purchase-actions'><a className='operations-reference-link' href='https://vrm.victronenergy.com/installation-overview' target='_blank' rel='noopener noreferrer'>Open VRM fleet ↗</a><button className='secondary' onClick={() => void refresh(canDiscover)} disabled={loading || privateInvalidated}>{loading ? 'Checking fleet…' : canDiscover ? 'Refresh fleet' : 'Reload saved fleet'}</button></div>
     </div>
     {error && <p role='alert'>{error}{privateInvalidated ? '' : loaded ? ' Showing the last successfully loaded fleet; it may be out of date.' : ' Reload the fleet to try again.'}</p>}
-    {sync && <div className='vrm-sync-status' role='status'><p>{error ? 'Saved sync status, not reverified: ' : ''}{syncDescription(sync)} {sync.error || ''}</p><p>{lastSuccess ? 'Last successful fleet sync: ' + lastSuccess + '. ' : 'No successful fleet sync recorded. '}{sync.scheduleActive ? 'Automatic discovery runs every 15 minutes.' : 'Automatic discovery is not active.'}{nextSync ? ' Next scheduled sync: ' + nextSync + '.' : ''}</p></div>}
+    {sync && <div className={'vrm-sync-status vrm-tone-'+syncTone} role='status'>
+      <p className='vrm-sync-line'><i aria-hidden='true'/><strong>{error ? 'Saved sync status, not reverified: ' : ''}{syncDescription(sync)}</strong>{sync.error ? <span> {sync.error}</span> : null}</p>
+      <p className='vrm-sync-times'>{lastSuccess ? <span title={lastSuccess}>Synced {shortTime(sync.lastSuccessAt ?? null)}</span> : <span>No successful sync yet</span>}{nextSync && <span title={nextSync}>Next {shortTime(sync.nextSyncAt ?? null)}</span>}<span>{sync.scheduleActive ? 'Auto every 15 min' : 'Auto sync off'}</span></p>
+    </div>}
+    {units.length > 0 && <ul className='vrm-fleet-summary' aria-label='Fleet power summary'>{summary.map(item => <li key={item.key} className={'vrm-tone-'+item.key}><strong>{item.value}</strong><span>{item.label}</span></li>)}</ul>}
     {!loaded && loading && <p role='status'>Loading your Victron installations…</p>}
     {loaded && units.length === 0 && <div className='vrm-awaiting' role='status'><h3>No installations in the saved fleet</h3><p>{canDiscover ? 'Refresh the fleet to check the connected Victron account.' : 'No saved installations are available. Ask an Owner to check the fleet sync.'} No installation IDs or dashboards are assumed.</p></div>}
-    {units.length > 0 && <nav className='tabs vrm-unit-grid' aria-label='Helios installations'>{units.map(item => <button key={item.installationId} className={selected === item.installationId ? 'selected' : 'secondary'} aria-pressed={selected === item.installationId} onClick={() => select(item.installationId)}>
-      <strong>{item.name}</strong>{(nameCounts.get(item.name) ?? 0) > 1 && <small>Installation {item.installationId}</small>}<small>{item.available === false ? 'Unavailable in latest sync' : item.embedUrl ? 'Dashboard enabled' : 'Read-only power'}</small>
+    {units.length > 0 && <nav className='tabs vrm-unit-grid' aria-label='Helios installations'>{units.map(item => <button key={item.installationId} className={(selected === item.installationId ? 'selected' : 'secondary') + ' vrm-tone-' + tiles.get(item.installationId)!.tone} aria-pressed={selected === item.installationId} onClick={() => select(item.installationId)}>
+      <strong>{item.name}</strong>{(nameCounts.get(item.name) ?? 0) > 1 && <small>Installation {item.installationId}</small>}<small className={item.available === false ? 'vrm-tile-status' : 'vrm-sr-only'}>{item.available === false ? 'Unavailable in latest sync' : item.embedUrl ? 'Dashboard enabled' : 'Read-only power'}</small>
+      {(() => { const tile = tiles.get(item.installationId)!; if (tile.tone === 'unavailable') return null; return <span className='vrm-tile-reading' aria-hidden='true' title={toneLabel[tile.tone]}>
+        <span className='vrm-tile-soc'><i/>{tile.soc ? Math.round(tile.soc.value) + '%' : '—'}</span>
+        <span className='vrm-tile-bar'><b style={{width: (tile.soc ? Math.max(0, Math.min(100, tile.soc.value)) : 0) + '%'}}/></span>
+        <span className='vrm-tile-solar'>☀ {tile.solar ? Math.round(tile.solar.value) + ' ' + tile.solar.unit : '—'}{tile.tone === 'stale' ? ' · stale' : ''}</span>
+      </span>; })()}
     </button>)}</nav>}
     {unit && <>
     <div className='vrm-dashboard-heading'><div className='vrm-selected-unit'><span className='vrm-eyebrow'>SELECTED INSTALLATION</span><h3>{unit.name}</h3><span className='vrm-access-status'>{unit.available === false ? 'Unavailable in the latest fleet sync' : unit.embedUrl ? 'Read-only dashboard' : 'Read-only power dashboard'}</span></div>
@@ -152,10 +176,9 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
     {unit.available === false && <p className='vrm-note'>This installation was not available in the latest fleet sync.{readableTime(unit.lastSeenAt ?? null) ? ' Last seen: ' + readableTime(unit.lastSeenAt ?? null) + '.' : ''} Its saved portal link may require restored access in Victron.</p>}
     {unit.embedUrl ? <iframe id='vrm-dashboard' key={unit.installationId + '-' + revision} className='vrm-dashboard' title={unit.name + ' Victron dashboard'} src={unit.embedUrl} referrerPolicy='no-referrer' sandbox='allow-scripts allow-same-origin allow-forms allow-popups' allow='fullscreen'/>
       : <VrmReadOnlyDashboard unit={unit} rows={power.rows} invalid={power.invalid} readFailed={Boolean(error)} now={now}/> }
-    <p className='vrm-reporting-context'>Battery, solar, and load readings are supplied by Victron. Additional measurements depend on the equipment reporting from this installation. Use its VRM portal for history, alarms, and detailed charts.</p>
     </div>
     <p className='vrm-note'>{enabled} embedded dashboards · {units.length-enabled} COS read-only power views. New installations appear automatically after discovery. Installation names and portal links come from the saved fleet; battery and solar readings come from Victron.</p>
     </>}
-    <details className='vrm-help'><summary>Dashboard help &amp; reporting</summary><p>Readings update at this unit’s configured VRM reporting interval. Check the dashboard’s last-update time before treating a reading as current. Reload view reloads the selected dashboard. {canDiscover ? 'Refresh fleet asks the server to discover installations now.' : 'Reload saved fleet reads the current saved installations. Fleet discovery and sharing settings remain with your Owner.'} This visible workspace checks the saved fleet every minute; automatic discovery runs separately every 15 minutes when configured.</p><p>For history, alarms, trends, and installation settings, use Open in VRM with your Victron account. COS displays existing approved Victron embeds or its own read-only power view. New installations do not need public sharing for the COS view. Neither view changes equipment settings.</p></details>
+    <details className='vrm-help'><summary>Dashboard help &amp; reporting</summary><p>Battery, solar, and load readings are supplied by Victron. Additional measurements depend on the equipment reporting from this installation. Use its VRM portal for history, alarms, and detailed charts. Tile colors: green 50% and up, amber 20–49%, red under 20%, grey when the reading is older than 30 minutes or missing.</p><p>Readings update at this unit’s configured VRM reporting interval. Check the dashboard’s last-update time before treating a reading as current. Reload view reloads the selected dashboard. {canDiscover ? 'Refresh fleet asks the server to discover installations now.' : 'Reload saved fleet reads the current saved installations. Fleet discovery and sharing settings remain with your Owner.'} This visible workspace checks the saved fleet every minute; automatic discovery runs separately every 15 minutes when configured.</p><p>For history, alarms, trends, and installation settings, use Open in VRM with your Victron account. COS displays existing approved Victron embeds or its own read-only power view. New installations do not need public sharing for the COS view. Neither view changes equipment settings.</p></details>
   </section>;
 }
