@@ -12,7 +12,7 @@ const cards: { metric: PowerMetric; label: string; kind: string }[] = [
   {metric:'battery_current',label:'Battery current',kind:'detail'},
   {metric:'battery_power',label:'Battery power',kind:'detail'},
 ];
-const time = (value:string) => new Date(value).toLocaleString(undefined,{timeZoneName:'short',hour12:true});
+const time = (value:string) => new Date(value).toLocaleString(undefined,{month:'numeric',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'});
 export default function VrmReadOnlyDashboard({unit,rows,invalid=false,readFailed=false,now,embedded=false}:{unit:VrmUnit;rows:SafeVrmPower[];invalid?:boolean;readFailed?:boolean;now:number;embedded?:boolean}) {
   const row = dashboardPowerFor(unit, rows);
   const selected = cards.map(card => ({...card,readings:card.metric === 'battery_soc' ? chargeReadings(row,now) : [selectReading(row,card.metric,now)].filter(reading => reading !== undefined)}));
@@ -25,7 +25,7 @@ export default function VrmReadOnlyDashboard({unit,rows,invalid=false,readFailed
     <div className='vrm-native-heading'><div><span className='vrm-eyebrow'>COS · READ-ONLY ENERGY</span><h4>Power overview</h4></div><span className={'vrm-native-status'+(old||issue?' vrm-native-warning':'')} role='status'>{status}</span></div>
     <p className='vrm-native-caption'>Saved Victron measurements. This view updates with fleet sync; it is not a live Remote Console.</p>
     <VrmEnergyFlow row={row} now={now} paused={issue||unit.available===false}/>
-    <div className='vrm-native-grid'>{selected.map(({metric,label,kind,readings}) => <article key={metric} className={'vrm-native-card vrm-native-'+kind} aria-label={label}>
+    <div className='vrm-native-grid'>{selected.map(({metric,label,kind,readings}) => <article key={metric} className={'vrm-native-card vrm-native-'+kind+(metric==='battery_soc'&&readings.length>1?' vrm-native-multi':'')} aria-label={label}>
       <h5>{label}</h5>{metric === 'battery_soc' && readings.length > 1 && <p className='vrm-native-multiple'>Separate source readings · no combined charge</p>}
       {readings.length ? readings.map((reading,index) => <div className='vrm-native-reading' key={reading.source+':'+reading.instance+':'+index}>
         <strong className='vrm-native-value'>{reading.value.toLocaleString(undefined,{maximumFractionDigits:2})}<small> {reading.unit}</small></strong>
