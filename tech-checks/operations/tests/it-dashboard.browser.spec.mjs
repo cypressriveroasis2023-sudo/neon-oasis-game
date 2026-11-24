@@ -157,7 +157,9 @@ test('all six cards retain their workspaces, browser Back and Dashboard return',
     await traverseIframeHistory(frame,'back','#it-dashboard');await ready(frame);
   }
   await card(frame,'mhelp').getByRole('button',{name:/^Open /}).click();await navigate(frame,'IT Dashboard');await ready(frame);
-  await navigate(frame,'Tech Checks');await frame.getByRole('button',{name:'Return to my IT Tech Checks',exact:true}).click();
+  // The tab opens the IT tech checks by itself; no page in between asks again.
+  await navigate(frame,'Tech Checks');await expect(frame.getByRole('button',{name:'Return to my IT Tech Checks'})).toHaveCount(0);
+  await expect(frame.getByRole('button',{name:'Open my IT Tech Checks',exact:true})).toBeVisible();
   await expect(page.locator('dialog,iframe')).toHaveCount(0);await expect(page.locator('[data-cos-it-dashboard]')).toBeFocused();assertReads(state);
 });
 

@@ -15,6 +15,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { api, openLegacy } from './api';
 import {useOperationsSession} from './useOperationsSession';
 import TvSignedOutBoard from './TvSignedOutBoard';
+import ItTechChecksDoor from './ItTechChecksDoor';
 import {setTvSessionHold} from './tvSessionHold';
 import TodayDashboard from './TodayDashboard';
 import TechChecksWorkspace from './TechChecksWorkspace';
@@ -293,7 +294,7 @@ function OwnerApp() {
         :active==='Handoffs'?<HandoffsWorkspace show={show}/>
         :active==='Equipment'?<EquipmentWorkspace show={show} initialUnitName={registerUnitName}/>
         :active==='Team'?<TeamWorkspace show={show} openWorkspace={navigate}/>
-        :active==='Tech Check'?(fleetOnly?<section className='panel module'><h2>IT Tech Checks</h2><button onClick={()=>openLegacy('it')}>Return to my IT Tech Checks</button></section>:<TechChecksWorkspace/>)
+        :active==='Tech Check'?(fleetOnly?<ItTechChecksDoor open={()=>openLegacy('it')}/>:<TechChecksWorkspace/>)
         :active==='Camera Health'?<CameraHealthWorkspace manualRefreshEnabled={can(session,'equipment.refresh')} powerReadEnabled={fleetVrmReadAllowed(session||{})} initialUnitId={route.unitId} backToMap={returnToMap} createTicket={undefined} canEditPlacement={session?.features?.fleetPlacementEdit===true} canEditConnection={session?.features?.fleetConnectionEdit===true} canReviewIdentity={session?.features?.ownerIdentityReview===true}/>
         :active==='InHand Routers'?<RouterWorkspace openMap={guardCurrent(unitId=>setRouteLocation({workspace:'Fleet Dashboard',jobId:'',detail:false,unitId}))}/>
         :active==='Victron VRM'?<VrmWorkspace canDiscover={!fleetOnly} initialUnit={heliosUnit} initialInstallationId={route.installationId} onSelectInstallation={guardCurrent(installationId=>setRouteLocation({workspace:'Victron VRM',jobId:'',detail:false,installationId},true))}/>
