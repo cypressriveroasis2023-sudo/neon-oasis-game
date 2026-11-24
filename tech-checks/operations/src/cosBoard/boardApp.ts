@@ -148,7 +148,7 @@ function view(u){
   const unk = Math.max(0,u.n-u.on-u.off), fs = u.vd || "unknown";
   if(u.s==="a") v.last = u.on ? "online" : u.off ? "offline" : "";
   v.fs = fs; v.unk = unk; v.excl = !!u.x;
-  v.why = fs!=="unknown" ? "" : u.s==="a" ? "No fresh Avigilon check for this unit." : u.s==="r" ? "The Recon cloud has no fresh reading for this unit." : "Star4Live has no fresh reading for every camera on this unit.";
+  v.why = fs!=="unknown" ? "" : u.s==="a" ? (u.ip ? "No fresh check of this unit's address." : "COS has no IP address saved for this unit, so there is nothing to check.") : u.s==="r" ? "The Recon cloud has no fresh reading for this unit." : "Star4Live has no fresh reading for every camera on this unit.";
   v.status = (v.excl && !S.mh) ? "excl" : place==="shop" ? (u.so ? "shopOnline" : "shop") : fs;
   v.side = (u.s==="a" || u.on+u.off===0) ? "" : (u.on+"/"+(u.on+u.off));
   return v;
@@ -307,7 +307,11 @@ function steps0(v){
   const u=v.u, routerOn=u.rs==="on", routerOff=u.rs==="of";
   if(v.status==="down") return [(routerOn ? "The router answers, so the unit likely has signal. Look at camera or recorder power and cabling." : routerOff ? "The router is not answering either. Check site power, then the SIM and signal." : u.rr ? "Start from the diagnosis above." : "COS has no router reading for this unit. Start with site power."),"Check mHelp for an open job on this unit before sending anyone.","When it is fixed or moved, update it here with Fix it."];
   if(v.status==="issues") return ["Some cameras are off, listed above. The unit itself is reachable.","Check power and cabling on just those cameras.","When it is fixed, tap Refresh on the board to confirm."];
-  if(v.status==="unknown") return ["No fresh reading. Do not treat this as down.","Tap Refresh on the board. If it stays Unknown, check the unit directly."];
+  if(v.status==="unknown") return v.u.s==="a" && !v.u.ip
+    ? ["COS has no IP address for this unit, so it cannot be checked at all. That is why it shows Unknown and not Down.",
+       "Add the IP under Fix it. COS checks the address within the hour and the unit stops being Unknown.",
+       "Only a tech or the 2027 tracker has that address. mHelp does not hold it and no camera system reports it."]
+    : ["No fresh reading. Do not treat this as down.","Tap Refresh on the board. If it stays Unknown, check the unit directly."];
   if(v.status==="shopOnline") return ["This unit is online but sits in the shop.","If it is really on a site, use Move to field and set the site.","If it is on the bench, nothing to do."];
   if(v.status==="shop") return ["In the shop. Not counted as down.","When it goes out, use Move to field and set the site."];
   return ["Nothing to do. All cameras are reporting."];
@@ -318,7 +322,7 @@ const WORD = { ok:"OK", warn:"Check", bad:"Problem", unk:"Unknown" }, RW = { on:
 function diagnose(v){
   const u=v.u, fs=v.fs, r=routerRead(u), ck=[];
   let cam;
-  if(u.s==="a") cam = u.t && v.last ? "Avigilon check said "+v.last+" · "+when(u.t) : "No Avigilon check on record";
+  if(u.s==="a") cam = u.t && v.last ? "COS checked this unit's address · "+v.last+" · "+when(u.t) : (u.ip ? "No check on record" : "No IP address saved, so COS has never checked it");
   else cam = (u.s==="r" ? "Recon cloud" : "Star4Live")+": "+u.on+" of "+u.n+" online"+(u.off ? ", "+u.off+" offline" : "")+(v.unk ? ", "+v.unk+" no reading" : "");
   ck.push({k:"Cameras", s: fs==="up"?"ok":fs==="issues"?"warn":fs==="down"?"bad":"unk", t:cam});
   if(u.rs) ck.push({k:"Router, COS check", s: u.rs==="on"?"ok":u.rs==="of"?"bad":"unk", t:(RW[u.rs]||u.rs)+(u.rt ? " · "+when(u.rt) : "")});
@@ -395,7 +399,7 @@ function drawPanel(){
   const v = S.vmap && S.vmap[S.openId]; if(!v){ closeUnit(); return; }
   if(v.mhOnly){ drawMhPanel(v); return; }
   const u=v.u, P=$("panel");
-  const src = u.s==="v" ? "Star4Live" : u.s==="a" ? "Avigilon check" : "Recon cloud";
+  const src = u.s==="v" ? "Star4Live" : u.s==="a" ? "COS's own check" : "Recon cloud";
   let reading;
   if(u.s==="a") reading = u.t && v.last ? (v.last==="online"?"Online":"Offline")+" · checked "+when(u.t) : "No check on record";
   else reading = u.on+" of "+u.n+" online"+(u.off?" · "+u.off+" offline":"")+(v.unk?" · "+v.unk+" no reading":"")+(u.s==="r"&&u.t?" · last heard "+when(u.t):"");

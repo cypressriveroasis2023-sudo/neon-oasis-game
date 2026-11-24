@@ -750,6 +750,24 @@ test('the other COS screens open from the board, by the names IT sees', async ({
   await expect.poll(() => host.evaluate(element => element.ownerDocument.defaultView.location.hash)).toBe('#camera-health');
 });
 
+test('a Sniper with no IP saved says why it is Unknown and sends you to the fix', async ({page}, info) => {
+  test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');
+  // COS pings a saved address to tell whether a Sniper is up. With no address there is nothing to ping.
+  const rows = [...units, unit('SNIPER 400', {state: 'UNKNOWN', online: 0, unknown: 1, source: 'ip_check', publicIp: null,
+    observedAt: '2026-10-01T00:00:00Z', cameraList: [{name: 'SNIPER 400 / Cam 1', status: 'unknown', atSite: true}]})];
+  const {host, state} = await phoneBoard(page, rows);
+  // The list opens on Down; this unit is one of the Unknown.
+  await inBoard(host, root => [...root.querySelectorAll('.tile')].find(tile => tile.querySelector('.lab').textContent === 'Unknown').click());
+  await openUnit(host, 'Sniper 400');
+  const card = await panel(host);
+  expect(card).toContain('COS has no IP address for this unit, so it cannot be checked at all');
+  expect(card).toContain('Add the IP under Fix it');
+  // Not the answer for a unit COS cannot reach at all.
+  expect(card).not.toContain('Tap Refresh on the board. If it stays Unknown');
+  expect(await fixButtons(host)).toContain('Correct IP');
+  expect(state.errors).toEqual([]);
+});
+
 test('a corrected IP can be saved on any unit, and the save names the system that still decides Up or Down', async ({page}, info) => {
   test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');
   // A Sniper's reading is COS's own check of the address, so the IP is the one fix that matters most on it.
