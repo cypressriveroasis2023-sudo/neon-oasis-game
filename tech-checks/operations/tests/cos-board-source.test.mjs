@@ -10,13 +10,13 @@ test('the board carries no fleet data and reads nothing itself', () => {
   // This repository is public. Unit names, customers, addresses and IPs reach the board from the signed-in feed only.
   const files = readdirSync(new URL('../src/cosBoard/', import.meta.url), {recursive: true}).map(name => String(name).replace(/\\/g, '/')).sort();
   assert.deepEqual(files, [
-    'boardApp.ts', 'boardData.ts', 'boardEdit.ts', 'boardFonts.ts', 'boardMap.json', 'boardStyle.ts',
+    'boardApp.ts', 'boardData.ts', 'boardEdit.ts', 'boardFonts.ts', 'boardMap.json', 'boardPower.ts', 'boardStyle.ts',
     'fonts', 'fonts/OFL.txt', 'fonts/inter-latin-wght-normal.woff2', 'fonts/inter-tight-latin-wght-normal.woff2',
   ]);
   const map = JSON.parse(read('../src/cosBoard/boardMap.json'));
   // A plain base map of Texas and its projection numbers. No pins, units or sites.
   assert.deepEqual(Object.keys(map).sort(), ['N', 'W', 'counties', 'h', 'hl', 'hwy', 'kx', 'lakes', 'land', 'places', 'rivers', 'roads', 'states', 'urban', 'w']);
-  for (const source of [app, read('../src/cosBoard/boardData.ts'), read('../src/cosBoard/boardEdit.ts'), read('../src/cosBoard/boardStyle.ts'), read('../src/cosBoard/boardFonts.ts')]) {
+  for (const source of [app, read('../src/cosBoard/boardData.ts'), read('../src/cosBoard/boardEdit.ts'), read('../src/cosBoard/boardStyle.ts'), read('../src/cosBoard/boardFonts.ts'), read('../src/cosBoard/boardPower.ts')]) {
     assert.doesNotMatch(source, /\bfetch\(|XMLHttpRequest|WebSocket|sendBeacon|EventSource|googleapis|gstatic|supabase\.co|execute_sql/i);
   }
 });

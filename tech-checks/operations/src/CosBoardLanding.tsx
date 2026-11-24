@@ -8,6 +8,8 @@ import type {MhelpAddressMapResult} from './mhelpAddressMapPins';
 import {workspaceHash} from './workspaceNavigation';
 import {setBoardSessionHold} from './tvSessionHold';
 import {boardData} from './cosBoard/boardData';
+import {boardPowerByUnit, type BoardPower} from './cosBoard/boardPower';
+import {getVrmFleet} from './vrmFleetApi';
 import {boardEditState, handFixRequest, type BoardEditFlags, type BoardEditState, type BoardFixStep} from './cosBoard/boardEdit';
 import {mountCosBoard} from './cosBoard/boardApp';
 import {loadBoardFonts} from './cosBoard/boardFonts';
@@ -74,12 +76,23 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
   none.current = onNone;
   const [flags, setFlags] = useState<BoardEditFlags | null>(null), [locked, setLocked] = useState(false);
   const writing = useRef(false);
+  // Victron power for the Helios cards: the saved fleet reading the Victron Power page shows. Never triggers a
+  // Victron sync; a failed read keeps the last reading, and readings older than 30 minutes draw grey.
+  const [vrm, setVrm] = useState<{data: unknown; at: number} | null>(null);
+  useEffect(() => {
+    let live = true;
+    const read = () => { getVrmFleet(api).then(response => { if (live) setVrm({data: response.data, at: Date.now()}); }).catch(() => {}); };
+    read();
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') read(); }, REREAD_MS);
+    return () => { live = false; window.clearInterval(timer); };
+  }, []);
+  const power = useMemo<Map<string, BoardPower> | null>(() => vrm ? boardPowerByUnit(vrm.data, Math.max(vrm.at, now)) : null, [vrm, now]);
   const data = useMemo(() => {
     if (!feed) return null;
     const clock = cameraFeedClock(feed, now);
     const census = cameraFeedCensus(feed, recorderLinksFromHealth(recorderRows), clock, fieldMap) || [];
-    return boardData({feed, census, now: clock, routers, upload, addresses});
-  }, [feed, recorderRows, now, fieldMap, routers, upload, addresses]);
+    return boardData({feed, census, now: clock, routers, upload, addresses, power});
+  }, [feed, recorderRows, now, fieldMap, routers, upload, addresses, power]);
   // A full reading: the units go to Fleet, and it says whether this person may make hand fixes.
   const take = useRef((_reading: Reading) => {});
   take.current = reading => {

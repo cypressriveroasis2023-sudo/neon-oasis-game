@@ -11,6 +11,8 @@ import type {MhelpAddressMapResult} from '../mhelpAddressMapPins';
  * on the board is always a slice of the app's own headline:
  *   Up = units online, Camera issues + Down = units offline, Unknown = unknown.
  */
+import {boardPowerFor, type BoardPower} from './boardPower';
+
 export type BoardVerdict = 'up' | 'issues' | 'down' | 'unknown';
 
 export type BoardUnit = {
@@ -50,6 +52,8 @@ export type BoardUnit = {
   hp?: [number, number];
   ad?: string;
   rs: string; rt: number; rr: string; ro: number; rm: string; ri: ''; rp: '';
+  /** Helios only: the Victron battery and solar reading for this unit, matched by exact Helios number. */
+  pw?: BoardPower;
 };
 
 /** One hand edit that is in force. `at` is in milliseconds, 0 when the record has no time. */
@@ -209,9 +213,11 @@ export type BoardInput = {
   routers?: readonly RouterRow[] | null;
   upload?: unknown;
   addresses?: MhelpAddressMapResult | null;
+  /** Victron power by exact Helios number (boardPowerByUnit). Absent until the Victron fleet has been read. */
+  power?: Map<string, BoardPower> | null;
 };
 
-export function boardData({feed, census, now, routers, upload, addresses}: BoardInput): BoardData {
+export function boardData({feed, census, now, routers, upload, addresses, power}: BoardInput): BoardData {
   const routerByUnit = new Map<string, RouterRow>();
   for (const router of routers || []) {
     const key = exactUnitName(router.unitKey), held = routerByUnit.get(key);
@@ -261,6 +267,7 @@ export function boardData({feed, census, now, routers, upload, addresses}: Board
       ...(typed ? {ad: typed} : {}),
       ...routerFields(routerByUnit.get(exactUnitName(unit.unit)), now),
       ri: '', rp: '',
+      ...((pw => pw ? {pw} : {})(boardPowerFor(power, unit.unit) ?? boardPowerFor(power, line(unit.displayName)))),
     };
   });
   changes.sort((left, right) => right.at - left.at || left.k.localeCompare(right.k, undefined, {numeric: true}) || left.f.localeCompare(right.f));
