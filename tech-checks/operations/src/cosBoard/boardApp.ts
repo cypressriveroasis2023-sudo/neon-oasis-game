@@ -990,6 +990,12 @@ function watchWidth(){
 /* The same reading and the same count as the board, drawn to be read from across the shop. Nothing on it needs
    a tap: it lists the field units that are down or have camera issues, and walks the map one area at a time. */
 const TV = { on:false, step:0, every: Math.max(5, Math.min(300, (hooks && +hooks.tvEvery) || 10)), turn:null, tick:null, areas:[], rows:[] };
+/* The TV board is a wall screen: a reload must not drop it back to the board.
+   Only Exit TV or Escape turns it off, so the choice is remembered per browser
+   and read back at start. Storage can be unavailable, so never let it throw. */
+const TV_KEY = "cos-tv-board";
+function tvRemember(on){ try{ on ? localStorage.setItem(TV_KEY,"1") : localStorage.removeItem(TV_KEY); }catch(_){} }
+function tvWanted(){ try{ return localStorage.getItem(TV_KEY)==="1"; }catch(_){ return false; } }
 const TVAREAS = [["Houston",29.80,-95.42],["Austin",30.27,-97.74],["San Antonio",29.45,-98.50],["Dallas–Fort Worth",32.80,-97.00]];
 const tvClockFmt = new Intl.DateTimeFormat("en-US",{hour:"numeric",minute:"2-digit",timeZone:TZ});
 const tvDayFmt = new Intl.DateTimeFormat("en-US",{weekday:"long",month:"short",day:"numeric",timeZone:TZ});
@@ -1066,7 +1072,7 @@ function drawTv(vs, c){
 /* On and off. The one map moves onto the TV screen and back to where it was. */
 function tvEnter(){
   if(TV.on) return;
-  closeUnit(); TV.on=true; TV.step=0;
+  closeUnit(); TV.on=true; TV.step=0; tvRemember(true);
   $("cosb").classList.add("tv"); $("viewTv").hidden=false;
   $("tvMap").append($("mapWrap"));
   M.near=40;                                        // bigger pins need more room before they share a circle
@@ -1077,7 +1083,7 @@ function tvEnter(){
 }
 function tvLeave(){
   if(!TV.on) return;
-  TV.on=false; clearInterval(TV.tick); clearInterval(TV.turn);
+  TV.on=false; tvRemember(false); clearInterval(TV.tick); clearInterval(TV.turn);
   $("cosb").classList.remove("tv"); $("viewTv").hidden=true;
   $("mapBlock").insertBefore($("mapWrap"), $("mapNote"));
   M.near=0; M.pk=0; M.fitted=false; M.sel=null; M.w=0;
@@ -1095,7 +1101,7 @@ function tvStart(){
     else if(ev.key==="ArrowRight" || ev.key==="ArrowLeft"){ TV.step=Math.max(0,TV.step+(ev.key==="ArrowRight"?1:-1)); tvTurn(TV.every); if(S.meta){ tvList(); tvTour(); } } });
   onWin("resize",()=>{ if(TV.on && S.meta) render(); });
   cleanups.push(()=>{ clearInterval(TV.tick); clearInterval(TV.turn); });
-  if(hooks && hooks.startView==="tv") tvEnter();
+  if((hooks && hooks.startView==="tv") || tvWanted()) tvEnter();
 }
 /* How long each page stays up. */
 function tvTurn(seconds){
