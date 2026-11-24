@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "resolution_date_utc": "2026-10-14",
+  "scope": "Read-only official GitHub ref and Docker Hub tag metadata; no image pulls, installs or execution.",
+  "actions": [
+    {
+      "repository": "actions/checkout",
+      "tag": "v4",
+      "commit": "11d5960a326750d5838078e36cf38b85af677262",
+      "source": "https://api.github.com/repos/actions/checkout/git/ref/tags/v4"
+    },
+    {
+      "repository": "actions/setup-node",
+      "tag": "v4",
+      "commit": "49933ea5288caeca8642d1e84afbd3f7d6820020",
+      "source": "https://api.github.com/repos/actions/setup-node/git/ref/tags/v4"
+    },
+    {
+      "repository": "actions/setup-python",
+      "tag": "v5",
+      "commit": "a26af69be951a213d495a4c3e4e4022e16d87065",
+      "source": "https://api.github.com/repos/actions/setup-python/git/ref/tags/v5"
+    },
+    {
+      "repository": "actions/upload-artifact",
+      "tag": "v4",
+      "commit": "ea165f8d65b6e75b540449e92b4886f43607fa02",
+      "source": "https://api.github.com/repos/actions/upload-artifact/git/ref/tags/v4"
+    }
+  ],
+  "containers": [
+    {
+      "repository": "library/postgres",
+      "tag": "17.6",
+      "index_digest": "sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929",
+      "linux_amd64_digest": "sha256:b86568d3e0fe1dfaeff52714f9da36f206a30e4c49131b82bf96982d78627409",
+      "source": "https://hub.docker.com/v2/repositories/library/postgres/tags/17.6"
+    },
+    {
+      "repository": "postgrest/postgrest",
+      "tag": "v14.5",
+      "index_digest": "sha256:b574528fe109c8343c1247155734d03df8c34b462f342dca0ccc20244fc36ef9",
+      "linux_amd64_digest": "sha256:bb289d00570b569525e1e22fb77c49cd17c17ca3f41da9ee2b4351a35027551b",
+      "source": "https://hub.docker.com/v2/repositories/postgrest/postgrest/tags/v14.5"
+    }
+  ],
+  "limits": "Pins establish immutable identities, not runtime success, binary audit or approval to execute. Ubuntu runner image and Node/Python package provisioning remain hosted environment dependencies."
+}
