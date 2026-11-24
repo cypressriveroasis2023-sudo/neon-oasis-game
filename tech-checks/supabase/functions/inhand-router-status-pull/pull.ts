@@ -175,3 +175,22 @@ export async function pullInhand(deps: PullDeps): Promise<{ readings: Reading[];
     return { ...(await listDevices(deps, token)), observedAt: deps.now().toISOString() };
   }
 }
+
+/**
+ * The address InHand's sign-in page sent the browser to, pasted back by the
+ * owner. Only http://localhost or 127.0.0.1 on port 1024-65535 at /callback is
+ * accepted (InHand's own CLI pattern). Returns the exact redirect address to
+ * use for the code exchange, plus the code and state.
+ */
+export function parseLandedAddress(raw: string): { redirectUri: string; code: string; state: string } | null {
+  let url: URL;
+  try { url = new URL(String(raw || '').trim()); } catch { return null; }
+  if (url.protocol !== 'http:' || !['localhost', '127.0.0.1'].includes(url.hostname) || url.pathname !== '/callback') return null;
+  const port = Number(url.port);
+  if (!Number.isInteger(port) || port < 1024 || port > 65535) return null;
+  const code = url.searchParams.get('code') ?? '';
+  const state = url.searchParams.get('state') ?? '';
+  if (!code || !/^[A-Za-z0-9_-]{20,100}$/.test(state)) return null;
+  return { redirectUri: `http://${url.hostname}:${port}/callback`, code, state };
+}
+

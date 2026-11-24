@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { exchangeCode, PullError, pullInhand, type PullDeps, type Token } from "./pull.ts";
+import { exchangeCode, parseLandedAddress, PullError, pullInhand, type PullDeps, type Token } from "./pull.ts";
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -47,6 +47,31 @@ Deno.serve(async (req) => {
       const detail = error instanceof PullError ? error.code + (error.detail ? " (" + error.detail + ")" : "") : "unexpected";
       await db.rpc("cos_inhand_pull_failed", { p_error_code: "connect " + detail });
       return text("InHand did not accept the connection (" + detail + "). Nothing was changed.", 502);
+    }
+  }
+
+  // Connect finish from the COS "Connect InHand" page: the owner pastes the localhost
+  // address InHand's sign-in page sent them to. Same one-time state rule as above.
+  const pageOrigin = "https://cypressriveroasis2023-sudo.github.io";
+  const cors = { "Access-Control-Allow-Origin": pageOrigin, "Access-Control-Allow-Headers": "content-type", "Access-Control-Allow-Methods": "POST, OPTIONS", "Vary": "Origin" };
+  if (url.pathname.endsWith("/connect")) {
+    if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+    const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json", "Cache-Control": "no-store" } });
+    if (req.method !== "POST") return reply({ ok: false, message: "POST required" }, 405);
+    if (req.headers.get("origin") !== pageOrigin) return reply({ ok: false, message: "Not allowed from this page." }, 403);
+    let address = "";
+    try { const body = await req.json(); address = typeof body?.address === "string" ? body.address.slice(0, 4096) : ""; } catch { /* empty */ }
+    const landed = parseLandedAddress(address);
+    if (!landed) return reply({ ok: false, message: "That doesn't look like the address InHand sent you to. It should start with http://localhost and contain code= and state=." }, 400);
+    const { data: taken } = await db.rpc("cos_inhand_connect_take", { p_state: landed.state });
+    if (taken !== true) return reply({ ok: false, message: "This connect link has expired or was already used. Ask for a new one." }, 400);
+    try {
+      await exchangeCode(deps, landed.code, landed.redirectUri);
+      return reply({ ok: true, message: "InHand is connected to COS. You can close this page." });
+    } catch (error) {
+      const detail = error instanceof PullError ? error.code + (error.detail ? " (" + error.detail + ")" : "") : "unexpected";
+      await db.rpc("cos_inhand_pull_failed", { p_error_code: "connect " + detail });
+      return reply({ ok: false, message: "InHand did not accept the connection: " + detail + ". Nothing was changed." }, 502);
     }
   }
 

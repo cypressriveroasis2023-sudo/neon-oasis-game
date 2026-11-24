@@ -156,3 +156,15 @@ test('connect: code is exchanged with the same redirect address and the session 
   assert.equal(h.saved.length, 1);
   await assert.rejects(exchangeCode(h.deps, 'bad code<script>', 'x'), (e) => e.code === 'sign_in_rejected');
 });
+
+test('landed address: only localhost /callback with code and a COS state', async () => {
+  const { parseLandedAddress } = await import('./pull.ts');
+  const st = 'cos_' + 'a'.repeat(36);
+  assert.deepEqual(parseLandedAddress(`http://localhost:8765/callback?code=XYZ&state=${st}`), { redirectUri: 'http://localhost:8765/callback', code: 'XYZ', state: st });
+  assert.deepEqual(parseLandedAddress(` http://127.0.0.1:9000/callback?state=${st}&code=Q `)?.redirectUri, 'http://127.0.0.1:9000/callback');
+  assert.equal(parseLandedAddress(`https://evil.example/callback?code=XYZ&state=${st}`), null);
+  assert.equal(parseLandedAddress(`http://localhost:8765/other?code=XYZ&state=${st}`), null);
+  assert.equal(parseLandedAddress(`http://localhost/callback?code=XYZ&state=${st}`), null);
+  assert.equal(parseLandedAddress(`http://localhost:8765/callback?state=${st}`), null);
+  assert.equal(parseLandedAddress('not a url'), null);
+});
