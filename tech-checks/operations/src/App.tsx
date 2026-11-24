@@ -40,6 +40,7 @@ import EquipmentWorkspace from './EquipmentWorkspace';
 import TeamWorkspace from './TeamWorkspace';
 import LegacyInstallEvidence from './LegacyInstallEvidence';
 import './continuation.css';
+import './compactHeader.css';
 import { workspaces as nav, itWorkspaces, workspaceGroups, workspaceLabel, workspaceGroup, canonicalWorkspace, isRetiredBusinessWorkspace, readWorkspaceRoute, workspaceHash, type WorkspaceRoute } from './workspaceNavigation';
 
 type Row = Record<string, any>;
