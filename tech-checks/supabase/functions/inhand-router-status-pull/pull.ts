@@ -56,9 +56,15 @@ async function send(deps: PullDeps, path: string, init: RequestInit, failure: Pu
 export async function oauthClient(deps: PullDeps): Promise<{ id: string; secret: string }> {
   const response = await send(deps, '/api/platform/config', { method: 'GET', headers: { Accept: 'application/json' } }, 'config_unavailable');
   if (response.status !== 200) { await response.body?.cancel(); throw new PullError('config_unavailable'); }
-  const body = await readJson(response) as any;
+  const raw = await response.text();
+  if (raw.length > MAX_BODY_BYTES) throw new PullError('config_unavailable');
+  let body: any = null;
+  try { body = JSON.parse(raw); } catch { /* handled below */ }
   const auth = body?.result?.auth;
-  const id = auth?.clientId == null ? '' : String(auth.clientId);
+  // InHand's clientId is a long number (e.g. 20 digits). JSON.parse rounds numbers past
+  // 2^53, which InHand then rejects as "invalid_client". Read the digits from the raw text.
+  const exact = raw.match(/"clientId"\s*:\s*"?([A-Za-z0-9_-]{4,128})"?/);
+  const id = exact ? exact[1] : (auth?.clientId == null ? '' : String(auth.clientId));
   const secret = typeof auth?.clientSecret === 'string' ? auth.clientSecret : '';
   if (!/^[A-Za-z0-9_-]{4,128}$/.test(id) || secret.length > 256) throw new PullError('config_unavailable');
   return { id, secret };
