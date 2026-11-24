@@ -20,7 +20,9 @@ export type PullErrorCode =
 
 export class PullError extends Error {
   readonly code: PullErrorCode;
-  constructor(code: PullErrorCode) { super(code); this.name = 'PullError'; this.code = code; }
+  /** Short, secret-free reason from InHand (HTTP status and OAuth error code only). */
+  readonly detail: string;
+  constructor(code: PullErrorCode, detail = '') { super(code); this.name = 'PullError'; this.code = code; this.detail = detail; }
 }
 
 export type Token = { access_token: string; expires_in?: number; refresh_token?: string | null };
@@ -62,7 +64,15 @@ export async function oauthClient(deps: PullDeps): Promise<{ id: string; secret:
   return { id, secret };
 }
 
-async function tokenRequest(deps: PullDeps, form: Record<string, string>): Promise<Token | 'rejected'> {
+/** InHand's own error code only, e.g. "400:invalid_grant" — never echoes anything we sent. */
+export function rejectionReason(status: number, body: any): string {
+  const raw = [body?.error, body?.error_code, body?.code].find(v => typeof v === 'string' || typeof v === 'number');
+  const code = raw == null ? '' : String(raw).toLowerCase().replace(/[^a-z0-9_.-]/g, '').slice(0, 40);
+  return status + (code ? ':' + code : '');
+}
+
+type Rejected = { rejected: string };
+async function tokenRequest(deps: PullDeps, form: Record<string, string>): Promise<Token | Rejected> {
   const response = await send(deps, '/oauth2/access_token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
@@ -71,31 +81,44 @@ async function tokenRequest(deps: PullDeps, form: Record<string, string>): Promi
   const body = await readJson(response) as any;
   if (response.status >= 500) throw new PullError('sign_in_unavailable');
   const token = typeof body?.access_token === 'string' ? body.access_token : '';
-  if (response.status !== 200 || body?.error || !/^[A-Za-z0-9._~+/=-]{16,8192}$/.test(token)) return 'rejected';
+  if (response.status !== 200 || body?.error || !/^[A-Za-z0-9._~+/=-]{16,8192}$/.test(token)) return { rejected: rejectionReason(response.status, body) };
   const refresh = typeof body.refresh_token === 'string' && /^[A-Za-z0-9._~+/=-]{8,8192}$/.test(body.refresh_token) ? body.refresh_token : null;
   const expires = Number(body.expires_in);
   return { access_token: token, refresh_token: refresh, expires_in: Number.isFinite(expires) && expires > 0 ? expires : 3600 };
 }
 
-/** Fresh sign-in: refresh token first (stored, then bootstrap secret), then username + password. */
+/**
+ * Fresh session from a refresh token: the stored one first, then the optional
+ * INHAND_REFRESH_TOKEN secret. InHand Device Manager refuses password sign-in
+ * for its public client ("invalid_client"), so the first session comes from
+ * the one-time browser connect flow (exchangeCode).
+ */
 export async function signIn(deps: PullDeps, storedRefresh: string | null): Promise<string> {
-  const username = deps.env('INHAND_USERNAME')?.trim();
-  const password = deps.env('INHAND_PASSWORD');
   const bootstrapRefresh = deps.env('INHAND_REFRESH_TOKEN')?.trim();
-  if (!storedRefresh && !bootstrapRefresh && !(username && password)) throw new PullError('not_configured');
+  if (!storedRefresh && !bootstrapRefresh) throw new PullError('not_configured');
   const client = await oauthClient(deps);
   const base = { client_id: client.id, client_secret: client.secret };
+  const reasons: string[] = [];
   for (const refresh of [storedRefresh, bootstrapRefresh]) {
     if (!refresh) continue;
     const token = await tokenRequest(deps, { ...base, grant_type: 'refresh_token', refresh_token: refresh });
-    if (token !== 'rejected') { await deps.saveSession(token); return token.access_token; }
-  }
-  if (username && password) {
-    const token = await tokenRequest(deps, { ...base, grant_type: 'password', username, password });
-    if (token !== 'rejected') { await deps.saveSession(token); return token.access_token; }
+    if (!('rejected' in token)) { await deps.saveSession(token); return token.access_token; }
+    reasons.push('refresh ' + token.rejected);
   }
   await deps.clearSession();
-  throw new PullError('sign_in_rejected');
+  throw new PullError('sign_in_rejected', reasons.join(', '));
+}
+
+/** One-time connect: trade the code from InHand's own sign-in page for a session. */
+export async function exchangeCode(deps: PullDeps, code: string, redirectUri: string): Promise<void> {
+  if (!/^[A-Za-z0-9._~+/=-]{4,2048}$/.test(code)) throw new PullError('sign_in_rejected', 'bad code');
+  const client = await oauthClient(deps);
+  const token = await tokenRequest(deps, {
+    grant_type: 'authorization_code', code, client_id: client.id, client_secret: client.secret, redirect_uri: redirectUri,
+  });
+  if ('rejected' in token) throw new PullError('sign_in_rejected', 'code ' + token.rejected);
+  if (!token.refresh_token) throw new PullError('sign_in_rejected', 'no refresh token');
+  await deps.saveSession(token);
 }
 
 function deviceArray(body: any): any[] | null {
@@ -152,3 +175,22 @@ export async function pullInhand(deps: PullDeps): Promise<{ readings: Reading[];
     return { ...(await listDevices(deps, token)), observedAt: deps.now().toISOString() };
   }
 }
+
+/**
+ * The address InHand's sign-in page sent the browser to, pasted back by the
+ * owner. Only http://localhost or 127.0.0.1 on port 1024-65535 at /callback is
+ * accepted (InHand's own CLI pattern). Returns the exact redirect address to
+ * use for the code exchange, plus the code and state.
+ */
+export function parseLandedAddress(raw: string): { redirectUri: string; code: string; state: string } | null {
+  let url: URL;
+  try { url = new URL(String(raw || '').trim()); } catch { return null; }
+  if (url.protocol !== 'http:' || !['localhost', '127.0.0.1'].includes(url.hostname) || url.pathname !== '/callback') return null;
+  const port = Number(url.port);
+  if (!Number.isInteger(port) || port < 1024 || port > 65535) return null;
+  const code = url.searchParams.get('code') ?? '';
+  const state = url.searchParams.get('state') ?? '';
+  if (!code || !/^[A-Za-z0-9_-]{20,100}$/.test(state)) return null;
+  return { redirectUri: `http://${url.hostname}:${port}/callback`, code, state };
+}
+

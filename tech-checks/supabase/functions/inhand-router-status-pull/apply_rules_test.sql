@@ -48,3 +48,23 @@ select public.cos_inhand_oauth_put('tok1', 3600, 'ref1'); select public.cos_inha
 select refresh_token = 'ref1' and access_token='tok2' as refresh_kept from public.cos_inhand_oauth_get();
 select public.cos_inhand_pull_failed('sign_in_rejected');
 select count(*) filter (where ok) ok_runs, count(*) filter (where not ok) failed_runs from public.cos_inhand_pull_recent(10);
+reset role;
+-- one-time connect links
+insert into inhand_private.connect_states (state) values ('state_aaaaaaaaaaaaaaaaaaaa');
+insert into inhand_private.connect_states (state, expires_at) values ('state_expiredxxxxxxxxxxxx', now() - interval '1 minute');
+set role service_role;
+select public.cos_inhand_connect_take('state_aaaaaaaaaaaaaaaaaaaa') first_use, public.cos_inhand_connect_take('state_aaaaaaaaaaaaaaaaaaaa') second_use,
+       public.cos_inhand_connect_take('state_expiredxxxxxxxxxxxx') expired, public.cos_inhand_connect_take('state_neverissuedxxxxxxxx') unknown \gset
+reset role;
+\if :first_use
+\echo PASS connect first use
+\endif
+select not (:'second_use'::boolean or :'expired'::boolean or :'unknown'::boolean) as rest_refused \gset
+\if :rest_refused
+\echo PASS connect reuse/expired/unknown refused
+\else
+\echo FAIL connect states
+\endif
+set role anon;
+do $$ begin perform public.cos_inhand_connect_take('x'); raise exception 'anon could take'; exception when insufficient_privilege then raise notice 'PASS anon cannot take connect state'; end $$;
+reset role;
