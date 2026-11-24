@@ -795,7 +795,8 @@ function show(which) {
   window.dispatchEvent(new CustomEvent('techcheck:view-changed', { detail:{ view:which } }));
 }
 async function logout() {
-  await db.auth.signOut();
+  // Sign out this screen only. A board left up on another screen keeps its own sign-in.
+  await db.auth.signOut({ scope: 'local' });
   showAuth();
 }
 function togglePasswordCard() {
