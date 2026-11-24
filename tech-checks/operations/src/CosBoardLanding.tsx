@@ -10,6 +10,7 @@ import {setBoardSessionHold} from './tvSessionHold';
 import {boardData} from './cosBoard/boardData';
 import {boardPowerByUnit, type BoardPower} from './cosBoard/boardPower';
 import {getVrmFleet} from './vrmFleetApi';
+import {readVrmHistory, type HistoryPoint} from './vrmHistory';
 import {boardEditState, handFixRequest, type BoardEditFlags, type BoardEditState, type BoardFixStep} from './cosBoard/boardEdit';
 import {mountCosBoard} from './cosBoard/boardApp';
 import {loadBoardFonts} from './cosBoard/boardFonts';
@@ -86,7 +87,18 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
     const timer = window.setInterval(() => { if (document.visibilityState === 'visible') read(); }, REREAD_MS);
     return () => { live = false; window.clearInterval(timer); };
   }, []);
-  const power = useMemo<Map<string, BoardPower> | null>(() => vrm ? boardPowerByUnit(vrm.data, Math.max(vrm.at, now)) : null, [vrm, now]);
+  // Saved Victron history (best-effort, every 15 minutes): last night's low and history flags on Helios cards.
+  const [history, setHistory] = useState<Map<number, HistoryPoint[]> | null>(null);
+  useEffect(() => {
+    let live = true;
+    const read = () => { void readVrmHistory().then(units => { if (live && units) setHistory(new Map(units.map(u => [u.installationId, u.points]))); }); };
+    read();
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') read(); }, 15 * 60 * 1000);
+    const drop = () => setHistory(null);
+    window.addEventListener('cos-private-data-invalidated', drop);
+    return () => { live = false; window.clearInterval(timer); window.removeEventListener('cos-private-data-invalidated', drop); };
+  }, []);
+  const power = useMemo<Map<string, BoardPower> | null>(() => vrm ? boardPowerByUnit(vrm.data, Math.max(vrm.at, now), history) : null, [vrm, now, history]);
   const data = useMemo(() => {
     if (!feed) return null;
     const clock = cameraFeedClock(feed, now);

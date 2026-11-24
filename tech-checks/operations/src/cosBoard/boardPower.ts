@@ -1,13 +1,16 @@
 import {readVrmFleetConfig} from '../../../supabase/functions/cos-operations-pages/vrm';
 import {canonicalCameraUnit} from '../fieldCameraHealth';
 import {readDashboardPower, unitTileSummary, type TileTone} from '../vrmReadOnlyModel';
+import {historyFlags, overnightLow, type HistoryPoint} from '../vrmHistory';
 
 /** One Helios unit's Victron reading as the COS Board draws it.
  * b = battery %, w = solar W, v = battery volts, t = reading time in seconds (0 = none), q = tone,
  * f = charging/draining now (with watts), al = Victron's own alarm ("Low voltage", level 1 warning / 2 alarm),
  * ls = when the installation last sent Victron anything, in seconds (0 = never). */
 export type BoardPower = {b: number | null; w: number | null; v: number | null; t: number; q: Exclude<TileTone, 'unavailable'> | 'off';
-  f?: {s: 'charging' | 'draining' | 'idle'; w: number | null}; al?: {k: string; l: 1 | 2}; ls: number};
+  f?: {s: 'charging' | 'draining' | 'idle'; w: number | null}; al?: {k: string; l: 1 | 2}; ls: number;
+  /** From saved history, when it has been read: last night's lowest battery %, and plain-language flags. */
+  nl?: number; hf?: string[]};
 
 const seconds = (value?: string) => {
   const time = value ? Date.parse(value) : NaN;
@@ -19,7 +22,7 @@ const seconds = (value?: string) => {
  * Only HELIOS names are matched. Two installations with the same number match nothing rather than a guess.
  * Separate batteries are never averaged: the system reading wins, otherwise the lowest single monitor.
  */
-export function boardPowerByUnit(fleetData: unknown, now: number): Map<string, BoardPower> {
+export function boardPowerByUnit(fleetData: unknown, now: number, history?: ReadonlyMap<number, HistoryPoint[]> | null): Map<string, BoardPower> {
   const out = new Map<string, BoardPower>();
   let items: ReturnType<typeof readVrmFleetConfig>['items'];
   try { items = readVrmFleetConfig(fleetData).items; } catch { return out; }
@@ -45,6 +48,11 @@ export function boardPowerByUnit(fleetData: unknown, now: number): Map<string, B
       ...(tile.flow ? {f: {s: tile.flow.state, w: tile.flow.watts}} : {}),
       ...(tile.alarms[0] ? {al: {k: tile.alarms[0].kind, l: tile.alarms[0].level}} : {}),
       ls: seconds(tile.lastSeen),
+      ...((points => {
+        if (!points?.length) return {};
+        const night = overnightLow(points, now), flags = historyFlags(points, now).map(f => f.line);
+        return {...(night ? {nl: night.low} : {}), ...(flags.length ? {hf: flags} : {})};
+      })(history?.get(item.installationId))),
     });
   }
   return out;
