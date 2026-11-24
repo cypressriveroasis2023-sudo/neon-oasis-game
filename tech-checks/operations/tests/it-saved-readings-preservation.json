@@ -1,154 +1,164 @@
 {
-  "contract": "COS_IT_SAVED_READINGS_PRESERVATION_V1",
-  "base": "709322abd63ba0cf11fab1ccedd339c3e33fd3cc",
-  "files": [
+ "contract": "COS_IT_SAVED_READINGS_PRESERVATION_V1",
+ "base": "709322abd63ba0cf11fab1ccedd339c3e33fd3cc",
+ "files": [
+  {
+   "path": "App.tsx",
+   "baselineBlob": "fadbee7d7bdc5e22ef47be8352675fb4433c9997",
+   "candidateBlob": "39b2b9edbde81019f2a534889694704b0bd9a1ae",
+   "replacements": [
     {
-      "path": "App.tsx",
-      "baselineBlob": "fadbee7d7bdc5e22ef47be8352675fb4433c9997",
-      "candidateBlob": "db2258e55500c5d1796f852fa31ca3cb8320db4a",
-      "replacements": [
-        {
-          "from": "",
-          "to": "manualRefreshEnabled={session?.role!=='IT'} ",
-          "count": 1
-        },
-        {
-          "from": "import {trackerAccess} from './unitTracker';",
-          "to": "import {trackerAccess} from './unitTracker';\nimport {can} from './cosCapabilities';",
-          "count": 1
-        },
-        {
-          "from": "manualRefreshEnabled={session?.role!=='IT'}",
-          "to": "manualRefreshEnabled={can(session,'equipment.refresh')}",
-          "count": 1
-        },
-        {
-          "from": "createTicket={fleetOnly?undefined:createTicket} canEditPlacement=",
-          "to": "createTicket={undefined} canEditPlacement=",
-          "count": 1
-        },
-        {
-          "from": "historyReadEnabled={!fleetOnly}",
-          "to": "historyReadEnabled={can(session,'equipment.history')}",
-          "count": 1
-        },
-        {
-          "from": "createTicket={fleetOnly?undefined:createTicket} initialUnitId={route.unitId}",
-          "to": "createTicket={undefined} initialUnitId={route.unitId}",
-          "count": 1
-        },
-        {
-          "from": "  const {session, checking, error:sessionError, reloadRequired, generation:sessionGeneration, check, guardCurrent}=useOperationsSession(reason=>{\n    if(reason!=='token-renewed'&&reason!=='parent-timeout')tvIntent.current=false;\n    setMenu(false);setToast('');setRegisterUnitName('');setHeliosUnit(1);setTvDisplay(false);",
-          "to": "  const {session, checking, error:sessionError, reloadRequired, generation:sessionGeneration, check, guardCurrent}=useOperationsSession((reason)=>{\n    const keepTv=tvIntent.current;\n    if(!keepTv&&reason!=='token-renewed'&&reason!=='parent-timeout')tvIntent.current=false;\n    setMenu(false);setToast('');setRegisterUnitName('');setHeliosUnit(1);\n    if(!keepTv)setTvDisplay(false);",
-          "count": 1
-        },
-        {
-          "from": "import {useOperationsSession} from './useOperationsSession';\n",
-          "to": "import {useOperationsSession} from './useOperationsSession';\nimport TvSignedOutBoard from './TvSignedOutBoard';\nimport {setTvSessionHold} from './tvSessionHold';\n",
-          "count": 1
-        },
-        {
-          "from": "  useEffect(()=>{if(reloadRequired||active!=='Daily Board'){tvIntent.current=false;setTvDisplay(false);}},[reloadRequired,active]);",
-          "to": "  const leaveTv=useCallback(()=>{tvIntent.current=false;setTvDisplay(false);},[]);\n  useEffect(()=>{if(active!=='Daily Board'){tvIntent.current=false;setTvDisplay(false);return;}if(reloadRequired&&!tvIntent.current){setTvDisplay(false);}},[reloadRequired,active]);\n  setTvSessionHold(tvDisplay&&active==='Daily Board');",
-          "count": 1
-        },
-        {
-          "from": "{checking&&!session?<section className='panel module' role='status'>",
-          "to": "{tvDisplay&&(reloadRequired||!authorized||(checking&&!session))?<TvSignedOutBoard note={reloadRequired?'Sign in again on Tech Check to resume':'Reconnecting'} exit={leaveTv}/>:checking&&!session?<section className='panel module' role='status'>",
-          "count": 1
-        },
-        {
-          "from": "Today\u2019s jobs, assigned tasks, readiness and TV view.",
-          "to": "Fleet count tiles for the shop TV: camera units, cameras, units in the field, and stands. Same numbers as the map.",
-          "count": 1
-        },
-        {
-          "from": ":active==='Daily Board'?<DailyBoard api={api} openWorkspace={navigate}",
-          "to": ":active==='Daily Board'?<DailyBoard api={api} session={session!} openWorkspace={navigate}",
-          "count": 1
-        }
-      ]
+     "from": "",
+     "to": "manualRefreshEnabled={session?.role!=='IT'} ",
+     "count": 1
     },
     {
-      "path": "FleetDashboard.tsx",
-      "baselineBlob": "3c6a26ac7d6ea53d767a4405800d3b14ab21ce87",
-      "candidateBlob": "9dbafecb1a18ee5d2d84f5083fd5124ecb18c2b4",
-      "replacements": [
-        {
-          "from": "",
-          "to": " const manualHealthRefreshEnabled=session.role!=='IT';\n",
-          "count": 1
-        },
-        {
-          "from": "<button className='cos-fleet-refresh' hidden={Boolean(selectedRow||selectedSource||selectedMhelpAddress)} disabled={loading||!valid.current} onClick={refresh}>{loading?'\u21bb Reading data\u2026':'\u21bb Refresh data'}</button>",
-          "to": "{manualHealthRefreshEnabled&&<button className='cos-fleet-refresh' hidden={Boolean(selectedRow||selectedSource||selectedMhelpAddress)} disabled={loading||!valid.current} onClick={refresh}>{loading?'\u21bb Reading data\u2026':'\u21bb Refresh data'}</button>}",
-          "count": 1
-        },
-        {
-          "from": "Refresh data to try again.",
-          "to": "{manualHealthRefreshEnabled?'Refresh data to try again.':'Saved results are read automatically every 10 minutes while visible.'}",
-          "count": 1
-        },
-        {
-          "from": "Refresh data to retry; equipment remains in inventory.",
-          "to": "{manualHealthRefreshEnabled?'Refresh data to retry; equipment remains in inventory.':'Equipment remains in inventory. Saved results are read automatically every 10 minutes while visible.'}",
-          "count": 1
-        },
-        {
-          "from": "refresh",
-          "to": "manualHealthRefreshEnabled?refresh:undefined",
-          "count": 1
-        },
-        {
-          "from": "<button disabled={loading||!valid.current||editorBusy} onClick={refresh}>{loading?'\u21bb Reading data\u2026':'\u21bb Refresh data'}</button>",
-          "to": "{manualHealthRefreshEnabled&&<button disabled={loading||!valid.current||editorBusy} onClick={refresh}>{loading?'\u21bb Reading data\u2026':'\u21bb Refresh data'}</button>}",
-          "count": 1
-        },
-        {
-          "from": "",
-          "to": "manualRefreshEnabled={manualHealthRefreshEnabled} ",
-          "count": 1
-        }
-      ]
+     "from": "import {trackerAccess} from './unitTracker';",
+     "to": "import {trackerAccess} from './unitTracker';\nimport {can} from './cosCapabilities';",
+     "count": 1
     },
     {
-      "path": "it-daily-mode.browser.spec.mjs",
-      "baselineBlob": "23dee1874cf523f76d8f869f14e444c8930fecb6",
-      "candidateBlob": "30566c2f5e51ff34d9d95bb8195d84f85de472c1",
-      "replacements": [
-        {
-          "from": "test('an unavailable Camera Health read never proves units healthy or changes placement',async({page})=>{\n  await desktop(page);\n  const {frame,state}=await mount(page,options());\n  await readyFleet(frame);\n  state.fail[sourcePaths.cameras]=true;\n  await frame.getByRole('button',{name:/Refresh data/}).first().click();\n  await expect(frame.locator('.cos-fleet-message[role=\"alert\"]')).toContainText('source');\n  await expect(frame.locator('.cos-fleet-map-canvas')).toBeVisible();\n  delete state.fail[sourcePaths.cameras];\n  await frame.getByRole('button',{name:/Refresh data/}).first().click();\n  await expect(frame.locator('.cos-fleet-map-canvas')).toBeVisible();\n  await assertReadBoundary(page,state);\n});\n\n",
-          "to": "test('an unavailable Camera Health read never proves units healthy or changes placement',async({page})=>{\n  await desktop(page);await page.clock.install();\n  const {frame,state}=await mount(page,options());\n  await readyFleet(frame);\n  await expect(frame.getByRole('button',{name:/Refresh data/})).toHaveCount(0);\n  const readCount=()=>state.calls.filter(call=>call.path===sourcePaths.cameras).length;\n  const scheduledRead=async()=>{\n    const before=readCount(),current=await frame.locator('body').evaluate(()=>Date.now());\n    await page.clock.pauseAt(new Date(current+1000));\n    await page.clock.setSystemTime(new Date(current+10*60000));\n    for(let tick=0;tick<61&&readCount()===before;tick++)await page.clock.runFor(1000);\n    await page.clock.resume();await expect.poll(readCount).toBe(before+1);\n  };\n  state.fail[sourcePaths.cameras]=true;\n  await scheduledRead();\n  await expect(frame.locator('.cos-fleet-message[role=\"alert\"]')).toContainText('source');\n  await expect(frame.locator('.cos-fleet-map-canvas')).toBeVisible();\n  delete state.fail[sourcePaths.cameras];\n  await scheduledRead();\n  await expect(frame.locator('.cos-fleet-message[role=\"alert\"]').filter({hasText:'Synthetic source unavailable'})).toHaveCount(0);\n  await expect(frame.locator('.cos-fleet-map-canvas')).toBeVisible();\n  await assertReadBoundary(page,state);\n});\n\n",
-          "count": 1
-        }
-      ]
+     "from": "manualRefreshEnabled={session?.role!=='IT'}",
+     "to": "manualRefreshEnabled={can(session,'equipment.refresh')}",
+     "count": 1
     },
     {
-      "path": "mhelp-live-inventory.browser.spec.mjs",
-      "baselineBlob": "e01e74347d23f811280f978c7be2bd0d5f85a29c",
-      "candidateBlob": "1a479ab21d17a4b255e8204c9c34f9ee0d8b7c2c",
-      "replacements": [
-        {
-          "from": "",
-          "to": "import {nextScheduledFleetRead} from './helpers/scheduled-fleet-read.mjs';\n",
-          "count": 1
-        },
-        {
-          "from": " const {app,state}=await mountFleet(page,it,{field:value});",
-          "to": " const {app,state}=await mountFleet(page,it,{field:value,advancingClock:it});",
-          "count": 1
-        },
-        {
-          "from": " state.field.mhelpPlacementSync.errorCode='inventory_source_unavailable';await app.getByRole('button',{name:'\u21bb Refresh data',exact:true}).click();await expect(app.getByRole('status',{name:'mHelpDesk update delayed'})).toBeVisible();await expect(inventory).toContainText('1001 total equipment records');",
-          "to": " state.field.mhelpPlacementSync.errorCode='inventory_source_unavailable';if(it)await nextScheduledFleetRead(page,app,state);else await app.getByRole('button',{name:'\u21bb Refresh data',exact:true}).click();await expect(app.getByRole('status',{name:'mHelpDesk update delayed'})).toBeVisible();await expect(inventory).toContainText('1001 total equipment records');",
-          "count": 1
-        },
-        {
-          "from": " await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('0');await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('0');await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('287');\n",
-          "to": " // No connection evidence here, so online and offline are not known to be\n // zero. Unverified stays a real count: every field unit genuinely is unknown.\n await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('\\u2014');await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('\\u2014');await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('287');\n",
-          "count": 1
-        }
-      ]
+     "from": "createTicket={fleetOnly?undefined:createTicket} canEditPlacement=",
+     "to": "createTicket={undefined} canEditPlacement=",
+     "count": 1
+    },
+    {
+     "from": "historyReadEnabled={!fleetOnly}",
+     "to": "historyReadEnabled={can(session,'equipment.history')}",
+     "count": 1
+    },
+    {
+     "from": "createTicket={fleetOnly?undefined:createTicket} initialUnitId={route.unitId}",
+     "to": "createTicket={undefined} initialUnitId={route.unitId}",
+     "count": 1
+    },
+    {
+     "from": "  const {session, checking, error:sessionError, reloadRequired, generation:sessionGeneration, check, guardCurrent}=useOperationsSession(reason=>{\n    if(reason!=='token-renewed'&&reason!=='parent-timeout')tvIntent.current=false;\n    setMenu(false);setToast('');setRegisterUnitName('');setHeliosUnit(1);setTvDisplay(false);",
+     "to": "  const {session, checking, error:sessionError, reloadRequired, generation:sessionGeneration, check, guardCurrent}=useOperationsSession((reason)=>{\n    const keepTv=tvIntent.current;\n    if(!keepTv&&reason!=='token-renewed'&&reason!=='parent-timeout')tvIntent.current=false;\n    setMenu(false);setToast('');setRegisterUnitName('');setHeliosUnit(1);\n    if(!keepTv)setTvDisplay(false);",
+     "count": 1
+    },
+    {
+     "from": "import {useOperationsSession} from './useOperationsSession';\n",
+     "to": "import {useOperationsSession} from './useOperationsSession';\nimport TvSignedOutBoard from './TvSignedOutBoard';\nimport {setTvSessionHold} from './tvSessionHold';\n",
+     "count": 1
+    },
+    {
+     "from": "  useEffect(()=>{if(reloadRequired||active!=='Daily Board'){tvIntent.current=false;setTvDisplay(false);}},[reloadRequired,active]);",
+     "to": "  const leaveTv=useCallback(()=>{tvIntent.current=false;setTvDisplay(false);},[]);\n  useEffect(()=>{if(active!=='Daily Board'){tvIntent.current=false;setTvDisplay(false);return;}if(reloadRequired&&!tvIntent.current){setTvDisplay(false);}},[reloadRequired,active]);\n  setTvSessionHold(tvDisplay&&active==='Daily Board');",
+     "count": 1
+    },
+    {
+     "from": "{checking&&!session?<section className='panel module' role='status'>",
+     "to": "{tvDisplay&&(reloadRequired||!authorized||(checking&&!session))?<TvSignedOutBoard note={reloadRequired?'Sign in again on Tech Check to resume':'Reconnecting'} exit={leaveTv}/>:checking&&!session?<section className='panel module' role='status'>",
+     "count": 1
+    },
+    {
+     "from": "Today\u2019s jobs, assigned tasks, readiness and TV view.",
+     "to": "Fleet count tiles for the shop TV: camera units, cameras, units in the field, and stands. Same numbers as the map.",
+     "count": 1
+    },
+    {
+     "from": ":active==='Daily Board'?<DailyBoard api={api} openWorkspace={navigate}",
+     "to": ":active==='Daily Board'?<DailyBoard api={api} session={session!} openWorkspace={navigate}",
+     "count": 1
+    },
+    {
+     "from": "import {setTvSessionHold} from './tvSessionHold';",
+     "to": "import ItTechChecksDoor from './ItTechChecksDoor';\nimport {setTvSessionHold} from './tvSessionHold';",
+     "count": 1
+    },
+    {
+     "from": "(fleetOnly?<section className='panel module'><h2>IT Tech Checks</h2><button onClick={()=>openLegacy('it')}>Return to my IT Tech Checks</button></section>:<TechChecksWorkspace/>)",
+     "to": "(fleetOnly?<ItTechChecksDoor open={()=>openLegacy('it')}/>:<TechChecksWorkspace/>)",
+     "count": 1
     }
-  ]
+   ]
+  },
+  {
+   "path": "FleetDashboard.tsx",
+   "baselineBlob": "3c6a26ac7d6ea53d767a4405800d3b14ab21ce87",
+   "candidateBlob": "9dbafecb1a18ee5d2d84f5083fd5124ecb18c2b4",
+   "replacements": [
+    {
+     "from": "",
+     "to": " const manualHealthRefreshEnabled=session.role!=='IT';\n",
+     "count": 1
+    },
+    {
+     "from": "<button className='cos-fleet-refresh' hidden={Boolean(selectedRow||selectedSource||selectedMhelpAddress)} disabled={loading||!valid.current} onClick={refresh}>{loading?'\u21bb Reading data\u2026':'\u21bb Refresh data'}</button>",
+     "to": "{manualHealthRefreshEnabled&&<button className='cos-fleet-refresh' hidden={Boolean(selectedRow||selectedSource||selectedMhelpAddress)} disabled={loading||!valid.current} onClick={refresh}>{loading?'\u21bb Reading data\u2026':'\u21bb Refresh data'}</button>}",
+     "count": 1
+    },
+    {
+     "from": "Refresh data to try again.",
+     "to": "{manualHealthRefreshEnabled?'Refresh data to try again.':'Saved results are read automatically every 10 minutes while visible.'}",
+     "count": 1
+    },
+    {
+     "from": "Refresh data to retry; equipment remains in inventory.",
+     "to": "{manualHealthRefreshEnabled?'Refresh data to retry; equipment remains in inventory.':'Equipment remains in inventory. Saved results are read automatically every 10 minutes while visible.'}",
+     "count": 1
+    },
+    {
+     "from": "refresh",
+     "to": "manualHealthRefreshEnabled?refresh:undefined",
+     "count": 1
+    },
+    {
+     "from": "<button disabled={loading||!valid.current||editorBusy} onClick={refresh}>{loading?'\u21bb Reading data\u2026':'\u21bb Refresh data'}</button>",
+     "to": "{manualHealthRefreshEnabled&&<button disabled={loading||!valid.current||editorBusy} onClick={refresh}>{loading?'\u21bb Reading data\u2026':'\u21bb Refresh data'}</button>}",
+     "count": 1
+    },
+    {
+     "from": "",
+     "to": "manualRefreshEnabled={manualHealthRefreshEnabled} ",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "path": "it-daily-mode.browser.spec.mjs",
+   "baselineBlob": "23dee1874cf523f76d8f869f14e444c8930fecb6",
+   "candidateBlob": "30566c2f5e51ff34d9d95bb8195d84f85de472c1",
+   "replacements": [
+    {
+     "from": "test('an unavailable Camera Health read never proves units healthy or changes placement',async({page})=>{\n  await desktop(page);\n  const {frame,state}=await mount(page,options());\n  await readyFleet(frame);\n  state.fail[sourcePaths.cameras]=true;\n  await frame.getByRole('button',{name:/Refresh data/}).first().click();\n  await expect(frame.locator('.cos-fleet-message[role=\"alert\"]')).toContainText('source');\n  await expect(frame.locator('.cos-fleet-map-canvas')).toBeVisible();\n  delete state.fail[sourcePaths.cameras];\n  await frame.getByRole('button',{name:/Refresh data/}).first().click();\n  await expect(frame.locator('.cos-fleet-map-canvas')).toBeVisible();\n  await assertReadBoundary(page,state);\n});\n\n",
+     "to": "test('an unavailable Camera Health read never proves units healthy or changes placement',async({page})=>{\n  await desktop(page);await page.clock.install();\n  const {frame,state}=await mount(page,options());\n  await readyFleet(frame);\n  await expect(frame.getByRole('button',{name:/Refresh data/})).toHaveCount(0);\n  const readCount=()=>state.calls.filter(call=>call.path===sourcePaths.cameras).length;\n  const scheduledRead=async()=>{\n    const before=readCount(),current=await frame.locator('body').evaluate(()=>Date.now());\n    await page.clock.pauseAt(new Date(current+1000));\n    await page.clock.setSystemTime(new Date(current+10*60000));\n    for(let tick=0;tick<61&&readCount()===before;tick++)await page.clock.runFor(1000);\n    await page.clock.resume();await expect.poll(readCount).toBe(before+1);\n  };\n  state.fail[sourcePaths.cameras]=true;\n  await scheduledRead();\n  await expect(frame.locator('.cos-fleet-message[role=\"alert\"]')).toContainText('source');\n  await expect(frame.locator('.cos-fleet-map-canvas')).toBeVisible();\n  delete state.fail[sourcePaths.cameras];\n  await scheduledRead();\n  await expect(frame.locator('.cos-fleet-message[role=\"alert\"]').filter({hasText:'Synthetic source unavailable'})).toHaveCount(0);\n  await expect(frame.locator('.cos-fleet-map-canvas')).toBeVisible();\n  await assertReadBoundary(page,state);\n});\n\n",
+     "count": 1
+    }
+   ]
+  },
+  {
+   "path": "mhelp-live-inventory.browser.spec.mjs",
+   "baselineBlob": "e01e74347d23f811280f978c7be2bd0d5f85a29c",
+   "candidateBlob": "1a479ab21d17a4b255e8204c9c34f9ee0d8b7c2c",
+   "replacements": [
+    {
+     "from": "",
+     "to": "import {nextScheduledFleetRead} from './helpers/scheduled-fleet-read.mjs';\n",
+     "count": 1
+    },
+    {
+     "from": " const {app,state}=await mountFleet(page,it,{field:value});",
+     "to": " const {app,state}=await mountFleet(page,it,{field:value,advancingClock:it});",
+     "count": 1
+    },
+    {
+     "from": " state.field.mhelpPlacementSync.errorCode='inventory_source_unavailable';await app.getByRole('button',{name:'\u21bb Refresh data',exact:true}).click();await expect(app.getByRole('status',{name:'mHelpDesk update delayed'})).toBeVisible();await expect(inventory).toContainText('1001 total equipment records');",
+     "to": " state.field.mhelpPlacementSync.errorCode='inventory_source_unavailable';if(it)await nextScheduledFleetRead(page,app,state);else await app.getByRole('button',{name:'\u21bb Refresh data',exact:true}).click();await expect(app.getByRole('status',{name:'mHelpDesk update delayed'})).toBeVisible();await expect(inventory).toContainText('1001 total equipment records');",
+     "count": 1
+    },
+    {
+     "from": " await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('0');await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('0');await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('287');\n",
+     "to": " // No connection evidence here, so online and offline are not known to be\n // zero. Unverified stays a real count: every field unit genuinely is unknown.\n await expect(app.locator('.cos-fleet-stat-online strong')).toHaveText('\\u2014');await expect(app.locator('.cos-fleet-stat-offline strong')).toHaveText('\\u2014');await expect(app.locator('.cos-fleet-stat-unknown strong')).toHaveText('287');\n",
+     "count": 1
+    }
+   ]
+  }
+ ]
 }
