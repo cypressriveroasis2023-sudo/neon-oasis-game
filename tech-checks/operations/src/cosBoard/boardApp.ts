@@ -326,10 +326,15 @@ function steps0(v){
 }
 /* Victron power for a Helios: one reading, never an average of separate batteries. Older than 45 min draws grey. */
 const PWQ = { good:"ok", fair:"warn", low:"bad", stale:"unk", none:"unk", off:"unk" };
-function powerText(p){ if(!p) return ""; if(p.q==="off") return "Victron: not in the latest sync";
-  return (p.b!==null ? p.b+"% battery" : "No battery reading")+(p.w!==null ? " · "+p.w+" W solar" : "")+(p.q==="stale" ? " · old reading" : ""); }
+function flowText(f){ if(!f) return ""; return f.s==="charging" ? "charging"+(f.w!==null ? " "+Math.abs(f.w)+" W" : "") : f.s==="draining" ? "draining"+(f.w!==null ? " "+Math.abs(f.w)+" W" : "") : "idle"; }
+function powerText(p){ if(!p) return ""; if(p.q==="off") return "Victron: not in the latest sync"+(p.ls ? " · last connected "+when(p.ls) : "");
+  if(p.q==="stale"||p.q==="none") return "No current Victron reading"+(p.ls ? " · last connected "+when(p.ls) : "");
+  return (p.al ? "Victron "+(p.al.l===2 ? "alarm" : "warning")+": "+p.al.k+" · " : "")+(p.b!==null ? p.b+"% battery" : "No battery reading")+(p.f ? " · "+flowText(p.f) : "")+(p.w!==null ? " · "+p.w+" W solar" : ""); }
 function powerChip(p){ if(!p) return null;
-  return h("span",{class:"pwr q-"+p.q,title:powerText(p)},h("i",{"aria-hidden":"true"}),p.q==="off" ? "Victron off" : (p.b!==null ? p.b+"%" : "—"),p.w!==null && p.q!=="off" ? h("small",{text:"☀ "+p.w+" W"}) : null); }
+  const live = p.q!=="off" && p.q!=="stale" && p.q!=="none";
+  return h("span",{class:"pwr q-"+p.q,title:powerText(p)},h("i",{"aria-hidden":"true"}),p.al && live ? "⚠ " : "",p.q==="off" ? "Victron off" : (p.b!==null ? p.b+"%" : "—"),
+    live && p.f && p.f.s!=="idle" ? h("small",{class:"fl-"+p.f.s,text:p.f.s==="charging" ? "↑" : "↓"}) : null,
+    p.w!==null && live ? h("small",{text:"☀ "+p.w+" W"}) : null); }
 function routerRead(u){ return { on: u.rs==="on" || (u.rs!=="of" && u.rr==="on"), off: u.rs==="of" || (u.rs!=="on" && u.rr==="of") }; }
 const WORD = { ok:"OK", warn:"Check", bad:"Problem", unk:"Unknown" }, RW = { on:"Online", of:"Offline", un:"Unknown" };
 /* Read the signs we have and say what is most likely wrong. A router reading is a hint only, never proof the cameras work. */
@@ -342,7 +347,7 @@ function diagnose(v){
   if(u.rs) ck.push({k:"Router, COS check", s: u.rs==="on"?"ok":u.rs==="of"?"bad":"unk", t:(RW[u.rs]||u.rs)+(u.rt ? " · "+when(u.rt) : "")});
   if(u.rr) ck.push({k:"Router, InHand says", s: u.rr==="on"?"ok":u.rr==="of"?"bad":"unk", t:(RW[u.rr]||u.rr)+(u.ro ? " · "+when(u.ro) : " · no time given")});
   if(!u.rs && !u.rr) ck.push({k:"Router", s:"unk", t: S.meta && S.meta.rl===false ? "Router readings have not loaded yet" : "No router on record for this unit"});
-  if(u.pw) ck.push({k:"Battery, Victron", s:PWQ[u.pw.q]||"unk", t:powerText(u.pw)+(u.pw.t ? " · "+when(u.pw.t) : "")});
+  if(u.pw) ck.push({k:"Battery, Victron", s:u.pw.al && u.pw.q!=="stale" && u.pw.q!=="off" ? (u.pw.al.l===2 ? "bad" : "warn") : (PWQ[u.pw.q]||"unk"), t:powerText(u.pw)+(u.pw.t ? " · "+when(u.pw.t) : "")});
   if(u.lo && fs!=="up") ck.push({k:"Last online", s:"info", t:when(u.lo)+" · "+ago(u.lo)+" ago"});
   const m = S.mh && S.rec ? S.rec.match[v.id] : null;
   if(S.mh){
@@ -418,9 +423,12 @@ function powerBox(v){
   const tiles = h("div",{class:"pwtiles"},
     h("div",{class:"pwt q-"+p.q},h("span",{text:"Battery"}),h("b",{text:p.b!==null ? p.b+"%" : "—"}),bar),
     h("div",{class:"pwt"},h("span",{text:"Solar"}),h("b",{text:p.w!==null ? p.w+" W" : "—"})),
-    h("div",{class:"pwt"},h("span",{text:"Voltage"}),h("b",{text:p.v!==null ? p.v+" V" : "—"})));
-  const note = p.q==="off" ? "This installation was not in the latest Victron sync." : p.q==="stale" ? "This reading is more than 45 minutes old"+(p.t ? " ("+when(p.t)+")" : "")+", so it is not called current." : p.q==="none" ? "Victron has no battery reading for this unit." : "Victron reading"+(p.t ? " · "+when(p.t) : "")+". Cameras come from Star4Live; power comes from Victron. A low battery is not the same as a camera being down.";
-  return h("div",{class:"box pwbox"},h("h3",{text:"Power"}),tiles,h("p",{class:"note",text:note}),go?h("div",{class:"links"},go):null);
+    h("div",{class:"pwt"},h("span",{text:"Voltage"}),h("b",{text:p.v!==null ? p.v+" V" : "—"})),
+    h("div",{class:"pwt fl-"+(p.f ? p.f.s : "none")},h("span",{text:"Right now"}),h("b",{text:p.f && p.q!=="stale" ? (p.f.s==="charging" ? "↑ Charging" : p.f.s==="draining" ? "↓ Draining" : "Idle") : "—"}),p.f && p.f.s!=="idle" && p.f.w!==null ? h("small",{text:Math.abs(p.f.w)+" W"}) : null));
+  const last = p.ls ? " Last connected to Victron "+when(p.ls)+"." : "";
+  const note = p.q==="off" ? "This installation was not in the latest Victron sync."+last : p.q==="stale" ? "No reading in the last 45 minutes, so it is not called current."+last : p.q==="none" ? "Victron has no battery reading for this unit."+last : "Victron reading"+(p.t ? " · "+when(p.t) : "")+". Cameras come from Star4Live; power comes from Victron. A low battery is not the same as a camera being down.";
+  const alarm = p.al && p.q!=="stale" && p.q!=="off" ? h("p",{class:"pwalarm l"+p.al.l,text:"⚠ Victron "+(p.al.l===2 ? "alarm" : "warning")+": "+p.al.k+". Victron raised this itself, so check the battery and charge controller."}) : null;
+  return h("div",{class:"box pwbox"},h("h3",{text:"Power"}),alarm,tiles,h("p",{class:"note",text:note}),go?h("div",{class:"links"},go):null);
 }
 function drawPanel(){
   const v = S.vmap && S.vmap[S.openId]; if(!v){ closeUnit(); return; }
