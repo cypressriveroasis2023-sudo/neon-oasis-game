@@ -168,3 +168,13 @@ test('landed address: only localhost /callback with code and a COS state', async
   assert.equal(parseLandedAddress(`http://localhost:8765/callback?state=${st}`), null);
   assert.equal(parseLandedAddress('not a url'), null);
 });
+
+test('a 20-digit clientId is sent exactly, not rounded', async () => {
+  const { oauthClient } = await import('./pull.ts');
+  const raw = '{"result":{"auth":{"clientId":17953450251798098136,"clientSecret":"cs"}}}';
+  const h = harness({ routes: () => new Response(raw, { status: 200 }) });
+  const client = await oauthClient(h.deps);
+  assert.equal(client.id, '17953450251798098136');
+  const quoted = harness({ routes: () => new Response('{"result":{"auth":{"clientId":"abc-123_X","clientSecret":"cs"}}}', { status: 200 }) });
+  assert.equal((await oauthClient(quoted.deps)).id, 'abc-123_X');
+});
