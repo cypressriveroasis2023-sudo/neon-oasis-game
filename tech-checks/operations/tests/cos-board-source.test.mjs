@@ -223,6 +223,17 @@ test('the board counts one way, and a hand fix comes first on the card and says 
   assert.equal(app.includes('u.s==="v" ? b("Correct IP","ip",true) : null'), false);
   assert.ok(app.includes("Up or Down comes from COS's own check of this unit, so it clears at the next check that finds its cameras online."));
   assert.ok(app.includes("Up or Down comes from the Recon cloud's own reading, so it clears when Recon sees the cameras online."));
+  // A Sniper with no IP saved is Unknown for good, and the card says so and sends him to the fix.
+  assert.match(app, /if\(v\.status==="unknown"\) return v\.u\.s==="a" && !v\.u\.ip/);
+  assert.ok(app.includes('COS has no IP address for this unit, so it cannot be checked at all. That is why it shows Unknown and not Down.'));
+  assert.ok(app.includes('Add the IP under Fix it. COS checks the address within the hour and the unit stops being Unknown.'));
+  assert.ok(app.includes('COS has no IP address saved for this unit, so there is nothing to check.'));
+  // The reading is COS's own check of the address. COS has no Avigilon feed.
+  assert.equal(app.includes('Avigilon check'), false);
+  assert.ok(app.includes('No IP address saved, so COS has never checked it'));
+  // The family is still called Avigilon, because that is what the units are.
+  assert.ok(app.includes('const FAM = { v:"Alibi", a:"Avigilon", r:"Recon II", x:"Other" };'));
+
   // The other COS screens open from the board itself, named as IT sees them.
   assert.ok(app.includes('const SCREENS = [["Camera Health","Camera Health"],["InHand Routers","InHand Routers"],["Victron VRM","Victron Power"],["Unit Tracker","2027 Unit Tracker"]];'));
   assert.match(app, /function screensRow\(\)\{[\s\S]*?hooks\.onScreen\(workspace\)/);
