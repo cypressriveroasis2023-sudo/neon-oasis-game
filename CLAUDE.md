@@ -1,0 +1,73 @@
+# Working in this repo
+
+More than one Claude session works here at the same time, on different parts of
+COS. Sessions cannot see or talk to each other. This file is where they
+coordinate, so read it before changing anything in "Shared ground" below, and
+append to the log at the bottom when you do.
+
+## Shared ground
+
+These are the places where one session's change has silently broken another's
+work. A change here is not local, however small it looks.
+
+| What | Why it crosses boundaries |
+| --- | --- |
+| `public.camera_inventory_audit` | A new `action` value breaks the camera sweep. See the rule below. |
+| `public.camera_devices` | One row per **camera**, not per unit. The camera health sweep requires exactly one row per `unit_key` or it holds the unit unverified. |
+| `public.equipment_master` | What the camera sweep iterates. Still holds a stale 22 Sep 2026 import; a refresh is pending. |
+| `cron.job` (Tech Check) | 15 jobs on interleaved minutes. Pick a free minute; don't reuse another job's slot. |
+| Edge functions under `tech-checks/supabase/functions/` | Several are loaded from **pinned GitHub commits**, so the deployed code is not what's on `main`. Check the entrypoint before assuming. |
+| `tech-checks/operations/dist` | Committed to the repo and published by GitHub Pages on push to `main`. |
+
+Two Supabase projects, easy to confuse:
+
+- **Tech Check** `goqrnolcvqnirjmzaeyk` — cameras, equipment master, health, **all cron jobs**
+- **Operations** `tughscoxralhofrckvxy` — mHelp inventory, placement, hand-edit log
+
+## Rule: adding an action to `camera_inventory_audit`
+
+`public.cos_tracker_endpoint_claims_v1` holds an allow-list of action values. It
+treats **any** unrecognised action as making the whole endpoint history
+incomplete, which blocks the camera direct-TCP sweep: every unit is held
+"unverified", nothing is published, and the board shows Unknown.
+
+The failure is silent. `pg_cron` reports success and the function returns HTTP
+200, because the sweep is designed to hold units rather than error.
+
+**If you add a new action value, add it to that allow-list in the same change.**
+
+A watchdog now catches this within ~3 minutes (`cos-sweep-watchdog`, job 15).
+Check it after any change to the audit table:
+
+```sql
+select public.cos_sweep_watchdog_recent_v1(20);
+```
+
+`status` of `alarm` with `unknown_audit_action_blocks_endpoint_claims` means a
+new action value needs adding to the allow-list.
+
+## Conventions
+
+- Merge with an explicit SHA: `gh api -X PUT .../pulls/N/merge -f merge_method=merge -f sha=<full sha>`
+- Rebuild before committing `dist`: `rm -rf dist/assets`, `git checkout -- dist`, `npm run build`, then `node .github/scripts/verify-cos-build-artifact.mjs` (expect exit 0)
+- `app_private` is not exposed to PostgREST. Reach it through a security-definer function in `public`.
+- Record live database changes as a file in `tech-checks/supabase/migrations/`, with a rollback line, even when applied by hand.
+- Don't commit another session's unrelated work-in-progress; stage only your own files.
+
+## Log of changes to shared ground
+
+Newest first. One line: date, what changed, what to watch.
+
+- **2026-11-24** — Added `ADD_ROUTER_LINK` to the allow-list in
+  `cos_tracker_endpoint_claims_v1` (migration
+  `20261124_cos_tracker_endpoint_claims_allow_add_router_link.sql`). Three such
+  rows written at 21:10 UTC had stopped the camera sweep publishing for 90
+  minutes. The InHand router feature itself was not changed. Added the
+  `cos-sweep-watchdog` cron job (15) and
+  `app_private.cos_sweep_watchdog_log`.
+- **2026-11-24** — Marked 82 stale 2026-tracker Sniper rows `do_not_use` in
+  `camera_devices`. Reversible from
+  `app_private.camera_devices_stale_2026_tracker_backup_20261124`. The sweep
+  does not read `do_not_use`, so this does not affect monitoring.
+- **2026-11-24** — Attached mHelp A# (`mhelp_product_id`) to 113 single-camera
+  units, taking units with an A# from 97 to 210.
