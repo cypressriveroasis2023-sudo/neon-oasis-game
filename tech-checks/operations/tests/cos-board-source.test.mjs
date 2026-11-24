@@ -121,8 +121,8 @@ test('the board is the Fleet screen, and the older screen only stands in when th
   const fleet = read('../src/FleetDashboard.tsx');
   const board = read('../src/FleetBoard.tsx');
   const css = read('../src/sourceAttention.css');
-  // Fleet hands the board what it needs and one thing more: why a unit asked for from another screen could not be opened.
-  assert.ok(fleet.includes(' onFeed={setCameraUnits} notice={selectionNotice}/>}'));
+  // Fleet hands the board what it needs, a way to re-read the mHelp list, and why a unit asked for from another screen could not be opened.
+  assert.ok(fleet.includes(' onFeed={setCameraUnits} onFleetRefresh={()=>cameras.refresh(true)} notice={selectionNotice}/>}'));
   assert.match(board, /\{notice && <p className='cos-board-notice' role='status'>\{notice\}<\/p>\}\s*<Suspense /);
   assert.ok(css.includes("#root#root .cos-fleet-dashboard:has(>.cos-board-landing>.cos-board-notice)>.cos-fleet-content>p.cos-fleet-message[role='status']{display:none}"));
   // While the board is on screen the older view, its jump button and its row of tabs are all out of sight. One rule each, nothing else.
