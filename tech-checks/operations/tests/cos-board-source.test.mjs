@@ -284,3 +284,19 @@ test('the app checks one unit with the same verify the rest of COS uses, then re
   assert.match(landing, /A save is still in progress/);
   assert.match(landing, /started !== generation\.current/);
 });
+
+test('no totals are published until the official list has loaded', () => {
+  // James saw the board show one set of counts, then a different set seconds later when mHelp landed.
+  // Without mHelp the board can only count what the camera systems see, which is a different set of units.
+  // One count means one count: the tiles wait rather than publishing a number that is about to change.
+  assert.match(app, /if\(!S\.mh\)\{\s*\$\("tiles"\)\.replaceChildren\(h\("div",\{class:"empty",text:"Waiting for the official count from mHelp\./);
+  assert.match(app, /\$\("shoprow"\)\.replaceChildren\(\);/);
+
+  // The wall screen is read from across the shop with nobody there to notice a caveat line, so it holds too.
+  assert.match(app, /\$\("tvTiles"\)\.replaceChildren\(h\("div",\{class:"empty",style:"grid-column:1\/-1"\},"Waiting for the official count from mHelp\."\)\)/);
+  assert.match(app, /\$\("tvMinis"\)\.replaceChildren\(\);/);
+  assert.match(app, /No totals until mHelp, the official list, has loaded\./);
+
+  // The list below still works while the totals wait, so the board is not blank.
+  assert.match(app, /the units below are what the camera systems can see/i);
+});

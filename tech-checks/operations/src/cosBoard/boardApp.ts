@@ -200,10 +200,18 @@ function render(){
   if(S.mh ? S.filter==="excl" : S.filter==="notin") S.filter="field";
   $("modeRow").replaceChildren(h("span",{class:"hint",text: S.mh ? "One count: mHelp, the official list"+(S.mh.meta.at ? ", read "+when(S.mh.meta.at) : "")+". A unit is in the field, at the site mHelp gives, until mHelp shows it back in the shop or it is moved by hand here."
     : "The mHelp list has not loaded, so this shows only what the camera systems can see. It is not the official count."}));
+  /* One count means one count. Without the official list the board can only count what the camera systems see,
+     which is a different set of units: it would show a number, then change it when mHelp lands. The tiles wait
+     instead. The list below still works, so the board is still useful while the official count is on its way. */
+  if(!S.mh){
+    $("tiles").replaceChildren(h("div",{class:"empty",text:"Waiting for the official count from mHelp. The units below are what the camera systems can see; the totals wait until mHelp has loaded. Tap Refresh if this stays."}));
+    $("shoprow").replaceChildren();
+  } else {
   const tile=(key,cls)=>h("button",{class:"tile "+cls,type:"button","aria-pressed":String(S.filter===key),onclick:()=>setFilter(key)},h("span",{class:"num",text:c[key]}),h("span",{class:"lab",text:LABEL[key]}));
   $("tiles").replaceChildren(tile("down","t-down"),tile("issues","t-issues"),tile("unknown","t-unknown"),tile("up","t-up"));
   const mini=(key,num,lab)=>h("button",{class:"mini",type:"button","aria-pressed":String(S.filter===key),onclick:()=>setFilter(key)},h("b",{text:num}),lab);
-  $("shoprow").replaceChildren(...[mini("field",c.down+c.issues+c.up+c.unknown,"in the field"),mini("shopAll",c.shop+c.shopOnline,"in the shop"),mini("shopOnline",c.shopOnline,"online in shop"), !S.mh ? (c.excl ? mini("excl",c.excl,"marked do not use") : null) : mini("notin",c.notin,"not in mHelp")].filter(Boolean));
+  $("shoprow").replaceChildren(mini("field",c.down+c.issues+c.up+c.unknown,"in the field"),mini("shopAll",c.shop+c.shopOnline,"in the shop"),mini("shopOnline",c.shopOnline,"online in shop"),mini("notin",c.notin,"not in mHelp"));
+  }
   const fams=[["all","All"],["Alibi","Alibi"],["Avigilon","Avigilon"],["Recon II","Recon II"]];
   $("fam").replaceChildren(...fams.map(([k,l])=>h("button",{class:"chip",type:"button","aria-pressed":String(S.fam===k),onclick:()=>{S.fam=k;render();}},l)));
 
@@ -1113,14 +1121,21 @@ function drawTv(vs, c){
   read.classList.toggle("stale", stale);
   if(!at) read.replaceChildren("Star4Live has not given a reading time.");
   else read.replaceChildren(stale ? "Old reading. " : "", "Star4Live read ", h("b",{text:when(at)}), " · "+ago(at)+" ago");
+  /* A wall screen is read from across the shop with nobody near it to notice a caveat, so the same rule holds
+     here as on the board: no totals until the official list has loaded. */
+  if(!S.mh){
+    $("tvTiles").replaceChildren(h("div",{class:"empty",style:"grid-column:1/-1"},"Waiting for the official count from mHelp."));
+    $("tvMinis").replaceChildren();
+  } else {
   const tile=(key,cls)=>h("div",{class:"tile "+cls+(c[key]?"":" zero")},h("span",{class:"num",text:c[key]}),h("span",{class:"lab",text:LABEL[key]}));
   $("tvTiles").replaceChildren(tile("down","t-down"),tile("issues","t-issues"),tile("unknown","t-unknown"),tile("up","t-up"));
   const mini=(num,lab)=>h("span",{},h("b",{text:num}),lab);
   $("tvMinis").replaceChildren(mini(c.down+c.issues+c.up+c.unknown,"in the field"),mini(c.shop+c.shopOnline,"in the shop"),mini(c.shopOnline,"online in shop"));
+  }
   const byName=(a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true});
   TV.rows=[...vs.filter(v=>v.status==="down").sort(byName), ...vs.filter(v=>v.status==="issues").sort(byName)];
   const feeds = !S.mh;
-  $("tvNote").textContent=(feeds ? "Counting what the camera systems see." : "Counting what mHelp lists.")+" A unit in the shop never counts as down. A reading that is missing or too old shows Unknown, never Down.";
+  $("tvNote").textContent=(feeds ? "No totals until mHelp, the official list, has loaded." : "Counting what mHelp lists.")+" A unit in the shop never counts as down. A reading that is missing or too old shows Unknown, never Down.";
   tvSize(); tvList();
   drawMap(vs); tvAreas(); tvTour();
 }
