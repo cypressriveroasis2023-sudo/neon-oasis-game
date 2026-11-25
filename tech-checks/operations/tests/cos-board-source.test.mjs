@@ -366,3 +366,12 @@ test('the map is on the board itself, on a phone as well as a desk', () => {
   // On the board the map shows only the map: its own tab keeps the filters and the list under it.
   assert.match(style, /#mapBlock\.onboard #mapChips,#mapBlock\.onboard #mapNote,#mapBlock\.onboard #mapList\{display:none\}/);
 });
+
+test('the Open box has the SIM and cell signal tools', () => {
+  // James, 25 Nov: Coverage map and Downdetector to troubleshoot SIM placement, and Simetry to work on the SIMs.
+  assert.match(app, /lk\("Coverage map","https:\/\/map\.coveragemap\.com\/"\)/);
+  assert.match(app, /lk\("Downdetector","https:\/\/downdetector\.com\/"\)/);
+  // Simetry's own sign-in page, never a pasted sign-in link with a token in it.
+  assert.match(app, /lk\("Simetry","https:\/\/simetry\.onelogin\.com\/login2\/"\)/);
+  assert.doesNotMatch(app, /simetry\.onelogin\.com\/login2\/\?return=/);
+});

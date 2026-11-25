@@ -59,6 +59,15 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-25** — Linked 31 InHand routers to COS units by exact name
+  (James approved the list) with `cos_router_link_v1`: 31 `ADD_ROUTER_LINK` rows,
+  safe after_state; watchdog `ok` after. 37 left unlinked on purpose. Record in
+  `tech-checks/docs/db-changes/20261125_inhand_link_31_routers.md`.
+- **2026-11-25** — Deployed `cos-unit-camera-status/a-links-v19` (#525): live now
+  **v20 `a9cc477f`** (pins updated). The camera-status read gives a unit with no
+  A# its hand-linked A#, and `POST /api/unit-camera-status/link-a` links one
+  (Tech Check `cos_mhelp_hand_link_v1`). Rollback `rollback-to-v19-entry`. A
+  next patch to this function must start from v20.
 - **2026-11-25** — Tech Check: `public.cos_mhelp_hand_link_state_v1` and
   `public.cos_mhelp_hand_link_v1` (A# linked by hand from the unit card; Owner or
   approved IT; writes `app_private.cos_mhelp_unit_link` `decided_by='hand'`, and
