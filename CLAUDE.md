@@ -59,6 +59,11 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-25** — `camera_devices`: SolarSpotter 029 (3 renamed by serial, old
+  029_4 row 158 `deactivated`), Helios 009 (Cam 001/002 swapped) and Solar Spotter
+  002 CAM 2 matched to VCC's names. Moved in VCC also lists camera-number
+  differences inside a unit. No audit row. Record in
+  `tech-checks/docs/db-changes/20261125_ss029_cam_numbers.md`.
 - **2026-11-25** — Tech Check: truck standard + extras + tech-to-tech moves
   (`techcheck-truck-extras-v1.sql`). New `app_private.truck_extra_units` /
   `truck_moves` / `truck_standard`, bucket `techcheck-truck-moves`, trigger
