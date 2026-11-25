@@ -5,6 +5,7 @@ import {readFileSync, readdirSync} from 'node:fs';
 const read = path => readFileSync(new URL(path, import.meta.url), 'utf8');
 const app = read('../src/cosBoard/boardApp.ts');
 const style = read('../src/cosBoard/boardStyle.ts');
+const data = read('../src/cosBoard/boardData.ts');
 
 test('the board carries no fleet data and reads nothing itself', () => {
   // This repository is public. Unit names, customers, addresses and IPs reach the board from the signed-in feed only.
@@ -42,8 +43,9 @@ test('the board is isolated from the rest of COS and sends nothing itself', () =
   assert.doesNotMatch(app, /drawTechForm|techCard|sendTech/);
   // Links open outside the app's own frame.
   const links = app.match(/h\("a",\{class:"(?:lk|mgshot)[^}]*\}/g) || [];
-  // Two on a unit's page, and on the manager view a handoff's signed report and each of its photos.
-  assert.equal(links.length, 4);
+  // On a unit's page: the system and port links, and each camera's Web and HTTPS page; on the manager view a
+  // handoff's signed report and each of its photos.
+  assert.equal(links.length, 6);
   for (const link of links) assert.match(link, /href:[^,}]+,target:"_blank",rel:"noopener noreferrer"/);
 });
 
@@ -290,9 +292,18 @@ test('checking one unit asks the app, never the network, and never fakes a readi
   assert.match(app, /mm && !mm\.fuzzy && mm\.rec && mm\.rec\.id/);
 });
 
+test('each camera links its own page through the forwarded port, and the card has a VCC button', () => {
+  // James, 25 Nov: "a VCC button also and a link to each cameras interface directly."
+  assert.match(app, /sys\.push\(lk\("VCC","https:\/\/global\.star4live\.com\/userWeb\/device\/device-management"\)\)/);
+  assert.match(app, /href:"http:\/\/"\+ip\+":"\+c\.p/);
+  assert.match(app, /href:"https:\/\/"\+ip\+":"\+\(c\.p\+43\)/);
+  // Only the standard forwarded ports are linked; anything else gets no link rather than a guess.
+  assert.match(data, /\[1400, 1500, 1600, 1700, 1900\]\.includes\(camera\.port\)/);
+});
+
 test('the card keeps its Star4Live button', () => {
   // James, 25 Nov: "keep star4live button." Troubleshoot never sends a tech there; the button stays for when they choose to.
-  assert.match(app, /if\(u\.s==="v"\) sys\.push\(lk\("Star4Live","https:\/\/global\.star4live\.com\/userWeb\/device\/device-management"\)\);/);
+  assert.match(app, /sys\.push\(lk\("Star4Live","https:\/\/global\.star4live\.com\/userWeb\/device\/device-management"\)\)/);
 });
 
 test('a full battery with a Victron alarm is not called out of power', () => {

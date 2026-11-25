@@ -59,6 +59,12 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-25** — Prepared, not deployed: patch
+  `cos-unit-camera-status/camera-ports-v18` (from live v18 `3c521a58`, record in
+  `tech-checks/docs/cos-unit-camera-status-v18-entry`). The camera query also
+  reads `source_metadata->>localIp`, and each camera in `cameraList` carries
+  `port` (1400/1500/1600/1700/1900 for 192.168.10.14-17/19); the local address is
+  never sent. After it deploys, live becomes v19 and the pins need its archive.
 - **2026-11-25** — Operations: `cos_troubleshoot_private.reports` and
   `public.cos_troubleshoot_report_v1` (Send to IT from the unit card; append-only,
   service_role only). Deployed 2026-11-25 17:31 UTC: patch
