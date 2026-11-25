@@ -59,11 +59,13 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
-- **2026-11-25** — Vendor emails v2 (prepared, deploy pending James): Eyeforce account
-  add / unit swap are the full CIF form, approved IT may send them, the filled CIF goes as an
-  attachment. Tech Check `cos-vendor-requests-v2.sql` (actor `fleet`, unit cameras, cron-secret
-  read); new **Operations** function `cos-deactivation-log` writes the cancellation sheet as the
-  COS service account. No audit row. Record in
+- **2026-11-25** — Vendor emails v2 **live** (#544, 22:46 UTC): Eyeforce account add / unit
+  swap are the full CIF form, approved IT may send them, the filled CIF goes as an attachment.
+  Tech Check `cos-vendor-requests-v2.sql` applied (actor `fleet`, unit cameras, cron-secret read);
+  `cos-vendor-request` **v2 is a pinned entry** (`docs/cos-vendor-request-v2-entry/serve.ts`,
+  commit 0537670) — a next change must redeploy with a new pin. New **Operations** function
+  `cos-deactivation-log` v1 (verify_jwt off, cron-secret checked by Tech Check) writes the
+  cancellation sheet as the COS service account. No audit row. Record in
   `tech-checks/docs/db-changes/20261125_eyeforce_cif_forms.md`.
 - **2026-11-25** — New edge function `cos-vendor-request` (Tech Check, v1) and
   `app_private.vendor_requests`: the unit card's "Email a vendor" (SIM cancel to

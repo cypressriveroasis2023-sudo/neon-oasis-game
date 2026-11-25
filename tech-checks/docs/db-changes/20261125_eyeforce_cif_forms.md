@@ -1,5 +1,10 @@
 # 2026-11-25 — Eyeforce account forms on the unit card, and the cancellation sheet through Operations
 
+**Applied and deployed 2026-11-25 ~22:46 UTC (James: "merge #544 and deploy").** SQL applied to Tech Check;
+`cos-vendor-request` v2 deployed as a pinned entry (`docs/cos-vendor-request-v2-entry/serve.ts`, commit
+0537670); `cos-deactivation-log` v1 deployed to Operations. Checked: James owner+fleet, Teddy fleet, Josh
+neither; Helios 002 lists 3 cameras; the Operations check opens the sheet and finds the tab.
+
 Asked by James (25 Nov): "Add account" and "Swap unit at account" become Eyeforce's own Customer Video
 Guarding Information Form (CIF V5), filled on the unit card by the techs, and emailed to techops@eyeforce.com
 with the form attached. The deactivation-sheet row now goes through the Operations project's service account,
@@ -50,5 +55,5 @@ select public.cos_sweep_watchdog_recent_v1(5);                                --
 
 - SQL: re-run `cos-vendor-requests-v1.sql`, then
   `drop function public.cos_vendor_unit_cameras_v1(text); drop function public.cos_vendor_log_secret_v1();`
-- Function: redeploy `cos-vendor-request` v1 (commit of #543).
+- Function: redeploy `cos-vendor-request` v1 (the files of #543, entry `serve.ts`, import map `deno.json`).
 - Operations: delete the `cos-deactivation-log` function.
