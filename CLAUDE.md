@@ -59,6 +59,11 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-25** — Deployed `cos-unit-camera-status/vcc-moves-v20` (#537): live now
+  **v21 `ac4a0ff3`** (pins updated). The camera-status read carries `vccMoves` for the
+  Owner and approved IT, and `POST /api/unit-camera-status/vcc-move` applies one item
+  (Tech Check `cos_vcc_move_apply_v1`). Rollback `rollback-to-v20-entry`. A next
+  patch to this function must start from v21.
 - **2026-11-25** — Tech Check: Moved in VCC. `public.cos_vcc_moves_state_v1` /
   `cos_vcc_move_apply_v1` (Owner or approved IT) list and apply camera records that
   no longer match VCC (moved / new / gone); applies write `camera_devices` one row at
