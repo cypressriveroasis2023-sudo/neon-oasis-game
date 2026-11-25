@@ -321,11 +321,11 @@ function drawVcc(){
   const go = !!(hooks && typeof hooks.onVccMove==="function") && S.can===true && vc && vc.fresh;
   $("punchList").replaceChildren(...(items.length ? items.map(it=>{
     const unit = it.toUnit || it.fromUnit || "", uv = Object.values(S.vmap||{}).find(v=>v.k===unit);
-    const lines = [["What: ", VCC_KIND[it.kind]||it.kind], it.vccName ? ["VCC calls it: ", it.vccName] : null, it.cosName ? ["COS calls it: ", it.cosName+(it.fromUnit ? " on "+it.fromUnit : "")] : null,
-      it.toUnit ? ["Goes to: ", it.toUnit] : null, ["Why: ", it.why||""]].filter(Boolean);
+    const lines = [["What: ", it.rename ? "Camera number differs from VCC" : (VCC_KIND[it.kind]||it.kind)], it.vccName ? ["VCC calls it: ", it.vccName] : null, it.cosName ? ["COS calls it: ", it.cosName+(it.fromUnit ? " on "+it.fromUnit : "")] : null,
+      it.toUnit && !it.rename ? ["Goes to: ", it.toUnit] : null, ["Why: ", it.why||""]].filter(Boolean);
     const main=h("button",{class:"pmain",type:"button",disabled:!uv,onclick:()=>{ if(uv) openUnit(uv.id); }},
       h("span",{class:"name",text: it.vccName || it.cosName || it.serial}), lines.map(([a,b])=>h("span",{class:"sub"},h("b",{text:a}),b)));
-    const btn = go && it.canApply ? h("button",{class:"pdone",type:"button",disabled:S.busy,onclick:()=>vccMove(it)}, VCC_BTN[it.kind]||"Apply") : null;
+    const btn = go && it.canApply ? h("button",{class:"pdone",type:"button",disabled:S.busy,onclick:()=>vccMove(it)}, it.rename ? "Use VCC's name" : (VCC_BTN[it.kind]||"Apply")) : null;
     return h("div",{class:"prow"+(uv?" s-"+uv.status:"")},main,btn);
   }) : [h("div",{class:"empty",text: vc ? "COS and VCC agree on every camera." : "Nothing here."})]));
 }

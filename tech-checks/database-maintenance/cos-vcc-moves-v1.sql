@@ -20,6 +20,9 @@
 -- Spotter, Solar Spotter and SS Hybrid count as one family here: VCC calls 253 "Spotter 253 (Solar
 -- Compatible)" while COS calls it SOLARSPOTTER 253, so a family difference alone is never a move.
 --
+-- A rename inside the same unit (VCC gives a camera another camera number) is listed as "moved" to the same
+-- unit; applying it takes VCC's name and keeps the unit's A#.
+--
 -- Every apply saves the row before and after, who and when, in app_private.cos_vcc_move_log. Nothing is
 -- written to camera_inventory_audit, so the camera sweep's allow-list is untouched.
 --
@@ -100,6 +103,19 @@ begin
      where m.vk is not null and app_private.cos_vcc_unit_of(m.unit_key) is not null
        and m.vk is distinct from app_private.cos_vcc_unit_of(m.unit_key)
     union all
+    -- renamed: same unit, but VCC gives the camera a different camera number than COS does (James, 25 Nov:
+    -- SolarSpotter 029 showed CAM 1 twice and its CAM 4 offline). Only the last number is compared, and only
+    -- when both names carry a camera number, so wording differences ("SS029_1", "SolarSpotter 029_1") never list.
+    select jsonb_build_object('key','moved:'||lower(m.device_serial),'kind','moved','cameraId',m.id,'serial',m.device_serial,
+             'vccName',m.vname,'cosName',m.device_name,'fromUnit',m.unit_key,'toUnit',m.unit_key,'status',m.vigilant_status,'site',m.site,
+             'rename',true,'canApply',true,
+             'why','VCC calls this camera '||m.vname||'. COS calls it '||m.device_name||'.') x
+      from moved m
+     where m.vk is not null and m.vk is not distinct from app_private.cos_vcc_unit_of(m.unit_key)
+       and (select count(*) from regexp_matches(m.vname,'\d+','g'))>=2
+       and (select count(*) from regexp_matches(m.device_name,'\d+','g'))>=2
+       and ((regexp_match(m.vname,'(\d+)\D*$'))[1])::int is distinct from ((regexp_match(m.device_name,'(\d+)\D*$'))[1])::int
+    union all
     -- new: in VCC, never matched to a COS camera
     select jsonb_build_object('key','new:'||lower(r->>'device_serial'),'kind','new','serial',r->>'device_serial',
              'vccName',regexp_replace(btrim(r->>'device_name'),'\s+',' ','g'),'toUnit',t.unit_key,'status',r->>'status',
@@ -159,7 +175,7 @@ begin
        and d.unit_key=it->>'toUnit' order by d.id desc limit 1;
     update public.camera_devices d set unit_key=it->>'toUnit', device_name=it->>'vccName',
         tech_check_unit_type=coalesce(tmpl.tech_check_unit_type,d.tech_check_unit_type),
-        mhelp_product_id=null, updated_at=now()
+        mhelp_product_id=case when it->>'toUnit'=d.unit_key then d.mhelp_product_id else null end, updated_at=now()
      where d.id=before_row.id returning * into after_row;
   elsif it->>'kind'='new' then
     select * into tmpl from public.camera_devices d where d.source='vigilant_control_center' and d.activation_state='active'

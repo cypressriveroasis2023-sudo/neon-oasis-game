@@ -797,8 +797,9 @@ test('Moved in VCC lists camera records VCC disagrees with, and one tap fixes on
     summary: {totalRecords: 2, fieldRecords: 2, shopRecords: 0, unflaggedFieldRecords: 2, doNotUseRecords: 0, missingRecords: 0},
   };
   const moved = {key: 'moved:sn-moved-1', kind: 'moved', cameraId: 7, serial: 'SN-MOVED-1', vccName: 'Spotter 002 CAM 4', cosName: 'Helios 001 Cam 2', fromUnit: 'HELIOS 001', toUnit: 'SPOTTER 002', canApply: true, why: 'VCC names this camera for SPOTTER 002. COS has it under HELIOS 001.'};
+  const renamed = {key: 'moved:sn-ren', kind: 'moved', rename: true, cameraId: 8, serial: 'SN-REN', vccName: 'Spotter 002 CAM 4', cosName: 'Spotter 002 CAM 1', fromUnit: 'SPOTTER 002', toUnit: 'SPOTTER 002', canApply: true, why: 'VCC calls this camera Spotter 002 CAM 4. COS calls it Spotter 002 CAM 1.'};
   const shop = {key: 'new:sn-shop', kind: 'new', serial: 'SN-SHOP', vccName: 'Shop', toUnit: null, canApply: false, why: 'Its VCC name gives no unit.'};
-  const vccMoves = {fresh: true, syncedAt: fresh, items: [moved, shop]};
+  const vccMoves = {fresh: true, syncedAt: fresh, items: [moved, renamed, shop]};
   const {app, state} = await mountFleet(page, false, {cameraStatus: reportOf(units, {vccMoves}), field: value, skipInitialFieldCount: true});
   const host = app.locator('.cos-board-host');
   await expect(host).toBeVisible();
@@ -810,22 +811,23 @@ test('Moved in VCC lists camera records VCC disagrees with, and one tap fixes on
     if (envelope.path !== '/api/unit-camera-status/vcc-move') return route.fallback();
     sent.push(envelope.body);
     return route.fulfill({status: 200, headers: {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
-      json: {...reportOf(units, {vccMoves: {fresh: true, syncedAt: fresh, items: [shop]}}), vccMoved: {key: moved.key, kind: 'moved', unit: 'SPOTTER 002', name: 'Spotter 002 CAM 4', state: 'active', by: 'Fixture Owner'}}});
+      json: {...reportOf(units, {vccMoves: {fresh: true, syncedAt: fresh, items: [renamed, shop]}}), vccMoved: {key: moved.key, kind: 'moved', unit: 'SPOTTER 002', name: 'Spotter 002 CAM 4', state: 'active', by: 'Fixture Owner'}}});
   });
   await inBoard(host, root => root.getElementById('tabPunch').click());
   const chips = () => inBoard(host, root => [...root.querySelectorAll('#punchChips .chip')].map(chip => chip.textContent));
-  await expect.poll(chips).toContain('Moved in VCC \u00b7 2');
+  await expect.poll(chips).toContain('Moved in VCC \u00b7 3');
   await inBoard(host, root => [...root.querySelectorAll('#punchChips .chip')].find(chip => chip.textContent.startsWith('Moved in VCC')).click());
   const shown = await inBoard(host, root => root.getElementById('viewPunch').textContent);
   expect(shown).toContain('VCC names this camera for SPOTTER 002');
   expect(shown).toContain('Its VCC name gives no unit');
   // Only the item with one safe answer gets a button.
-  expect(await inBoard(host, root => [...root.querySelectorAll('#punchList .pdone')].map(b => b.textContent))).toEqual(['Move it']);
+  expect(await inBoard(host, root => [...root.querySelectorAll('#punchList .pdone')].map(b => b.textContent))).toEqual(['Move it', "Use VCC's name"]);
+  expect(shown).toContain('Camera number differs from VCC');
   await inBoard(host, root => root.querySelector('#punchList .pdone').click());
   await expect.poll(() => sent.length).toBe(1);
   expect(sent[0]).toEqual({key: 'moved:sn-moved-1'});
   await expect.poll(() => toastText(host)).toContain('Spotter 002 CAM 4 is now on SPOTTER 002');
-  await expect.poll(chips).toContain('Moved in VCC \u00b7 1');
+  await expect.poll(chips).toContain('Moved in VCC \u00b7 2');
   expect(state.errors).toEqual([]);
 });
 
