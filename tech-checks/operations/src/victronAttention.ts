@@ -1,11 +1,11 @@
 import {canonicalCameraUnit} from './fieldCameraHealth';
 import {inventoryPlacement} from './fleetSnapshot';
-import {unitTileSummary} from './vrmReadOnlyModel';
+import {shortDate, unitTileSummary} from './vrmReadOnlyModel';
 import type {VrmUnit} from '../../supabase/functions/cos-operations-pages/vrm';
 import type {SafeVrmPower} from '../../supabase/functions/cos-operations-pages/vrmSafePower';
 
 export type VictronPlacement = 'field' | 'shop' | 'unknown';
-export type VictronAttention = {installationId: number; name: string; kind: 'low' | 'fair' | 'unknown' | 'off'; line: string};
+export type VictronAttention = {installationId: number; name: string; kind: 'alarm' | 'low' | 'fair' | 'unknown' | 'off'; line: string};
 type InventoryUnit = {unitNumber?: string; placement?: string; currentLocationType?: string; effectivePlacement?: {contract?: string; state?: string}};
 
 /** Field or Shop from the one mHelp unit with the same Helios number. None or two matches stay unknown. */
@@ -28,12 +28,14 @@ export function victronNeedsAttention(units: readonly VrmUnit[], rows: SafeVrmPo
     if (heliosPlacement(unit.name, inventory) !== 'field') continue;
     const tile = unitTileSummary(unit, rows, now);
     const pct = tile.soc ? Math.round(tile.soc.value) + '%' : '';
-    if (tile.tone === 'low') out.push({installationId: unit.installationId, name: unit.name, kind: 'low', line: 'Low battery · ' + pct});
+    const seen = tile.lastSeen ? ' · last connected ' + shortDate(tile.lastSeen, now) : '';
+    if (tile.alarms.length) out.push({installationId: unit.installationId, name: unit.name, kind: 'alarm', line: 'Victron ' + (tile.alarms[0].level === 2 ? 'alarm' : 'warning') + ' · ' + tile.alarms.map(a => a.kind).join(', ') + (pct ? ' · ' + pct : '')});
+    else if (tile.tone === 'low') out.push({installationId: unit.installationId, name: unit.name, kind: 'low', line: 'Low battery · ' + pct});
     else if (tile.tone === 'fair' && tile.soc && tile.soc.value < 35) out.push({installationId: unit.installationId, name: unit.name, kind: 'fair', line: 'Getting low · ' + pct});
-    else if (tile.tone === 'stale') out.push({installationId: unit.installationId, name: unit.name, kind: 'unknown', line: 'Power unknown · reading over 45 min old'});
-    else if (tile.tone === 'none') out.push({installationId: unit.installationId, name: unit.name, kind: 'unknown', line: 'Power unknown · no battery reading'});
-    else if (tile.tone === 'unavailable') out.push({installationId: unit.installationId, name: unit.name, kind: 'off', line: 'Not in the latest Victron sync'});
+    else if (tile.tone === 'stale') out.push({installationId: unit.installationId, name: unit.name, kind: 'unknown', line: 'Power unknown' + (seen || ' · reading over 45 min old')});
+    else if (tile.tone === 'none') out.push({installationId: unit.installationId, name: unit.name, kind: 'unknown', line: 'Power unknown · no battery reading' + seen});
+    else if (tile.tone === 'unavailable') out.push({installationId: unit.installationId, name: unit.name, kind: 'off', line: 'Not in the latest Victron sync' + seen});
   }
-  const rank = {low: 0, fair: 1, off: 2, unknown: 3};
+  const rank = {alarm: 0, low: 1, fair: 2, off: 3, unknown: 4};
   return out.sort((a, b) => rank[a.kind] - rank[b.kind] || a.name.localeCompare(b.name, undefined, {numeric: true}));
 }

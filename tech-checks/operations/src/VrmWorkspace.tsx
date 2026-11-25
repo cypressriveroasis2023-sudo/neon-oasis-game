@@ -4,7 +4,7 @@ import { getVrmFleet } from './vrmFleetApi';
 import { readVrmFleetConfig, type VrmUnit } from '../../supabase/functions/cos-operations-pages/vrm';
 import './vrm.css';
 import VrmReadOnlyDashboard from './VrmReadOnlyDashboard';
-import { readDashboardPower, unitTileSummary } from './vrmReadOnlyModel';
+import { readDashboardPower, shortDate, unitTileSummary } from './vrmReadOnlyModel';
 import { heliosPlacement, placementLabel, victronNeedsAttention } from './victronAttention';
 
 type FleetSync = ReturnType<typeof readVrmFleetConfig>['sync'];
@@ -168,10 +168,15 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
     {loaded && units.length === 0 && <div className='vrm-awaiting' role='status'><h3>No installations in the saved fleet</h3><p>{canDiscover ? 'Refresh the fleet to check the connected Victron account.' : 'No saved installations are available. Ask an Owner to check the fleet sync.'} No installation IDs or dashboards are assumed.</p></div>}
     {units.length > 0 && <nav className='tabs vrm-unit-grid' aria-label='Helios installations'>{units.map(item => <button key={item.installationId} className={(selected === item.installationId ? 'selected' : 'secondary') + ' vrm-tone-' + tiles.get(item.installationId)!.tone} aria-pressed={selected === item.installationId} onClick={() => select(item.installationId)}>
       <span className='vrm-tile-head'><strong>{item.name}</strong>{heliosPlacement(item.name, inventory) !== 'unknown' && <em aria-hidden='true' className={'vrm-place vrm-place-'+heliosPlacement(item.name, inventory)}>{placementLabel(heliosPlacement(item.name, inventory))}</em>}</span>{(nameCounts.get(item.name) ?? 0) > 1 && <small>Installation {item.installationId}</small>}<small className={item.available === false ? 'vrm-tile-status' : 'vrm-sr-only'}>{item.available === false ? 'Unavailable in latest sync' : item.embedUrl ? 'Dashboard enabled' : 'Read-only power'}</small>
-      {(() => { const tile = tiles.get(item.installationId)!; if (tile.tone === 'unavailable') return null; return <span className='vrm-tile-reading' aria-hidden='true' title={toneLabel[tile.tone]}>
+      {(() => { const tile = tiles.get(item.installationId)!; if (tile.tone === 'unavailable') return tile.lastSeen ? <span className='vrm-tile-reading' aria-hidden='true'><span className='vrm-tile-solar vrm-tile-seen'>Last seen {shortDate(tile.lastSeen, now)}</span></span> : null; return <span className='vrm-tile-reading' aria-hidden='true' title={toneLabel[tile.tone]}>
         <span className='vrm-tile-soc'><i/>{tile.soc ? Math.round(tile.soc.value) + '%' : '—'}</span>
         <span className='vrm-tile-bar'><b style={{width: (tile.soc ? Math.max(0, Math.min(100, tile.soc.value)) : 0) + '%'}}/></span>
-        <span className='vrm-tile-solar'>☀ {tile.solar ? Math.round(tile.solar.value) + ' ' + tile.solar.unit : '—'}{tile.tone === 'stale' ? ' · stale' : ''}</span>
+        {tile.tone === 'stale' || tile.tone === 'none'
+          ? <span className='vrm-tile-solar vrm-tile-seen'>{tile.lastSeen ? 'Last seen ' + shortDate(tile.lastSeen, now) : 'Never connected'}</span>
+          : <span className='vrm-tile-solar'>☀ {tile.solar ? Math.round(tile.solar.value) + ' ' + tile.solar.unit : '—'}</span>}
+        {tile.alarms.length > 0
+          ? <span className={'vrm-tile-alarm vrm-alarm-' + tile.alarms[0].level}>⚠ {tile.alarms[0].kind}{tile.alarms[0].level === 1 ? ' warning' : ''}</span>
+          : tile.flow && <span className={'vrm-tile-flow vrm-flow-' + tile.flow.state} title={tile.flow.state === 'charging' ? 'Charging' : tile.flow.state === 'draining' ? 'Draining' : 'Idle'}>{tile.flow.state === 'idle' ? 'Idle' : (tile.flow.state === 'charging' ? '↑ ' : '↓ ') + (tile.flow.watts !== null ? Math.abs(tile.flow.watts) + ' W' : tile.flow.amps !== null ? Math.abs(tile.flow.amps) + ' A' : '') + (tile.flow.state === 'charging' ? ' in' : ' out')}</span>}
       </span>; })()}
     </button>)}</nav>}
     {unit && <>
