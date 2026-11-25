@@ -1,6 +1,7 @@
 import {readVrmFleetConfig} from '../../../supabase/functions/cos-operations-pages/vrm';
 import {canonicalCameraUnit} from '../fieldCameraHealth';
 import {readDashboardPower, unitTileSummary, type TileTone} from '../vrmReadOnlyModel';
+import {cloudyWarning, outlookLine, type OutlookDay} from '../vrmWeather';
 import {historyFlags, overnightLow, tonightBasis, tonightForecast, tonightHeadline, tonightSteps, type HistoryPoint} from '../vrmHistory';
 
 /** One Helios unit's Victron reading as the COS Board draws it.
@@ -12,7 +13,9 @@ export type BoardPower = {b: number | null; w: number | null; v: number | null; 
   /** From saved history, when it has been read: last night's lowest battery %, and plain-language flags. */
   nl?: number; hf?: string[];
   /** Tonight's estimate (5 PM to 7 AM): verdict, one-line headline, why, and steps for a tech. */
-  tn?: {v: 'ok' | 'tight' | 'low' | 'charging'; h: string; b: string; s: string[]}};
+  tn?: {v: 'ok' | 'tight' | 'low' | 'charging'; h: string; b: string; s: string[]};
+  /** Sun for the next two days at this unit's site ("☀ Today · ☁ Tomorrow"), and a warning when gray days meet a low battery. */
+  sk?: {o: string; w?: string}};
 
 const seconds = (value?: string) => {
   const time = value ? Date.parse(value) : NaN;
@@ -24,7 +27,7 @@ const seconds = (value?: string) => {
  * Only HELIOS names are matched. Two installations with the same number match nothing rather than a guess.
  * Separate batteries are never averaged: the system reading wins, otherwise the lowest single monitor.
  */
-export function boardPowerByUnit(fleetData: unknown, now: number, history?: ReadonlyMap<number, HistoryPoint[]> | null): Map<string, BoardPower> {
+export function boardPowerByUnit(fleetData: unknown, now: number, history?: ReadonlyMap<number, HistoryPoint[]> | null, weather?: ReadonlyMap<string, OutlookDay[]> | null): Map<string, BoardPower> {
   const out = new Map<string, BoardPower>();
   let items: ReturnType<typeof readVrmFleetConfig>['items'];
   try { items = readVrmFleetConfig(fleetData).items; } catch { return out; }
@@ -57,6 +60,11 @@ export function boardPowerByUnit(fleetData: unknown, now: number, history?: Read
         return {...(night ? {nl: night.low} : {}), ...(flags.length ? {hf: flags} : {}),
           ...(t ? {tn: {v: t.verdict, h: tonightHeadline(t), b: tonightBasis(t), s: tonightSteps(t)}} : {})};
       })(history?.get(item.installationId))),
+      ...((o => {
+        if (!o?.length) return {};
+        const w = tile.fresh && tile.soc ? cloudyWarning(o, tile.soc.value) : null;
+        return {sk: {o: outlookLine(o), ...(w ? {w} : {})}};
+      })(weather?.get(key))),
     });
   }
   return out;
