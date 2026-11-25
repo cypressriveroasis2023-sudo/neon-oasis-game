@@ -37,6 +37,22 @@ import {createHash} from 'node:crypto';
 // polled window is unchanged, and tests/recon-event-window.test.mjs holds both
 // boundaries exactly, including that a wider window never turns Unknown into
 // online and never softens a fresh confirmed miss.
+// Reviewed 2026-11-25 at James's instruction: a Recon may carry its site in its
+// name. canonicalCameraUnit was fully anchored on purpose -- "never
+// device/site-name substring matching" -- but Reconeyez names a detector after
+// where it stands ("RII005 - Newmark/Gembler", "RII-024 GVP Rise Loop 410"), so
+// all 38 Recon records in camera_devices failed it and every Recon on the board
+// read "No site on record" at Unknown. Two patterns are ADDED after the two
+// anchored ones, which are unchanged, so every name that parsed before parses
+// identically; the new ones accept the Recon families only, and only with a
+// separator and a site after the number. Checked against all 472 unit keys in
+// camera_devices: 36 Recon records gain an identity and the other 16 unparsed
+// keys stay unparsed, including "Stolen from RII-022 on 04/10/2026", the test
+// rigs, "Sniper Alibi 243", "SPOTTER NVR 305" and "SS023.1". Where a duplicate
+// pair now resolves to one unit (024 and 034 each have two COS records), the
+// existing guard at the call site reports 'ambiguous' rather than choosing, so
+// a collision is never silently resolved. fieldCameraHealth.ts's pin moves with
+// that change and tests/recon-name-with-site.test.mjs holds all four properties.
 const expected={
   "FleetDashboard.tsx": "8d711a97853b5f646d892f5552a792656623a9f8",
   "FleetUnitHealth.tsx": "3ba1f2507241a63d839424bc1db28b6d584659c1",
@@ -44,7 +60,7 @@ const expected={
   "FleetBatterySummary.tsx": "278f67abefcc6846876e2ced0862eec9cf1733dd",
   "LastKnownCameraStatus.tsx": "40b4218e51b13c8e15d5f5e7ad81be410df4663d",
   "fleetDashboardModel.ts": "d98e1e1700ef34888a40b5caa0a9c9bdb3359d41",
-  "fieldCameraHealth.ts": "f3f44410e9368919658330d18e8b14957e227753",
+  "fieldCameraHealth.ts": "d9104f61006a5f76c478de8e2cddb84c7fcda323",
   "cameraEvidence.ts": "3eabba249ac6c8f4384eefd044a6d154e7904172",
   "api.ts": "b00323c7dc29b5e8cfb05851dcf65bf53c9108a7",
   "useCameraHealth.ts": "62382e9352b2c17cdafa144a784bc2f64fa04d51",
