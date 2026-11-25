@@ -21,7 +21,7 @@ const endpoint = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-oper
 // paths are kept in step with the function's own list by a test, rather than
 // imported, so every existing harness that compiles this file keeps working.
 const unitCameraStatusEndpoint = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-unit-camera-status';
-const unitCameraStatusPaths = ['/api/unit-camera-status', '/api/unit-camera-status/edit', '/api/unit-camera-status/troubleshoot'];
+const unitCameraStatusPaths = ['/api/unit-camera-status', '/api/unit-camera-status/edit', '/api/unit-camera-status/troubleshoot', '/api/unit-camera-status/link-a'];
 const endpointFor = (path: string) => unitCameraStatusPaths.includes(path) ? unitCameraStatusEndpoint : endpoint;
 type ParentSession = { token: string; role: string };
 // Only reviewed snapshot routes may share a pending read. A logical GET alone

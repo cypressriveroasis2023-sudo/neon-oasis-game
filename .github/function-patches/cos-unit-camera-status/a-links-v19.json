@@ -1,0 +1,83 @@
+{
+  "slug": "cos-unit-camera-status",
+  "projectRef": "tughscoxralhofrckvxy",
+  "sourceDir": "tech-checks/docs/cos-unit-camera-status-v19-entry",
+  "sourceCommit": "95e3e5a4f81f0f823e7e646a01a8235da7c5f425",
+  "deployedFileNames": {
+    "index.ts": "cos-unit-camera-status/index.ts",
+    "deno.json": "cos-unit-camera-status/deno.json"
+  },
+  "entrypointPath": "cos-unit-camera-status/index.ts",
+  "importMapPath": "cos-unit-camera-status/deno.json",
+  "verifyJwt": false,
+  "description": "A# links on the unit card. The camera-status read also reads every unit's A# link from Tech Check (public.cos_mhelp_hand_link_state_v1, as the signed-in person) and gives a unit without a productId its linked A#; and POST /api/unit-camera-status/link-a links one unit to one mHelp A# by hand through public.cos_mhelp_hand_link_v1 (Owner or approved IT; A# must be on the mHelp list and free). Seven exact edits to live v19; nothing else changes.",
+  "authorization": "James, 2026-11-25: 'build a# button'. Running the deploy still needs his explicit go for that run.",
+  "releaseStatus": "PREPARED",
+  "sourceRecord": "tech-checks/docs/cos-unit-camera-status-v19-entry/index.ts",
+  "requireLiveBeforeDeploy": {
+    "status": "ACTIVE",
+    "version": 19,
+    "ezbr_sha256": "c434eaf6f135cff295ec0f97cfbf46c669801af5f2d6c14a7ed49a3c7d226a68"
+  },
+  "edits": [
+    {
+      "file": "index.ts",
+      "needle": "          const [cameras, integrations, handEdits, otherDevices, otherHealth] = await Promise.all([\n",
+      "replacement": "          const [cameras, integrations, handEdits, otherDevices, otherHealth, aLinks] = await Promise.all([\n",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "            legacyAll(\"camera_health_current?select=camera_device_id,overall_status,checked_at&order=camera_device_id.asc\", context.headers).catch(() => null)\n          ]);\n",
+      "replacement": "            legacyAll(\"camera_health_current?select=camera_device_id,overall_status,checked_at&order=camera_device_id.asc\", context.headers).catch(() => null),\n            // A# links (mHelp product ids) by unit, so the card knows each unit's A#. Unreadable links hide nothing else.\n            readJson(LEGACY_URL + \"/rest/v1/rpc/cos_mhelp_hand_link_state_v1\", { method: \"POST\", headers: { ...context.headers, \"Content-Type\": \"application/json\" }, body: \"{}\" }, \"A# links could not be read.\").then((v) => v?.contract === \"COS_MHELP_HAND_LINKS_V1\" && Array.isArray(v.links) ? v.links : null).catch(() => null)\n          ]);\n",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "            ...applyHandEdits({ ...star, units, counts: countUnits(units) }, handEdits),\n",
+      "replacement": "            ...applyHandEdits({ ...star, units: units.map((u) => u.productId ? u : ((l) => l ? { ...u, productId: String(l.productId) } : u)((aLinks || []).find((l) => typeof l?.unitKey === \"string\" && l.unitKey.toUpperCase() === String(u.unit).toUpperCase() && /^[1-9][0-9]{0,14}$/.test(String(l.productId))))), counts: countUnits(units) }, handEdits),\n            aLinksRead: Array.isArray(aLinks),\n",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "      if (path === \"/api/unit-camera-status\" || path === \"/api/unit-camera-status/edit\") {\n",
+      "replacement": "      if (path === \"/api/unit-camera-status\" || path === \"/api/unit-camera-status/edit\" || path === \"/api/unit-camera-status/link-a\") {\n",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "        const editing = path.endsWith(\"/edit\");\n",
+      "replacement": "        const editing = path.endsWith(\"/edit\") || path.endsWith(\"/link-a\");\n",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "        if (!current.handEditsRead) fail16(\"Saved hand edits are unavailable, so a new one cannot be recorded safely.\", 503);\n",
+      "replacement": "        if (!current.handEditsRead) fail16(\"Saved hand edits are unavailable, so a new one cannot be recorded safely.\", 503);\n        if (path === \"/api/unit-camera-status/link-a\") {\n          // An A# linked by hand on the unit card (James, 25 Nov). Tech Check checks the person is the Owner or\n          // approved IT, that the A# is on the mHelp list and free, and records who and when.\n          const lb = body && typeof body === \"object\" && !Array.isArray(body) ? body : {};\n          const lUnit = typeof lb.unitKey === \"string\" ? lb.unitKey.trim() : \"\";\n          const lPid = typeof lb.productId === \"string\" ? lb.productId.trim() : \"\";\n          if (!lUnit || lUnit.length > 120 || !/^[1-9][0-9]{0,14}$/.test(lPid)) return json({ error: \"Enter the A# from mHelp, digits only. Nothing was linked.\" }, 422);\n          if (!current.units.some((u) => String(u.unit).toUpperCase() === lUnit.toUpperCase())) return json({ error: \"COS is no longer reporting that unit. Nothing was linked.\" }, 404);\n          const lRole = context.legacyOwner && context.actorId ? \"owner\" : \"it\";\n          const lName = (context.name || \"\").trim() || (lRole === \"owner\" ? \"Owner\" : \"IT technician\");\n          let lReply, lData = {};\n          try { lReply = await requestFetch(LEGACY_URL + \"/rest/v1/rpc/cos_mhelp_hand_link_v1\", { method: \"POST\", headers: { ...context.headers, \"Content-Type\": \"application/json\" }, body: JSON.stringify({ p_unit_key: lUnit, p_product_id: lPid, p_actor_name: lName }) }); } catch { fail16(\"The A# could not be linked. Nothing was changed.\", 503); }\n          try { lData = await lReply.json(); } catch { lData = {}; }\n          if (!lReply.ok) return json({ error: lData?.code === \"PT409\" && typeof lData.message === \"string\" ? lData.message.slice(0, 300) : lData?.code === \"42501\" ? \"Only the Owner or approved IT can link an A#.\" : \"The A# could not be linked. Nothing was changed.\" }, lReply.status === 403 || lData?.code === \"42501\" ? 403 : 422);\n          if (lData?.contract !== \"COS_MHELP_HAND_LINK_RESULT_V1\") fail16(\"The A# link could not be confirmed. Tap Refresh.\", 503);\n          const lAfter = await readStatus();\n          return json({ ...lAfter, linked: { unit: lData.unitKey, productId: lData.productId, label: lData.label, by: lName, duplicate: lData.repeat === true } });\n        }\n",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "var UNIT_CAMERA_STATUS_PATHS = [\"/api/unit-camera-status\", \"/api/unit-camera-status/edit\", \"/api/unit-camera-status/troubleshoot\"];",
+      "replacement": "var UNIT_CAMERA_STATUS_PATHS = [\"/api/unit-camera-status\", \"/api/unit-camera-status/edit\", \"/api/unit-camera-status/troubleshoot\", \"/api/unit-camera-status/link-a\"];",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "const CAMERA_STATUS_ROUTES=[\"/api/unit-camera-status\",\"/api/unit-camera-status/edit\",\"/api/unit-camera-status/troubleshoot\"];",
+      "replacement": "const CAMERA_STATUS_ROUTES=[\"/api/unit-camera-status\",\"/api/unit-camera-status/edit\",\"/api/unit-camera-status/troubleshoot\",\"/api/unit-camera-status/link-a\"];",
+      "occurrences": 1
+    }
+  ],
+  "expectedBefore": {
+    "index.ts": "a718c407bdacd735cce4f00aedfab32e8557b886b25ee653a9c32defa3c2c4e7",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "expectedAfter": {
+    "index.ts": "60a851de56dd962de727dfba577c7d84c4ddf4ce0e2a7b6b639a72b7b9ad63e2",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "dryRun": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/a-links-v19.json --dry-run",
+  "deploy": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/a-links-v19.json --deploy",
+  "rollback": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/rollback-to-v19-entry.json --deploy"
+}

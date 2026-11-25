@@ -31,10 +31,13 @@ test('the board is isolated from the rest of COS and sends nothing itself', () =
   assert.doesNotMatch(app, /unit-camera-status|\bapi\.(?:get|post)\(|from '\.\.?\/api'/);
   const landing = read('../src/CosBoardLanding.tsx');
   assert.equal(landing.split("api.post('/api/unit-camera-status/edit', handFixRequest(unit, step, crypto.randomUUID()))").length - 1, 1);
-  // Exactly three sends, each named here on purpose: the hand fix, checking one unit on demand, and sending a
+  // Exactly four sends, each named here on purpose: the hand fix, checking one unit on demand, sending a
   // Troubleshoot result to IT (James, 25 Nov: it goes on the next IT sheet instead of being copied by hand; it
-  // schedules nothing and changes no unit). The count stays exact so a fourth has to be argued for here.
-  assert.equal(landing.split('api.post(').length - 1, 3);
+  // schedules nothing and changes no unit), and linking an A# by hand (James, 25 Nov: "build a# button"; Tech Check
+  // checks the person and the A#). The count stays exact so a fifth has to be argued for here.
+  assert.equal(landing.split('api.post(').length - 1, 4);
+  assert.equal(landing.split("api.post('/api/unit-camera-status/link-a', {unitKey, productId})").length - 1, 1);
+  assert.match(app, /await hooks\.onLinkA\(v\.k, pid\)/);
   assert.equal(landing.split("api.post('/api/unit-camera-status/troubleshoot', report)").length - 1, 1);
   assert.match(app, /await hooks\.onSendTrouble\(\{requestId: tr\.sent\.id/);
   assert.equal(landing.split("api.post('/api/product-connections/verify', {productIds: [productId]})").length - 1, 1);
@@ -133,7 +136,9 @@ test('the board is the Fleet screen, and the older screen only stands in when th
   const board = read('../src/FleetBoard.tsx');
   const css = read('../src/sourceAttention.css');
   // Fleet hands the board what it needs and one thing more: why a unit asked for from another screen could not be opened.
-  assert.ok(fleet.includes(' onFeed={setCameraUnits} notice={selectionNotice}/>}'));
+  assert.ok(fleet.includes(' onFeed={setCameraUnits} notice={selectionNotice} unitAsked={boardAsk.n?boardAsk:null}/>}'));
+  // A unit asked for from another screen opens on the board's own card, not the older details drawer (James, 25 Nov).
+  assert.ok(fleet.includes('if(boardShownHere()&&(matches.length===1||initialUnitLabel)){'));
   assert.match(board, /\{notice && <p className='cos-board-notice' role='status'>\{notice\}<\/p>\}\s*<Suspense /);
   assert.ok(css.includes("#root#root .cos-fleet-dashboard:has(>.cos-board-landing>.cos-board-notice)>.cos-fleet-content>p.cos-fleet-message[role='status']{display:none}"));
   // While the board is on screen the older view, its jump button and its row of tabs are all out of sight. One rule each, nothing else.
@@ -260,7 +265,7 @@ test('the board counts one way, and a hand fix comes first on the card and says 
   assert.ok(app.includes('["done","Fixed by hand","Set by hand in COS, so these are off the list and stay off.'));
   // The card says in so many words that a hand fix is kept.
   assert.ok(app.includes('A fix made by hand wins in COS and stays until someone undoes it. No new reading from mHelp or Star4Live replaces it.'));
-  assert.match(app, /render\(\);\n  announce\(\);\n  saidSaved\(\);\n\}/);
+  assert.match(app, /render\(\);\n  announce\(\);\n  saidSaved\(\);\n  if\(S\.ask\) openByName\(S\.ask\);\n\}/);
   assert.ok(app.includes('" The count changed: "+moved.join(", ")+"."'));
 });
 
