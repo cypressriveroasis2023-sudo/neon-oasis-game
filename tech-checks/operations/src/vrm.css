@@ -168,3 +168,5 @@ html[data-theme='light'] .vrm-fleet-summary li,html[data-theme='light'] .vrm-wor
 .vrm-guide-alerts b{color:#fff}.vrm-guide-alerts em{font-style:normal;color:#9ff0c0}.vrm-guide-alerts em::before{content:'→ '}
 .vrm-guide-ok li::before{content:'✓ ';color:#3ddc84}.vrm-guide-escalate li::before{content:'! ';color:#ff6b78;font-weight:800}
 .vrm-tonight ol{list-style:decimal outside}.vrm-tonight ol li{display:list-item;padding-left:2px}.vrm-tonight ol li::marker{color:#ff8a93;font-weight:700}
+
+.vrm-attention .vrm-attn-notfull span{color:#f5b942;font-weight:650}.vrm-attention .vrm-attn-load span{color:#f5b942;font-weight:650}

@@ -6,7 +6,7 @@ import type {VrmUnit} from '../../supabase/functions/cos-operations-pages/vrm';
 import type {SafeVrmPower} from '../../supabase/functions/cos-operations-pages/vrmSafePower';
 
 export type VictronPlacement = 'field' | 'shop' | 'unknown';
-export type VictronAttention = {installationId: number; name: string; kind: 'alarm' | 'low' | 'tonight' | 'fair' | 'overnight' | 'solar' | 'tight' | 'unknown' | 'off'; line: string};
+export type VictronAttention = {installationId: number; name: string; kind: 'alarm' | 'low' | 'tonight' | 'fair' | 'overnight' | 'notfull' | 'load' | 'solar' | 'tight' | 'unknown' | 'off'; line: string};
 type InventoryUnit = {unitNumber?: string; placement?: string; currentLocationType?: string; effectivePlacement?: {contract?: string; state?: string}};
 
 /** Field or Shop from the one mHelp unit with the same Helios number. None or two matches stay unknown. */
@@ -46,6 +46,6 @@ export function victronNeedsAttention(units: readonly VrmUnit[], rows: SafeVrmPo
       for (const flag of historyFlags(history?.get(unit.installationId) ?? [], now)) out.push({installationId: unit.installationId, name: unit.name, kind: flag.kind, line: flag.line});
     }
   }
-  const rank = {alarm: 0, low: 1, tonight: 2, fair: 3, overnight: 4, solar: 5, tight: 6, off: 7, unknown: 8};
+  const rank = {alarm: 0, low: 1, tonight: 2, fair: 3, overnight: 4, notfull: 5, load: 6, solar: 7, tight: 8, off: 9, unknown: 10};
   return out.sort((a, b) => rank[a.kind] - rank[b.kind] || a.name.localeCompare(b.name, undefined, {numeric: true}));
 }

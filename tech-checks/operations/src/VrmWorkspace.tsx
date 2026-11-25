@@ -6,7 +6,7 @@ import './vrm.css';
 import VrmReadOnlyDashboard from './VrmReadOnlyDashboard';
 import { readDashboardPower, shortDate, unitTileSummary } from './vrmReadOnlyModel';
 import { heliosPlacement, placementLabel, victronNeedsAttention } from './victronAttention';
-import { historyFlags, isNightForecastTime, last24h, overnightLow, readVrmHistory, solarVsYesterday, tonightBasis, tonightForecast, tonightHeadline, tonightSteps, type HistoryPoint, type Tonight } from './vrmHistory';
+import { dayPeak, historyFlags, isNightForecastTime, nightLoad, last24h, overnightLow, readVrmHistory, solarVsYesterday, tonightBasis, tonightForecast, tonightHeadline, tonightSteps, type HistoryPoint, type Tonight } from './vrmHistory';
 import VrmTechGuide from './VrmTechGuide';
 import VrmHistoryChart from './VrmHistoryChart';
 
@@ -234,6 +234,8 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
         <ul className='vrm-history-facts'>
           <li className={night && night.low < 30 ? 'bad' : ''}><span>Overnight low</span><b>{night ? night.low + '%' : '—'}</b></li>
           <li className={sun && sun.share < 0.5 ? 'warn' : ''}><span>Solar vs yesterday</span><b>{sun ? Math.round(sun.share * 100) + '%' : '—'}</b></li>
+          {(() => { const peak = dayPeak(points, now); return <li className={peak && peak.peak < 95 ? 'warn' : ''}><span>{peak ? 'Best battery ' + peak.label : 'Best battery today'}</span><b>{peak ? peak.peak + '%' : '—'}</b></li>; })()}
+          {(() => { const load = nightLoad(points, now); return <li className={load?.high ? 'warn' : ''}><span>Night power use</span><b>{load ? load.recent + ' W' + (load.high ? ' (normal ' + load.normal + ')' : '') : '—'}</b></li>; })()}
         </ul>
         {flags.length > 0 && <p className='vrm-history-flag'>{flags.map(f => f.line).join(' · ')}</p>}
       </section>;
