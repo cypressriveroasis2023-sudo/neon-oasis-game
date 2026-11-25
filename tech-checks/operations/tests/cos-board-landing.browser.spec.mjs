@@ -263,8 +263,10 @@ test('a hand fix on the board is saved through the Camera status route and shows
   const {app, state, host, server} = await phoneBoard(page);
   await openUnit(host, 'Spotter 002');
   await expect.poll(() => fixButtons(host)).toEqual(['Move to shop', 'Change site', 'Rename', 'Correct IP']);
-  // The fix is the first thing on the card after what is wrong, not under everything else.
-  expect((await inBoard(host, root => [...root.querySelectorAll('#panel .box > h3')].map(head => head.textContent))).slice(0, 2)).toEqual(['Diagnosis', 'Fix it']);
+  // What is wrong comes first, then troubleshooting; fixing the record comes after the unit's own pages.
+  const heads = await inBoard(host, root => [...root.querySelectorAll('#panel .box > h3')].map(head => head.textContent));
+  expect(heads[0]).toBe('Diagnosis');
+  expect(heads.indexOf('Fix the record')).toBe(heads.indexOf('Open') + 1);
   await pressFix(host, 'Move to shop');
   // The save says what it did to the count, once the saved reading is on the board.
   await expect.poll(() => toastText(host)).toBe('Saved. The count changed: Down 1 to 0.');
@@ -773,7 +775,7 @@ test('a field unit COS cannot check at all is a job on the punch list', async ({
   const shown = await inBoard(host, root => root.getElementById('viewPunch').textContent);
   expect(shown).toContain('Sniper 401');
   expect(shown).toContain('no IP address saved, so this unit has never been checked');
-  expect(shown).toContain('open the unit and add the IP under Fix it');
+  expect(shown).toContain('open the unit and add the IP under Fix the record');
   expect(shown).not.toContain('Helios 001');
   expect(state.errors).toEqual([]);
 });
@@ -789,7 +791,7 @@ test('a Sniper with no IP saved says why it is Unknown and sends you to the fix'
   await openUnit(host, 'Sniper 400');
   const card = await panel(host);
   expect(card).toContain('COS has no IP address for this unit, so it cannot be checked at all');
-  expect(card).toContain('Add the IP under Fix it');
+  expect(card).toContain('Add the IP under Fix the record');
   // Not the answer for a unit COS cannot reach at all.
   expect(card).not.toContain('Tap Refresh on the board. If it stays Unknown');
   expect(await fixButtons(host)).toContain('Correct IP');
@@ -812,3 +814,29 @@ test('a corrected IP can be saved on any unit, and the save names the system tha
   expect(state.errors).toEqual([]);
 });
 
+
+test('a unit with cameras off names them and walks a tech through it without leaving COS', async ({page}, info) => {
+  test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');
+  const {host, state} = await phoneBoard(page);
+  await inBoard(host, root => [...root.querySelectorAll('.tile')].find(tile => tile.querySelector('.lab').textContent === 'Camera issues').click());
+  await openUnit(host, 'Spotter 003');
+  const card = await panel(host);
+  // The diagnosis names the camera that is off, instead of saying "listed below".
+  expect(card).toContain('Off: SPOTTER 003 / Cam 2');
+  expect(card).not.toContain('listed below');
+  const heads = await inBoard(host, root => [...root.querySelectorAll('#panel .box > h3')].map(head => head.textContent));
+  expect(heads.indexOf('Troubleshoot')).toBeGreaterThan(heads.indexOf('Diagnosis'));
+  expect(heads.indexOf('Troubleshoot')).toBeLessThan(heads.indexOf('Fix the record'));
+  const answer = label => inBoard(host, (root, wanted) => { const b = [...root.querySelectorAll('#panel .trbtn')].find(x => x.textContent === wanted); b?.click(); return Boolean(b); }, label);
+  expect(await answer('No, or not sure')).toBe(true);
+  // Every step points somewhere in COS, never to Star4Live.
+  expect(await inBoard(host, root => root.querySelector('#panel .trb').textContent)).not.toMatch(/Star4Live/);
+  for (const label of ['Still off', 'Yes, it answers', 'Still off']) {
+    if (!(await answer(label))) break;
+  }
+  await expect.poll(() => inBoard(host, root => root.querySelector('#panel .trres')?.textContent || '')).toContain('Manager help');
+  expect(await inBoard(host, root => root.querySelector('#panel .trnote').textContent)).toContain('SPOTTER 003 / Cam 2 is off');
+  // Answering troubleshooting writes nothing anywhere.
+  expect(state.errors).toEqual([]);
+  if (process.env.SHOT) { await inBoard(host, root => root.querySelector('#panel .trb').scrollIntoView()); await page.screenshot({path: process.env.SHOT}); }
+});

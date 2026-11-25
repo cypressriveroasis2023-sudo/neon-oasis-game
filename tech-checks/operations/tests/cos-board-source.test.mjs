@@ -10,7 +10,7 @@ test('the board carries no fleet data and reads nothing itself', () => {
   // This repository is public. Unit names, customers, addresses and IPs reach the board from the signed-in feed only.
   const files = readdirSync(new URL('../src/cosBoard/', import.meta.url), {recursive: true}).map(name => String(name).replace(/\\/g, '/')).sort();
   assert.deepEqual(files, [
-    'boardApp.ts', 'boardData.ts', 'boardEdit.ts', 'boardFonts.ts', 'boardMap.json', 'boardPower.ts', 'boardStyle.ts',
+    'boardApp.ts', 'boardData.ts', 'boardEdit.ts', 'boardFonts.ts', 'boardMap.json', 'boardPower.ts', 'boardStyle.ts', 'boardTrouble.ts',
     'fonts', 'fonts/OFL.txt', 'fonts/inter-latin-wght-normal.woff2', 'fonts/inter-tight-latin-wght-normal.woff2',
   ]);
   const map = JSON.parse(read('../src/cosBoard/boardMap.json'));
@@ -217,8 +217,8 @@ test('the board counts one way, and a hand fix comes first on the card and says 
   // What the camera systems see on their own is only the fallback, and so is its DO NOT USE exclusion.
   assert.ok(app.includes('(v.excl && !S.mh) ? "excl"'));
   assert.ok(app.includes('const feeds = !S.mh;'));
-  // Fix it sits right under the diagnosis, and the save waits for the saved reading before saying how the count moved.
-  assert.ok(app.includes('body.splice(2,0,fx);'));
+  // Fixing the record sits after troubleshooting and the unit's own pages, and the save waits for the saved reading before saying how the count moved.
+  assert.ok(app.includes('body.splice(body.indexOf(ob)+1,0,fx);'));
   assert.equal(app.includes('body.push(fx);'), false);
   assert.match(app, /S\.saved=\{was, said: said \|\| "Saved\.", unit:v\.id, ip:steps\.some\(x=>x\.field==="public_ip"\)\}; clearTimeout\(savedTimer\); savedTimer=setTimeout\(saidSaved, 1500\);/);
   // A corrected IP is kept for every unit, and the save names the system that still decides Up or Down.
@@ -230,7 +230,7 @@ test('the board counts one way, and a hand fix comes first on the card and says 
   // A Sniper with no IP saved is Unknown for good, and the card says so and sends him to the fix.
   assert.match(app, /if\(v\.status==="unknown"\) return v\.u\.s==="a" && !v\.u\.ip/);
   assert.ok(app.includes('COS has no IP address for this unit, so it cannot be checked at all. That is why it shows Unknown and not Down.'));
-  assert.ok(app.includes('Add the IP under Fix it. COS checks the address within the hour and the unit stops being Unknown.'));
+  assert.ok(app.includes('Add the IP under Fix the record. COS checks the address within the hour and the unit stops being Unknown.'));
   assert.ok(app.includes('COS has no IP address saved for this unit, so there is nothing to check.'));
   // The reading is COS's own check of the address. COS has no Avigilon feed.
   assert.equal(app.includes('Avigilon check'), false);
