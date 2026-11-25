@@ -347,6 +347,7 @@ function diagnose(v){
   if(u.rs) ck.push({k:"Router, COS check", s: u.rs==="on"?"ok":u.rs==="of"?"bad":"unk", t:(RW[u.rs]||u.rs)+(u.rt ? " · "+when(u.rt) : "")});
   if(u.rr) ck.push({k:"Router, InHand says", s: u.rr==="on"?"ok":u.rr==="of"?"bad":"unk", t:(RW[u.rr]||u.rr)+(u.ro ? " · "+when(u.ro) : " · no time given")});
   if(!u.rs && !u.rr) ck.push({k:"Router", s:"unk", t: S.meta && S.meta.rl===false ? "Router readings have not loaded yet" : "No router on record for this unit"});
+  if(u.pw && u.pw.hf) ck.push({k:"Victron history", s:"warn", t:u.pw.hf.join(" · ")});
   if(u.pw) ck.push({k:"Battery, Victron", s:u.pw.al && u.pw.q!=="stale" && u.pw.q!=="off" ? (u.pw.al.l===2 ? "bad" : "warn") : (PWQ[u.pw.q]||"unk"), t:powerText(u.pw)+(u.pw.t ? " · "+when(u.pw.t) : "")});
   if(u.lo && fs!=="up") ck.push({k:"Last online", s:"info", t:when(u.lo)+" · "+ago(u.lo)+" ago"});
   const m = S.mh && S.rec ? S.rec.match[v.id] : null;
@@ -428,7 +429,9 @@ function powerBox(v){
   const last = p.ls ? " Last connected to Victron "+when(p.ls)+"." : "";
   const note = p.q==="off" ? "This installation was not in the latest Victron sync."+last : p.q==="stale" ? "No reading in the last 45 minutes, so it is not called current."+last : p.q==="none" ? "Victron has no battery reading for this unit."+last : "Victron reading"+(p.t ? " · "+when(p.t) : "")+". Cameras come from Star4Live; power comes from Victron. A low battery is not the same as a camera being down.";
   const alarm = p.al && p.q!=="stale" && p.q!=="off" ? h("p",{class:"pwalarm l"+p.al.l,text:"⚠ Victron "+(p.al.l===2 ? "alarm" : "warning")+": "+p.al.k+". Victron raised this itself, so check the battery and charge controller."}) : null;
-  return h("div",{class:"box pwbox"},h("h3",{text:"Power"}),alarm,tiles,h("p",{class:"note",text:note}),go?h("div",{class:"links"},go):null);
+  const hist = p.nl!==undefined || p.hf ? h("p",{class:"pwhist"+(p.hf ? " flag" : "")},
+    p.nl!==undefined ? "Last night's low: "+p.nl+"%." : "", p.hf ? " "+p.hf.join(" · ")+"." : "") : null;
+  return h("div",{class:"box pwbox"},h("h3",{text:"Power"}),alarm,tiles,hist,h("p",{class:"note",text:note}),go?h("div",{class:"links"},go):null);
 }
 function drawPanel(){
   const v = S.vmap && S.vmap[S.openId]; if(!v){ closeUnit(); return; }
