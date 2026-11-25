@@ -120,3 +120,9 @@ html[data-theme='light'] .vrm-fleet-summary li,html[data-theme='light'] .vrm-wor
 .vrm-tile-head{flex-wrap:wrap;justify-content:flex-start;gap:3px 6px}
 #root#root .operations-shell .vrm-workspace .vrm-unit-grid .vrm-tile-head strong{white-space:nowrap}
 .vrm-attention button strong{white-space:nowrap;flex:none}.vrm-attention button span{text-align:right}
+/* Charging / draining and Victron's own alarms on the tiles */
+.vrm-tile-flow,.vrm-tile-alarm{font-size:10.5px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vrm-flow-charging{color:#3ddc84}.vrm-flow-draining{color:#f5b942}.vrm-flow-idle{color:#7b8ba0}
+.vrm-tile-alarm{color:#ff6b78}.vrm-tile-alarm.vrm-alarm-1{color:#f5b942}
+.vrm-attention .vrm-attn-alarm span{color:#ff6b78;font-weight:700}
+.vrm-tile-seen{white-space:normal;line-height:1.3}

@@ -23,7 +23,7 @@ const fleet = {
 
 test('Victron power matches a Helios by exact number and never averages batteries', () => {
   const power = boardPowerByUnit(fleet, now);
-  assert.deepEqual(boardPowerFor(power, 'Helios 001'), {b: 86, w: 380, v: 26.3, t: Math.round(Date.parse(at(2)) / 1000), q: 'good'});
+  assert.deepEqual(boardPowerFor(power, 'Helios 001'), {b: 86, w: 380, v: 26.3, t: Math.round(Date.parse(at(2)) / 1000), q: 'good', ls: Math.round(Date.parse(at(2)) / 1000)});
   assert.equal(boardPowerFor(power, 'HELIOS 002').b, 15);
   assert.equal(boardPowerFor(power, 'HELIOS 002').q, 'low');
   // A 50-minute-old reading is not called current (cutoff 45).
