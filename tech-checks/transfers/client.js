@@ -36,14 +36,25 @@ function database(){if(!storePromise)storePromise=new Promise((resolve,reject)=>
 export async function deviceDraft(key,value,remove=false){
  const db=await database();return new Promise((resolve,reject)=>{const tx=db.transaction('drafts',value===undefined&&!remove?'readonly':'readwrite'),store=tx.objectStore('drafts');const r=remove?store.delete(key):value===undefined?store.get(key):store.put(value,key);tx.oncomplete=()=>resolve(r.result);tx.onerror=()=>reject(new Error('The transfer draft could not be preserved on this device.'));tx.onabort=tx.onerror;});
 }
-// Safari can reject image.decode() with "Loading was canceled" for an image that is
-// not on the page. Wait for the load event instead; decode() is only a bonus.
-export function loadPhotoImage(url){
- return new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>{Promise.resolve(image.decode?.()).catch(()=>{}).then(()=>resolve(image));};image.onerror=()=>reject(new Error('This photo could not be read. Take it again.'));image.src=url;});
+// Read a photo into something a canvas can draw. createImageBitmap reads the file
+// directly; the <img> path is the fallback. Safari can reject image.decode() with
+// "Loading was canceled", so the fallback waits for the load event instead.
+// Nothing here may hang: after 15 seconds the tech gets a clear message.
+export function loadPhotoImage(source){
+ const timeout=new Promise((_,reject)=>setTimeout(()=>reject(new Error('This photo took too long to read. Take it again.')),15000));
+ const read=(async()=>{
+  if(typeof source!=='string'&&typeof createImageBitmap==='function'){try{return await createImageBitmap(source);}catch{}}
+  const url=typeof source==='string'?source:URL.createObjectURL(source);
+  try{return await new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>reject(new Error('This photo could not be read. Take it again.'));image.src=url;});}
+  finally{if(typeof source!=='string')setTimeout(()=>URL.revokeObjectURL(url),0);}
+ })();
+ return Promise.race([read,timeout]);
 }
 export async function transferJpeg(file){
  if(!file||file.size>25*1024*1024)throw new Error('Choose an image smaller than 25 MB.');
- const url=URL.createObjectURL(file);
- try{const image=await loadPhotoImage(url);const scale=Math.min(1,1920/Math.max(image.width,image.height)),c=document.createElement('canvas');c.width=Math.round(image.width*scale);c.height=Math.round(image.height*scale);c.getContext('2d').drawImage(image,0,0,c.width,c.height);const blob=await new Promise(resolve=>c.toBlob(resolve,'image/jpeg',.88));if(!blob||blob.size>5*1024*1024)throw new Error('Image too large.');return blob;}
- finally{URL.revokeObjectURL(url);}
+ const image=await loadPhotoImage(file);
+ const w=image.naturalWidth||image.width,h=image.naturalHeight||image.height;
+ if(!w||!h)throw new Error('This photo could not be read. Take it again.');
+ const scale=Math.min(1,1920/Math.max(w,h)),c=document.createElement('canvas');c.width=Math.round(w*scale);c.height=Math.round(h*scale);c.getContext('2d').drawImage(image,0,0,c.width,c.height);image.close?.();
+ const blob=await Promise.race([new Promise(resolve=>c.toBlob(resolve,'image/jpeg',.88)),new Promise((_,reject)=>setTimeout(()=>reject(new Error('This photo took too long to save. Take it again.')),15000))]);if(!blob||blob.size>5*1024*1024)throw new Error('Image too large.');return blob;
 }
