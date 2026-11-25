@@ -37,6 +37,7 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
   if(control?.isConnected){control.setAttribute('aria-invalid','true');control.scrollIntoView({block:'center'});control.focus({preventScroll:true});}
   else alert.scrollIntoView({block:'center'});
  };
+ const hasProblem=item=>Object.values(item?.checks||{}).includes(false);
  const RECEIPT_SKIPPED_BATTERY_CHECKS=['delivery_batteries_charged_ok','helios_battery_box_installed_ok','helios_battery_120v_charged_ok'];
  const receiptChecks=(item,expected)=>{
   const type=item.workflow_type||data?.equipment?.find(e=>e.equipment_key===item.equipment_key)?.workflow_type||expected?.family||item.family;
@@ -44,7 +45,7 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
   return window.TechCheckRules.itChecklist({equipment_type:type,purpose:draft.purpose==='installation'?'DELIVERY':'BACKUP',unit_tag:expected?.unit_tag||item.unit_tag,required_battery_count:installationBatteryPlan(type,item.batteryConfiguration).minimum??0},1)
    .filter(s=>s.kind==='bool'&&(draft.purpose!=='truck_replenishment'||!RECEIPT_SKIPPED_BATTERY_CHECKS.includes(s.field)));
  };
- function serviceChecks(group,item,expected){
+ function serviceChecks(group,item,expected,transfer){
   const steps=receiptChecks(item,expected);if(!steps.length)return;
   const box=element('div','','tc-service-checks');
   box.append(element('strong','Check it yourself before you sign'),element('small','Answer every line. Pick Problem for anything that is not right and say what is wrong in Notes. IT or James will review it.'));
@@ -53,13 +54,13 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
    const pick=element('select');pick.required=true;pick.dataset.serviceCheck=step.field;
    pick.append(new Option('Choose Pass or Problem',''),new Option('Pass','true'),new Option('Problem','false'));
    pick.value=item.checks[step.field]===undefined?'':String(item.checks[step.field]);
-   pick.onchange=()=>{item.checks[step.field]=pick.value===''?undefined:pick.value==='true';changed();};
+   pick.onchange=()=>{const before=hasProblem(item);item.checks[step.field]=pick.value===''?undefined:pick.value==='true';changed();if(before!==hasProblem(item)&&transfer)render(transfer);};
    box.append(label(caption,pick));
   }
   group.append(box);
  }
  const fieldFor=(index,field)=>root.querySelector('[data-transfer-item="'+index+'"][data-transfer-field="'+field+'"]');
- const needsPhoto=item=>item.requirePhoto===true||!(draft?.kind==='receipt'&&draft.purpose==='truck_replenishment'&&item.receiptMode!=='difference'&&item.receivedAsListed===true);
+ const needsPhoto=item=>item.requirePhoto===true||(draft?.kind==='receipt'&&hasProblem(item))||!(draft?.kind==='receipt'&&draft.purpose==='truck_replenishment'&&item.receiptMode!=='difference'&&item.receivedAsListed===true);
  function validateBeforeSubmit(){
   if(!draft||draft.request)return null;
   const form=root.querySelector('form');
@@ -307,11 +308,11 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
     if(asListed){
      const confirm=element('input');confirm.type='checkbox';confirm.required=true;confirm.checked=item.receivedAsListed===true;confirm.dataset.transferItem=String(index);confirm.dataset.transferField='receivedAsListed';confirm.onchange=()=>{item.receivedAsListed=confirm.checked;item.missing=false;changed();};group.append(label('I received this equipment as listed',confirm));
      group.append(button('Something is different or missing',()=>{item.receiptMode='difference';item.receivedAsListed=false;item.family='';item.unit_tag='';item.simText='';item.partsText='';changed();render(transfer);},true));
-     if(item.requirePhoto)photoField(group,item,index);
+     if(item.requirePhoto||hasProblem(item)){if(!item.requirePhoto)group.append(element('p','You marked a Problem. Take a photo that shows it.','tc-purpose-note'));photoField(group,item,index);}
     }else group.append(element('p','Record what you actually received. The differences will be saved for IT / Owner review.'),button('Receive this equipment as listed',()=>{item.receiptMode='as_listed';item.receivedAsListed=false;item.missing=false;item.family=expected.family;item.unit_tag=expected.unit_tag;item.simText=expected.sims.join('\n');item.partsText=expected.parts.map(p=>p.name+' | '+p.quantity).join('\n');draft.photos=draft.photos.filter(photo=>photo.equipment_key!==item.equipment_key);changed();render(transfer);},true));
    }
    if(draft.kind==='receipt'&&!asListed){const missing=element('input');missing.type='checkbox';missing.checked=item.missing;missing.onchange=()=>{item.missing=missing.checked;changed();render(transfer);};group.append(label('I did not receive this item',missing));}
-   if(draft.kind==='receipt'&&!item.missing)serviceChecks(group,item,expected);
+   if(draft.kind==='receipt'&&!item.missing)serviceChecks(group,item,expected,transfer);
    if(!item.missing&&!asListed){
     const inputs=[['family','Unit family / name','text'],['unit_tag','Unit number','text'],['simText','Exact SIM numbers (one per line; blank only when none)','textarea']];
     if(draft.purpose!=='truck_replenishment')inputs.push(['batteryText','Batteries / battery boxes on this unit','number']);

@@ -147,6 +147,7 @@ test('the database refuses a receipt with a blank check even if the screen is sk
 test('IT picks a SIM from the drawer during a handoff, and that SIM leaves the drawer',async({page})=>{
  await page.setViewportSize({width:390,height:844});f=await mountTransfers(page);
  await f.db.query("insert into app_private.sim_drawer(sim_number,carrier) values('89852350825066019344','Smart SIM'),('89852350825066019369','Smart SIM')");
+ await page.reload();
  await page.getByRole('button',{name:'Check Out / Hand Off',exact:true}).click();await page.getByLabel('What is this equipment for?',{exact:true}).selectOption('installation');await page.getByLabel('Receiving Service technician').selectOption(SERVICE);await page.getByLabel('Select equipment').selectOption('sniper:001');await page.getByRole('button',{name:'Add unit to handoff'}).click();
  await fillUnit(page,'001','');
  const pick=page.getByLabel('Pick a SIM from the drawer 1',{exact:true});
