@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-import {mountTransfers,passServiceChecks} from './helpers/transfer-fixture.mjs';
+import {mountTransfers,passServiceChecks,setFamily} from './helpers/transfer-fixture.mjs';
 
 const photo={name:'synthetic.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=','base64')};
 let f;
@@ -10,7 +10,7 @@ async function sign(page){await passServiceChecks(page);
   await page.getByRole('checkbox',{name:'I confirm this report is accurate',exact:true}).check();
 }
 async function fillReceipt(page,{family='Sniper',batteries='1'}={}){
-  await page.getByLabel('Unit family / name 1',{exact:true}).fill(family);
+  await setFamily(page,family);
   await page.getByLabel('Unit number 1',{exact:true}).fill('001');
   await page.getByLabel('Exact SIM numbers (one per line; blank only when none) 1',{exact:true}).fill('00123456789012345670');
   await page.getByLabel('Batteries / battery boxes on this unit 1',{exact:true}).fill(batteries);
