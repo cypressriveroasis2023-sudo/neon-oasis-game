@@ -13,6 +13,7 @@ import {boardPowerByUnit, type BoardPower} from './cosBoard/boardPower';
 import {heliosSpots, readSunForecast, sunOutlook, type OutlookDay, type SunDay} from './vrmWeather';
 import {getVrmFleet} from './vrmFleetApi';
 import {readVrmHistory, type HistoryPoint} from './vrmHistory';
+import {readRouterDetails} from './routerDetails';
 import {boardEditState, handFixRequest, type BoardEditFlags, type BoardEditState, type BoardFixStep} from './cosBoard/boardEdit';
 import {mountCosBoard} from './cosBoard/boardApp';
 import {loadBoardFonts} from './cosBoard/boardFonts';
@@ -43,9 +44,11 @@ export type CosBoardLandingProps = {
   onReady?: () => void;
   /** Called when the board was opened ahead of the camera feed and the feed then could not be read. */
   onNone?: () => void;
+  /** A unit another COS screen asked for. The board opens its own card for it; n changes on every new ask. */
+  unitAsked?: {name: string; n: number} | null;
 };
 
-type Board = {update(data: unknown): void; setEdit(state: BoardEditState): void; destroy(): void; root: ShadowRoot};
+type Board = {update(data: unknown): void; setEdit(state: BoardEditState): void; destroy(): void; root: ShadowRoot; openByName(name: string): boolean};
 type Report = {
   contract?: string; units?: UnitCameraStatus[]; canEdit?: boolean; handEditsRead?: boolean;
   recorded?: {pinned?: boolean; pinNote?: string | null};
@@ -67,7 +70,7 @@ function checked(value: unknown): Reading {
  * holds and is counted by the shared count's own unit list, so its tiles are a
  * split of the Fleet headline and never a second count.
  */
-export default function CosBoardLanding({feed, recorderRows, now, fieldMap, routers, upload, addresses, onFeed, onReady, onNone}: CosBoardLandingProps) {
+export default function CosBoardLanding({feed, recorderRows, now, fieldMap, routers, upload, addresses, onFeed, onReady, onNone, unitAsked = null}: CosBoardLandingProps) {
   const host = useRef<HTMLDivElement>(null), board = useRef<Board | null>(null), tvOn = useRef(false), tvKeep = useRef(0);
   const deliver = useRef(onFeed);
   deliver.current = onFeed;
@@ -215,6 +218,23 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
         take.current(result);
         return {said: found + '.', tone};
       },
+      // An A# linked by hand from the unit card (James, 25 Nov), for a unit mHelp could not match by name. Tech Check
+      // checks the person and the A#; only the server's own confirmation is called linked.
+      onLinkA: async (unitKey: string, productId: string) => {
+        if (writing.current) throw new Error('A save is still in progress. Try again once it finishes.');
+        writing.current = true;
+        try {
+          generation.current += 1;
+          const data = (await api.post('/api/unit-camera-status/link-a', {unitKey, productId})).data as {linked?: {productId?: string; label?: string; duplicate?: boolean}} | null;
+          const result = checked(data);
+          generation.current += 1;
+          if (data?.linked?.productId !== productId) throw new Error('COS could not confirm the link. Tap Refresh.');
+          take.current(result);
+          return data.linked.duplicate ? 'A# ' + productId + ' was already linked to this unit.' : 'A# ' + productId + ' linked' + (data.linked.label ? ' (' + data.linked.label + ')' : '') + '. Check this unit now can use it.';
+        } catch (failure: any) {
+          throw new Error(failure?.response?.data?.error || failure?.message || 'COS could not confirm the link.');
+        } finally { writing.current = false; }
+      },
       // Troubleshoot result sent to IT for the next daily IT sheet (James, 25 Nov). It schedules nothing and
       // changes no unit. A reply that is not the server's receipt is not called sent.
       onSendTrouble: async (report: {requestId: string; unitKey: string; unitName: string; result: string; next: string; managerHelp: boolean; note: string}) => {
@@ -232,6 +252,8 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
         window.location.hash = workspaceHash({workspace: 'Tech Check', jobId: '', detail: false});
       },
       // The board is the screen James works from, so the other COS screens open from it, not only from More.
+      // The unit card's router box: InHand status, signal and the :8080 link, read from Tech Check.
+      loadRouters: () => readRouterDetails(),
       onScreen: (workspace: string) => { window.location.hash = workspaceHash({workspace, jobId: '', detail: false}); },
       // The owner's manager view. The signed-in Tech Check app around this frame reads the trucks, inspections and
       // handoffs; the board only draws them. A sign-in with no manager view never gets an answer, and never a tab.
@@ -267,6 +289,8 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
   // While the board is up, a sign-in hiccup refreshes quietly instead of dropping it.
   useEffect(() => { setBoardSessionHold(true); return () => setBoardSessionHold(false); }, []);
   useEffect(() => { if (data) board.current?.update(data); }, [data]);
+  // "Take me to the unit in COS" lands on the board's own unit card, not the older Fleet details drawer.
+  useEffect(() => { if (unitAsked?.name) board.current?.openByName(unitAsked.name); }, [unitAsked?.n]);
   // COS has a bar across the bottom of a phone. Tell the board how much room it takes, so its messages sit above it.
   useEffect(() => {
     const element = host.current, bar = document.querySelector('.operations-bottom-nav');

@@ -4,7 +4,7 @@
   "files": [
     {
       "path": "FleetDashboard.tsx",
-      "candidateBlob": "aaf3bbcd6f0c2d552def50111f4ff89a6c004619",
+      "candidateBlob": "64ca4dd132ba9f003ff02615f4900fe588140ff4",
       "baselineBlob": "0f1427aad67d9f5652038e4d861ec2c8a2590c54",
       "replacements": [
         {
@@ -99,12 +99,22 @@
         },
         {
           "from": "import PhoneTechLanding from './PhoneTechLanding';\n",
-          "to": "import PhoneTechLanding from './PhoneTechLanding';\nimport PhoneFleetBoard from './PhoneFleetBoard';\n",
+          "to": "import PhoneTechLanding from './PhoneTechLanding';\nimport PhoneFleetBoard from './PhoneFleetBoard';\nimport {boardShownHere} from './FleetBoard';\n",
           "count": 1
         },
         {
           "from": "  <ApprovedFleetViews compact>",
-          "to": "  {(view==='map'||view==='fleet')&&<PhoneFleetBoard feed={cameraUnits} recorderRows={cameras.data?.rows} now={snapshotNow} fieldMap={map||undefined} routers={routers?.items} upload={effectiveUpload} addresses={mhelpAddresses} onFeed={setCameraUnits} notice={selectionNotice}/>}\n  <ApprovedFleetViews compact>",
+          "to": "  {(view==='map'||view==='fleet')&&<PhoneFleetBoard feed={cameraUnits} recorderRows={cameras.data?.rows} now={snapshotNow} fieldMap={map||undefined} routers={routers?.items} upload={effectiveUpload} addresses={mhelpAddresses} onFeed={setCameraUnits} notice={selectionNotice} unitAsked={boardAsk.n?boardAsk:null}/>}\n  <ApprovedFleetViews compact>",
+          "count": 1
+        },
+        {
+          "from": "ring|null;initialPresentation:SavedFleetPresentation|null}){",
+          "to": "ring|null;initialPresentation:SavedFleetPresentation|null}){\n const [boardAsk,setBoardAsk]=useState<{name:string;n:number}>({name:'',n:0});",
+          "count": 1
+        },
+        {
+          "from": "const matches=initialUnitId?rows.filter(row=>row.id===initialUnitId):fieldMapLabelMatches(rows.map(row=>({...row,unitNumber:row.name})),initialUnitLabel);",
+          "to": "const matches=initialUnitId?rows.filter(row=>row.id===initialUnitId):fieldMapLabelMatches(rows.map(row=>({...row,unitNumber:row.name})),initialUnitLabel);if(boardShownHere()&&(matches.length===1||initialUnitLabel)){/* James: a unit asked for from another screen opens on the board's own unit card, which is the troubleshooting screen, and never on the older details drawer. */setSelected('');setSelectionNotice('');setBoardAsk(a=>({name:initialUnitLabel||matches[0].displayName||matches[0].name,n:a.n+1}));return;}",
           "count": 1
         }
       ]

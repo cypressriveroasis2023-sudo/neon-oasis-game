@@ -12,6 +12,22 @@
 import mapData from './boardMap.json';
 import {BOARD_CSS} from './boardStyle';
 import {troubleWalk, troubleKnown, troubleNote, TROUBLE_CSS} from './boardTrouble';
+import {ROUTER_DETAIL_FRESH_MS, signalWord, milesBetween, unitKeyOf} from '../routerDetails';
+
+/* The router box on a unit card: the open-router button, signal bars and the warnings. */
+const ROUTER_CSS = `
+.rtr .rtop{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.rtr .rbtn{display:flex;flex-direction:column;gap:2px;padding:12px 14px;margin:0 0 12px;border-radius:10px;background:#0e7a3c;color:#fff;text-decoration:none;border:1px solid #13a352}
+.rtr .rbtn b{font-size:16px}.rtr .rbtn span{font-size:12px;opacity:.85}
+.rtr .rbtn:hover,.rtr .rbtn:focus-visible{background:#11904a;outline:2px solid #fff;outline-offset:2px}
+.rtr .rbtn.off{background:#2a2d33;border-color:#555;color:#ddd}.rtr .rbtn.off:hover,.rtr .rbtn.off:focus-visible{background:#33373e}
+.rtr .bars{display:inline-flex;align-items:flex-end;gap:2px;height:14px;vertical-align:middle}
+.rtr .bars i{display:block;width:4px;background:rgba(255,255,255,.18);border-radius:1px}
+.rtr .bars i:nth-child(1){height:20%}.rtr .bars i:nth-child(2){height:40%}.rtr .bars i:nth-child(3){height:60%}.rtr .bars i:nth-child(4){height:80%}.rtr .bars i:nth-child(5){height:100%}
+.rtr .bars.good i.on{background:#2ecc71}.rtr .bars.fair i.on{background:#f1c40f}.rtr .bars.poor i.on{background:#e74c3c}.rtr .bars i.on{background:#9aa}
+.rtr .note.warn{color:#ffcf66;border-left:3px solid #ffcf66;padding-left:8px}
+.rtr dd a{color:inherit}
+`;
 
 const SHELL = "<div class=\"cosb\" id=\"cosb\"><header class=\"top\"><div class=\"wrap\">\n  <div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div>\n  <span class=\"topbtns\"><button class=\"tvgo\" id=\"tvGo\" type=\"button\">TV board</button><button class=\"refresh\" id=\"refresh\" type=\"button\">Refresh</button></span>\n</div></header>\n<div class=\"asof\" id=\"asof\"><div class=\"wrap\"><span id=\"asofMain\">Loading the camera reading…</span><span id=\"asofSub\"></span></div></div>\n\n<main class=\"wrap\">\n  <div class=\"tabs\" role=\"tablist\">\n    <button class=\"tab\" role=\"tab\" id=\"tabBoard\" aria-selected=\"true\" type=\"button\">Board</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabMap\" aria-selected=\"false\" type=\"button\">Map</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabTech\" aria-selected=\"false\" type=\"button\">Tech check</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabManager\" aria-selected=\"false\" type=\"button\" hidden>Manager</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabPunch\" aria-selected=\"false\" type=\"button\">Punch list</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabActivity\" aria-selected=\"false\" type=\"button\">Changes</button>\n  </div>\n\n  <section id=\"viewBoard\">\n    <div id=\"boardMain\">\n    <div class=\"mode\" id=\"modeRow\"></div>\n    <div class=\"kpi\" id=\"kpi\">\n    <p class=\"provnote\" id=\"provNote\" hidden></p>\n    <div class=\"tiles\" id=\"tiles\"></div>\n    <div class=\"shoprow\" id=\"shoprow\"></div>\n    </div>\n    <div id=\"boardList\">\n    <div class=\"controls\">\n      <input class=\"search\" id=\"q\" type=\"search\" placeholder=\"Find a unit, site, A# or IP\" autocomplete=\"off\" aria-label=\"Find a unit, site, A number or IP\">\n      <div class=\"chips\" id=\"fam\"></div>\n    </div>\n    <div class=\"count\" id=\"count\"></div>\n    <div class=\"list\" id=\"list\"></div>\n    <div class=\"screens\" id=\"screensRow\"><h3>Other COS screens</h3><div class=\"links\" id=\"screensLinks\"></div></div><ul class=\"foot\"><li>One unit counts once, however many cameras it has.</li><li>One count here, and it is mHelp’s camera units. mHelp’s own field total is higher because it counts stands and poles as well. The camera systems see fewer, because some units in mHelp have no camera record in COS yet; those show Unknown.</li><li>A unit in the shop never counts as down.</li><li>A reading that is missing or too old shows Unknown, never Down.</li><li>Router checks are a reference only. A router online does not prove the cameras work.</li><li>Hand fixes made here are saved in COS with your name and the time. Nothing here changes mHelp, Star4Live or InHand.</li></ul>\n    </div>\n    </div>\n    <aside id=\"boardSide\" aria-label=\"Map of field units\" hidden></aside>\n  </section>\n\n  <section id=\"viewMap\" hidden>\n    <div id=\"mapBlock\">\n    <div class=\"chips\" id=\"mapChips\"></div>\n    <div class=\"chips\" id=\"mapGo\" style=\"margin-top:8px\"></div>\n    <div class=\"mapwrap\" id=\"mapWrap\">\n      <svg id=\"mapSvg\" role=\"img\" aria-label=\"Map of field units\"><g id=\"mapBase\"></g><g id=\"mapLabels\"></g><g id=\"mapPins\"></g></svg>\n      <div class=\"mapbtns\"><button type=\"button\" id=\"zin\" aria-label=\"Zoom in\">+</button><button type=\"button\" id=\"zout\" aria-label=\"Zoom out\">&minus;</button></div>\n      <div class=\"mapmsg\" id=\"mapMsg\" hidden></div>\n      <div class=\"mapsel\" id=\"mapSel\" hidden></div>\n    </div>\n    <p class=\"note\" id=\"mapNote\" style=\"margin-top:10px\"></p>\n    <div class=\"list\" id=\"mapList\"></div>\n    </div>\n  </section>\n\n  <section id=\"viewTech\" hidden>\n    <div id=\"techForm\"></div>\n    <div id=\"techList\"></div>\n  </section>\n\n  <section id=\"viewManager\" hidden>\n    <div id=\"mgNow\"></div>\n    <div id=\"mgChecks\"></div>\n    <div id=\"mgTrucks\"></div>\n    <div id=\"mgGap\"></div>\n    <div id=\"mgSim\"></div>\n    <div id=\"mgX\"></div>\n    <div id=\"mgTools\"></div>\n  </section>\n\n  <section id=\"viewPunch\" hidden>\n    <div class=\"box\" id=\"punchTop\"><p class=\"note\">Loading the mHelp list…</p></div>\n    <div class=\"chips\" id=\"punchChips\" style=\"margin-top:12px\"></div>\n    <div class=\"count\" id=\"punchCount\"></div>\n    <div class=\"list\" id=\"punchList\"></div>\n  </section>\n\n  <section id=\"viewActivity\" hidden>\n    <p class=\"note\" id=\"actNote\">Every change made by hand on this board, newest first.</p>\n    <ul class=\"hist\" id=\"activity\"></ul>\n  </section>\n</main>\n\n<section id=\"viewTv\" hidden><header class=\"tvtop\"><div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div><div class=\"tvread\" id=\"tvRead\" role=\"status\">Loading the camera reading…</div><div class=\"tvclock\"><b id=\"tvClock\"></b><span id=\"tvDate\"></span></div><button type=\"button\" class=\"tvx\" id=\"tvExitTop\">Exit TV</button></header><div class=\"tvgrid\" id=\"tvGrid\"><div class=\"tvleft\" id=\"tvKpi\"><div class=\"tvtiles\" id=\"tvTiles\"></div><div class=\"tvminis\" id=\"tvMinis\"></div><div class=\"tvhead\" id=\"tvHead\"></div><div class=\"tvlist\" id=\"tvList\"></div></div><div class=\"tvright\" id=\"tvRight\"><div class=\"tvmaptitle\" id=\"tvMapTitle\"></div><div class=\"tvmap\" id=\"tvMap\"></div></div></div><footer class=\"tvfoot\"><span id=\"tvNote\"></span><span class=\"tvbtns\"><button type=\"button\" id=\"tvRefresh\">Refresh</button><button type=\"button\" id=\"tvFull\">Full screen</button><button type=\"button\" id=\"tvExit\">Exit TV</button></span></footer></section><div class=\"sheet\" id=\"sheet\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"pname\"><div class=\"panel\" id=\"panel\"></div></div>\n<div class=\"toast\" id=\"toast\" role=\"status\" aria-live=\"polite\"></div></div>";
 /* A shadow root can be attached to an element only once, so a host that is mounted again gets its first root back. */
@@ -22,7 +38,7 @@ export function mountCosBoard(host, hooks){
 let root = ROOTS.get(host);
 if(!root){ root = host.attachShadow({mode:'closed'}); ROOTS.set(host, root); }
 root.replaceChildren();
-const style = document.createElement('style'); style.textContent = BOARD_CSS + TROUBLE_CSS;
+const style = document.createElement('style'); style.textContent = BOARD_CSS + TROUBLE_CSS + ROUTER_CSS;
 const frame = document.createElement('template'); frame.innerHTML = SHELL;
 root.append(style, frame.content);
 const cleanups=[];
@@ -350,7 +366,17 @@ function powerChip(p){ if(!p) return null;
     live && p.f && p.f.s!=="idle" ? h("small",{class:"fl-"+p.f.s,text:p.f.s==="charging" ? "↑" : "↓"}) : null,
     p.w!==null && live ? h("small",{text:"☀ "+p.w+" W"}) : null,
     live && p.tn && (p.tn.v==="low"||p.tn.v==="tight") ? h("small",{class:"night-"+p.tn.v,text:"🌙"}) : null); }
-function routerRead(u){ return { on: u.rs==="on" || (u.rs!=="of" && u.rr==="on"), off: u.rs==="of" || (u.rs!=="on" && u.rr==="of") }; }
+/* The fresh InHand reading for a unit from the 30-minute pull, as "on", "of" or "" (none, or too old to trust). */
+function inhandNow(u){
+  const r = S.rd && u ? (S.rd.get(unitKeyOf(u.k)) || null) : null;
+  if(!r || !r.at || Date.now()-Date.parse(r.at) >= ROUTER_DETAIL_FRESH_MS) return {st:"", r};
+  return {st: r.status==="online" ? "on" : r.status==="offline" ? "of" : "", r};
+}
+/* What the router readings say, all sources together. COS's own check first, then the InHand pull, then InHand on record. */
+function routerRead(u){
+  const ih = inhandNow(u).st, rr = ih || u.rr;
+  return { on: u.rs==="on" || (u.rs!=="of" && rr==="on"), off: u.rs==="of" || (u.rs!=="on" && rr==="of") };
+}
 const WORD = { ok:"OK", warn:"Check", bad:"Problem", unk:"Unknown" }, RW = { on:"Online", of:"Offline", un:"Unknown" };
 /* Read the signs we have and say what is most likely wrong. A router reading is a hint only, never proof the cameras work. */
 function diagnose(v){
@@ -360,8 +386,12 @@ function diagnose(v){
   else cam = (u.s==="r" ? "Recon cloud" : "Star4Live")+": "+u.on+" of "+u.n+" online"+(u.off ? ", "+u.off+" offline" : "")+(v.unk ? ", "+v.unk+" no reading" : "");
   ck.push({k:"Cameras", s: fs==="up"?"ok":fs==="issues"?"warn":fs==="down"?"bad":"unk", t:cam});
   if(u.rs) ck.push({k:"Router, COS check", s: u.rs==="on"?"ok":u.rs==="of"?"bad":"unk", t:(RW[u.rs]||u.rs)+(u.rt ? " · "+when(u.rt) : "")});
-  if(u.rr) ck.push({k:"Router, InHand says", s: u.rr==="on"?"ok":u.rr==="of"?"bad":"unk", t:(RW[u.rr]||u.rr)+(u.ro ? " · "+when(u.ro) : " · no time given")});
-  if(!u.rs && !u.rr) ck.push({k:"Router", s:"unk", t: S.meta && S.meta.rl===false ? "Router readings have not loaded yet" : "No router on record for this unit"});
+  /* James (25 Nov): the card said "Router readings have not loaded yet" right above a Router box that had the reading.
+     The 30-minute InHand pull is the newest InHand reading, so it wins here and the two always agree. */
+  const ih = inhandNow(u);
+  if(ih.st) ck.push({k:"Router, InHand says", s: ih.st==="on"?"ok":"bad", t:(ih.st==="on"?"Online":"Offline")+" · "+when(secOf(ih.r.at))+(ih.st==="of" ? " · the router itself is not reaching InHand" : "")});
+  else if(u.rr) ck.push({k:"Router, InHand says", s: u.rr==="on"?"ok":u.rr==="of"?"bad":"unk", t:(RW[u.rr]||u.rr)+(u.ro ? " · "+when(u.ro) : " · no time given")});
+  if(!u.rs && !u.rr && !ih.st) ck.push({k:"Router", s:"unk", t: ih.r ? "No InHand reading in the last 75 minutes" : S.rd ? "No router on record for this unit" : S.meta && S.meta.rl===false ? "Router readings have not loaded yet" : "No router on record for this unit"});
   if(u.pw && u.pw.tn && (u.pw.tn.v==="low"||u.pw.tn.v==="tight")) ck.push({k:"Tonight, Victron", s:u.pw.tn.v==="low" ? "bad" : "warn", t:u.pw.tn.h});
   if(u.pw && u.pw.hf) ck.push({k:"Victron history", s:"warn", t:u.pw.hf.join(" · ")});
   if(u.pw && u.pw.sk && u.pw.sk.w) ck.push({k:"Weather, Victron", s:"warn", t:u.pw.sk.w});
@@ -407,6 +437,68 @@ function camsBox(v){
     h("div",null,h("b",{text:c.name}),h("span",{text:[c.type,c.model,c.fw ? "firmware "+c.fw : ""].filter(Boolean).join(" · ")}),camLinks(c)),
     h("span",{class:"cst "+(c.st===1?"ok":c.st===0?"bad":"unk"),text: c.st===1 ? "Online" : c.st===0 ? "Offline"+(c.lo ? " since "+when(c.lo) : "") : "No reading"}))),
     S.devAt ? h("p",{class:"note",text:"Camera list read "+when(S.devAt)+"."}) : null); }
+/* The unit's InHand router, from the 30-minute InHand pull. A hint only: router up never means the cameras are up.
+   No SIM numbers ever reach the board. The router page is plain http on a public address, so it opens in a new tab. */
+const secOf = iso => { const t=Date.parse(iso||""); return isFinite(t) ? Math.round(t/1000) : 0; };
+function routerBox(v){
+  if(v.mhOnly || !S.rd) return null;
+  const r = S.rd.get(unitKeyOf(v.k)) || S.rd.get(unitKeyOf(v.name));
+  const goScreen = hooks && typeof hooks.onScreen==="function" ? h("button",{class:"lk",type:"button",onclick:()=>hooks.onScreen("InHand Routers")},"Open InHand Routers") : null;
+  if(!r){
+    if(v.place!=="field") return null;
+    return h("div",{class:"box rtr"},h("h3",{text:"Router"}),
+      h("p",{class:"note",text:"No InHand router is linked to this unit in COS. Owner or IT can link one on the InHand Routers screen."}),
+      goScreen ? h("div",{class:"links"},goScreen) : null);
+  }
+  const fresh = r.at && Date.now()-Date.parse(r.at) < ROUTER_DETAIL_FRESH_MS;
+  const st = !fresh ? "unk" : r.status==="online" ? "ok" : r.status==="offline" ? "bad" : "unk";
+  const stText = st==="ok" ? "Connected" : st==="bad" ? "Offline" : "Unknown";
+  const kids=[h("h3",{text:"Router"}),
+    h("div",{class:"rtop"},h("span",{class:"cst "+st,text:stText}),
+      h("span",{class:"note",text: r.at ? (fresh ? "InHand read "+when(secOf(r.at)) : "No InHand reading since "+when(secOf(r.at))) : "No InHand reading yet"}))];
+  /* Green only when the router is connected. An offline router's page will not open, and a green button next to a red
+     Offline read as "online" (James, 25 Nov, Sniper 168). */
+  if(r.ip && IPV4.test(r.ip)) kids.push(h("a",{class:"rbtn"+(st==="ok"?"":" off"),href:"http://"+r.ip+":"+(r.port||8080),target:"_blank",rel:"noopener noreferrer"},
+    h("b",{text:"Open router (:"+(r.port||8080)+")"}),h("span",{text: st==="ok" ? "Opens the router's own page in a new tab" : st==="bad" ? "The router is offline, so its page will not open until it is back. Last known address." : "No fresh InHand reading, so the page may not open."})));
+  if(st==="bad") kids.push(h("p",{class:"note warn",text:"The router is not reaching InHand"+(r.at ? " (InHand read "+when(secOf(r.at))+")" : "")+". With the router down, the cameras behind it cannot be reached either. Check power first, then the SIM and antenna."}));
+  else kids.push(h("p",{class:"note",text:"No public IP for this router yet, so there is no router page to open."}));
+  const kv=[];
+  const word = signalWord(r.sig);
+  if(r.sig){
+    const lv = typeof r.sig.level==="number" ? Math.max(0,Math.min(5,Math.round(r.sig.level))) : (word==="Good"?4:word==="Fair"?3:word==="Poor"?1:0);
+    const bars=h("span",{class:"bars "+(word||"").toLowerCase(),"aria-label":(word||"Signal")+", "+lv+" of 5 bars"},...[1,2,3,4,5].map(i=>h("i",{class:i<=lv?"on":""})));
+    const parts=[word, r.sig.radio, r.sig.band ? "band "+r.sig.band : "", typeof r.sig.rsrp==="number" ? r.sig.rsrp+" dBm" : ""].filter(Boolean).join(" · ");
+    kv.push([st==="ok" ? "Signal" : "Last signal", h("span",null,bars," ",parts||"No reading")]);
+  }
+  if(r.carrier) kv.push(["Carrier", r.carrier]);
+  kv.push(["Router", [r.model, r.serial].filter(Boolean).join(" · ")]);
+  if(r.fw) kv.push(["Firmware", r.fw]);
+  if(r.ip) kv.push(["Router IP", r.ip+(r.ipFrom==="cos" ? " (from the COS record)" : "")]);
+  let far=null;
+  if(r.gps){
+    const pin=pinOf(v), maps="https://www.google.com/maps?q="+r.gps.lat.toFixed(5)+","+r.gps.lng.toFixed(5);
+    const mi = pin ? milesBetween(r.gps, pin) : null;
+    kv.push(["Cell-tower spot", h("span",null, mi===null ? "No unit pin to compare" : mi<1 ? "Under a mile from the unit's pin" : Math.round(mi)+" mi from the unit's pin"," · ",
+      h("a",{href:maps,target:"_blank",rel:"noopener noreferrer"},"map"))]);
+    if(mi!==null && mi>25) far=h("p",{class:"note warn",text:"The router's cell tower is about "+Math.round(mi)+" miles from where COS has this unit. The unit may have moved, or the router may be on a different unit. Cell-tower spots are rough, so check before changing anything."});
+  }
+  const dl=h("dl",{class:"kv"}); for(const [a,b] of kv) dl.append(h("dt",{text:a}), typeof b==="string" ? h("dd",{text:b}) : h("dd",null,b));
+  kids.push(dl);
+  if(r.cosDiffers) kids.push(h("p",{class:"note warn",text:"InHand reports a different public IP than the COS record. The button uses InHand's, which is newer. Correct the COS record if the cameras use the same address."}));
+  if(far) kids.push(far);
+  kids.push(h("p",{class:"note",text:"Router status is a hint, not camera health. A connected router with offline cameras is still a camera problem."}));
+  if(goScreen) kids.push(h("div",{class:"links"},goScreen));
+  return h("div",{class:"box rtr",id:"rtrBox"},kids);
+}
+async function loadRouters(){
+  if(!hooks || typeof hooks.loadRouters!=="function") return;
+  try{
+    const res = await hooks.loadRouters();
+    if(!res || res.ok!==true || !res.data) return;
+    S.rd = new Map(res.data.routers.map(r=>[unitKeyOf(r.unit), r]));
+    if(S.meta) render(); else if(S.openId) drawPanel();
+  }catch(_){ /* the card simply has no router box */ }
+}
 /* The cameras COS has as off right now, by name, with when each was last online. The camera list first; the unit's own list as a fallback. */
 function offCams(v){
   const list = S.dev && S.dev[v.k];
@@ -571,7 +663,7 @@ function drawPanel(){
   const tb = troubleBox(v), ob = openBox(v);
   const tbx = tb || h("div",{class:"box"},h("h3",{text:"What to do"}),h("ol",{class:"steps"},steps(v).map(s=>h("li",{text:s}))));
   const dg = diagBox(v);
-  const body=[ resBox(resFor(v.name, v.k, mm&&mm.rec.label)), dg, camsBox(v),
+  const body=[ resBox(resFor(v.name, v.k, mm&&mm.rec.label)), dg, camsBox(v), routerBox(v),
     tbx,
     ob, locBox(v), logBox(v),
     h("div",{class:"box"},h("h3",{text:"Details"}),dl, v.why?h("p",{class:"note",text:v.why}):null) ];
@@ -586,9 +678,18 @@ function drawPanel(){
     fx.append(h("div",{class:"fix"},
       h("button",{class:"fixbtn alt",type:"button",disabled:S.busy,onclick:()=>{ if(v.place==="field") save(v,{place:"shop"}); else { S.form="tofield"; drawPanel(); } }}, v.place==="field"?"Move to shop":"Move to field"),
       b("Change site","site",true), b("Rename","name",true), b("Correct IP","ip",true),
+      canLinkA(v) ? b("Add A#","pid",true) : null,
       v.edited ? b("Undo hand edits","undo",true) : null));
     const F={ site:["Site name",v.site,"site"], tofield:["Which site is it on?",v.site||v.feedSite,"site"], name:["Unit name",v.name,"name"], ip:["IP address",v.ip||"","ip"] }[S.form];
-    if(S.form==="undo"){
+    if(S.form==="pid" && canLinkA(v)){
+      /* An A# linked by hand (James, 25 Nov): so a unit mHelp could not match by name can still be checked. */
+      const inp=h("input",{id:"fixInput",type:"text",inputmode:"numeric",autocomplete:"off",placeholder:"e.g. 2226712"});
+      const go=()=>linkA(v, inp.value.replace(/^\s*A#?\s*/i,"").trim());
+      fx.append(h("form",{class:"form",onsubmit:ev=>{ev.preventDefault();go();}},h("label",{for:"fixInput",text:"A# from mHelp"}),inp,
+        h("p",{class:"note",text:"Digits only, as mHelp shows it. COS checks it is on the mHelp list and not already on another unit, then saves it with your name and the time."}),
+        h("div",{class:"btns"},h("button",{class:"fixbtn",type:"submit",disabled:S.busy},"Link A#"),h("button",{class:"fixbtn alt",type:"button",onclick:()=>{S.form=null;drawPanel();}},"Cancel"))));
+      setTimeout(()=>{ try{ inp.focus(); }catch(_){} },0);
+    } else if(S.form==="undo"){
       fx.append(h("div",{class:"form"},
         h("p",{class:"note",text:"This clears what was set by hand on "+v.name+": "+((u.hx||[]).map(x=>FIELD[x.f]||x.f).join(", ")||"nothing")+". The unit goes back to what "+(u.s==="v"?"Star4Live":u.s==="a"?"the COS record":"the Recon cloud")+" reports."}),
         h("div",{class:"btns"},h("button",{class:"fixbtn",type:"button",disabled:S.busy,onclick:()=>save(v,{__reset:true})},"Clear them"),h("button",{class:"fixbtn alt",type:"button",onclick:()=>{S.form=null;drawPanel();}},"Cancel"))));
@@ -611,7 +712,7 @@ function drawPanel(){
   if(!v.mhOnly && hooks && typeof hooks.onCheckUnit==="function"){
     const c = S.chk && S.chk.unit===v.id ? S.chk : null, pid = checkPid(v);
     const cb=h("div",{class:"box chkb",id:"chkBox"},h("h3",{text:"Check it now"}));
-    if(!pid) cb.append(h("p",{class:"note",text:"This unit has no A# in COS yet, so there is nothing to check it against. Give it an A# in mHelp first."}));
+    if(!pid) cb.append(h("p",{class:"note",text:"This unit has no A# in COS yet, so there is nothing to check it against. "+(canLinkA(v) && S.can===true ? "Add it under Fix the record with Add A#." : "Give it an A# in mHelp first.")}));
     else {
       cb.append(h("div",{class:"fix"},h("button",{class:"fixbtn",type:"button",disabled:S.busy,
         onclick:()=>checkNow(v)}, c && c.state==="run" ? "Checking…" : "Check this unit now")));
@@ -859,6 +960,16 @@ async function save(v, ch){
    Refresh asks for the latest saved reading. This asks the cameras themselves, for this unit only, so a tech
    standing at a unit does not wait for the next sweep. A check that does not run says so: a stale reading is
    never redrawn as if it were current, and nothing is written to mHelp, Star4Live or InHand. */
+/* Add A#: drawn only where the unit has no A# to check against and the app can link one. */
+function canLinkA(v){ return !v.mhOnly && v.u.s!=="r" && !checkPid(v) && !!(hooks && typeof hooks.onLinkA==="function"); }
+async function linkA(v, pid){
+  if(S.can!==true || S.busy || !canLinkA(v)) return;
+  if(!/^[1-9][0-9]{0,14}$/.test(pid)){ toast("Not linked. Enter the A# from mHelp, digits only.", 8000); return; }
+  S.busy=true; drawPanel();
+  try{ const said = await hooks.onLinkA(v.k, pid); S.form=null; toast(said || ("A# "+pid+" linked."), 9000); }
+  catch(err){ toast("Not linked. "+((err && err.message) || "COS could not confirm the link."), 14000); }
+  S.busy=false; render();
+}
 function checkPid(v){
   /* The unit's own A# first. An mHelp match counts only when it is exact: a fuzzy name match can belong to another unit,
      and checking it would report that unit's cameras on this card. */
@@ -885,6 +996,7 @@ async function refresh(){
   const was = S.meta ? when(S.meta.v) : "the last reading";
   if(!hooks || typeof hooks.onRefresh!=="function"){ toast("Refresh isn't available here. Still showing the reading from "+was+"."); return; }
   btn.disabled=true; btn.textContent="Reading…";
+  void loadRouters();
   S.before = S.meta ? S.meta.v : null;
   try{ await hooks.onRefresh(); S.announce=true; clearTimeout(announceTimer); announceTimer=setTimeout(announce, 1500); }
   catch(_){ toast("Couldn't get a new reading. Still showing "+was+".", 12000); }
@@ -1411,6 +1523,9 @@ M.data = mapData;
 measureWide(); watchWidth();
 setView(MGK && hooks.startView==="manager" ? "manager" : "board");
 tvStart();
+void loadRouters();
+const rtrTick=setInterval(()=>{ void loadRouters(); }, 15*60000);
+cleanups.push(()=>clearInterval(rtrTick));
 
 /* ---------- data in ---------- */
 function update(data){
@@ -1422,9 +1537,25 @@ function update(data){
   render();
   announce();
   saidSaved();
+  if(S.ask) openByName(S.ask);
+}
+/* Another COS screen asked for a unit ("take me to the unit in COS"). James: the unit card here is the troubleshooting
+   screen, so the unit opens on this card, never on the older Fleet details drawer. A name matches when it is the same
+   once spaces, dashes and case are ignored, against the unit's name, its key and its mHelp listing; only one unit may
+   match. Asked before the first reading arrives, it waits for it. Returns whether a unit was opened. */
+const squash = x => String(x||"").toUpperCase().replace(/\d+/g,d=>"#"+String(+d)).replace(/[^A-Z0-9#]/g,"").replace(/^SS(?=#)/,"SOLARSPOTTER");
+function openByName(name){
+  const want=squash(name); if(!want) return false;
+  if(!S.meta || !S.vmap){ S.ask=name; return false; }
+  S.ask=null;
+  const hits=Object.values(S.vmap).filter(v=>[v.k, v.name, v.mh && v.mh.rec && v.mh.rec.label, v.rec && v.rec.label].some(x=>x && squash(x)===want));
+  if(hits.length!==1){ toast(hits.length ? name+" matches more than one unit on the board. Search for it to pick the right one." : name+" is not on the board. Search for it, or check the Punch list."); return false; }
+  if(S.view!=="board") setView("board");
+  openUnit(hits[0].id);
+  return true;
 }
 /* Whether this person may make a hand fix right now, and the reason when not. */
 function setEdit(state){ S.can = !!(state && state.can===true); S.canWhy = (state && state.why) || ""; if(S.meta) render(); }
 function destroy(){ for(const fn of cleanups.splice(0)){ try{ fn(); }catch(_){} } clearTimeout(toastTimer); clearTimeout(announceTimer); clearTimeout(savedTimer); cancelAnimationFrame(M.raf); root.replaceChildren(); }
-return { update, setEdit, destroy, root, setTurn: tvTurn };
+return { update, setEdit, destroy, root, setTurn: tvTurn, openByName };
 }

@@ -11,8 +11,8 @@ const response=(data,status=200)=>new Response(JSON.stringify(data),{status,head
 const census=(matches)=>({result:{addressMatches:matches}});
 const katy={matchedAddress:'9500 KATY FWY, HOUSTON, TX, 77024',coordinates:{x:-95.534,y:29.7838}};
 
-function fixture({geocode=census([katy]),geocodeStatus=200,edits=[],role='owner',repeat=false,remoteResult=null,reconAgeMs=120000}={}){
- const calls=[],unexpected=[],recorded=[],asked=[],fixtureNow=Date.now();
+function fixture({geocode=census([katy]),geocodeStatus=200,edits=[],role='owner',repeat=false,remoteResult=null,reconAgeMs=120000,aLinks=[],linkReply=null}={}){
+ const calls=[],unexpected=[],recorded=[],asked=[],linked=[],fixtureNow=Date.now();
  const transport=async(url,init={})=>{
   const parsed=new URL(url),name=parsed.pathname.split('/').at(-1),body=init.body?JSON.parse(init.body):null,headers=new Headers(init.headers);
   calls.push({url,method:init.method||'GET',body});
@@ -30,6 +30,8 @@ function fixture({geocode=census([katy]),geocodeStatus=200,edits=[],role='owner'
   if(name==='camera_integrations')return response(['vigilant','reconeyez'].map(provider=>({provider,enabled:true,last_sync_at:new Date(fixtureNow-60000).toISOString(),last_sync_status:'ok'})));
   if(name==='cos_camera_unit_hand_edit_state_v1')return response({contract:'COS_UNIT_STATUS_HAND_EDITS_V1',edits});
   if(name==='cos_camera_unit_hand_edit_v1'){recorded.push(body);return response({contract:'COS_UNIT_STATUS_HAND_EDIT_RESULT_V1',id:body.p_request_id,applied:!repeat,repeat,latitude:repeat?null:undefined});}
+  if(name==='cos_mhelp_hand_link_state_v1')return aLinks===null?response({message:'no'},500):response({contract:'COS_MHELP_HAND_LINKS_V1',links:aLinks});
+  if(name==='cos_mhelp_hand_link_v1'){linked.push({body,auth:headers.get('authorization')});return linkReply?response(linkReply.data,linkReply.status):response({contract:'COS_MHELP_HAND_LINK_RESULT_V1',unitKey:body.p_unit_key,productId:body.p_product_id,label:'SOLARSPOTTER 029',repeat:false,cameraRows:1});}
   if(parsed.hostname==='geocoding.geo.census.gov'){
    // Only the address text leaves COS, with the two fixed settings.
    assert.equal(parsed.pathname,'/geocoder/locations/onelineaddress');
@@ -43,7 +45,7 @@ function fixture({geocode=census([katy]),geocodeStatus=200,edits=[],role='owner'
  const handler=createOperationsHandler({platformUrl:nativeOrigin,serviceKey,fetch:transport});
  const send=(path,method,body)=>handler(new Request('https://synthetic-bridge.invalid/functions/v1/cos-operations-pages',{method:'POST',
   headers:{Authorization:'Bearer '+callerToken,'Content-Type':'application/json'},body:JSON.stringify({path,method,body})}));
- return {calls,unexpected,recorded,asked,send};
+ return {calls,unexpected,recorded,asked,linked,send};
 }
 const geocodeCalls=f=>f.calls.filter(c=>c.url.includes('geocoding.geo.census.gov'));
 
@@ -217,4 +219,47 @@ for(const remote of [false,true])test('SS032 handler refuses 10428 Mathis for 10
  const r=await f.send('/api/unit-camera-status/edit','POST',{unitKey:'SPOTTER 306',field:'address',expectedAddressRevision:null,value:typed});
  assert.equal(r.status,200);const result=await r.json();assert.equal(result.recorded.pinned,false);
  assert.equal(f.recorded[0].p_payload.value,typed);assert.equal('latitude' in f.recorded[0].p_payload,false);
+});
+
+// An A# linked by hand on the unit card (James, 25 Nov).
+test('the read gives a unit without an A# the A# linked to it, and nothing else',async()=>{
+ const f=fixture({aLinks:[{unitKey:'solarspotter 029',productId:'2226712',label:'SS029',by:'hand'},{unitKey:'SPOTTER 306',productId:'not-digits'}]});
+ const data=await (await f.send('/api/unit-camera-status','GET')).json();
+ assert.equal(data.aLinksRead,true);
+ assert.equal(data.units.find(u=>u.unit==='SOLARSPOTTER 029').productId,'2226712');
+ assert.ok(!data.units.find(u=>u.unit==='SPOTTER 306').productId,'a malformed link is ignored');
+ assert.deepEqual(f.unexpected,[]);
+});
+test('unreadable A# links still show every unit',async()=>{
+ const f=fixture({aLinks:null});
+ const r=await f.send('/api/unit-camera-status','GET');
+ assert.equal(r.status,200);
+ const data=await r.json();
+ assert.equal(data.aLinksRead,false);assert.equal(data.units.length,4);
+});
+test('an A# is linked as the signed-in person and the fresh read carries it',async()=>{
+ const f=fixture();
+ const r=await f.send('/api/unit-camera-status/link-a','POST',{unitKey:'SOLARSPOTTER 029',productId:'2226712'});
+ assert.equal(r.status,200,await r.clone().text());
+ const data=await r.json();
+ assert.equal(f.linked.length,1);
+ assert.deepEqual(f.linked[0].body,{p_unit_key:'SOLARSPOTTER 029',p_product_id:'2226712',p_actor_name:'Synthetic Owner'});
+ assert.equal(f.linked[0].auth,'Bearer '+callerToken,'Tech Check decides who may link, from the person, not a service key');
+ assert.equal(data.linked.productId,'2226712');assert.equal(data.linked.duplicate,false);
+ assert.ok(Array.isArray(data.units));
+});
+test('a bad A# or an unknown unit links nothing',async()=>{
+ const f=fixture();
+ assert.equal((await f.send('/api/unit-camera-status/link-a','POST',{unitKey:'SOLARSPOTTER 029',productId:'A#2226712'})).status,422);
+ assert.equal((await f.send('/api/unit-camera-status/link-a','POST',{unitKey:'NOPE 1',productId:'2226712'})).status,404);
+ assert.equal(f.linked.length,0);
+});
+test('a refusal from Tech Check is said plainly and nothing is called linked',async()=>{
+ const f=fixture({linkReply:{status:409,data:{code:'PT409',message:'A# 2226712 is already linked to SPOTTER 306.'}}});
+ const r=await f.send('/api/unit-camera-status/link-a','POST',{unitKey:'SOLARSPOTTER 029',productId:'2226712'});
+ assert.equal(r.status,422);
+ assert.equal((await r.json()).error,'A# 2226712 is already linked to SPOTTER 306.');
+ const g=fixture({linkReply:{status:403,data:{code:'42501',message:'x'}}});
+ const r2=await g.send('/api/unit-camera-status/link-a','POST',{unitKey:'SOLARSPOTTER 029',productId:'2226712'});
+ assert.equal(r2.status,403);assert.match((await r2.json()).error,/Owner or approved IT/);
 });

@@ -41,3 +41,17 @@
  .router-detail dl>div{grid-template-columns:110px minmax(0,1fr)}
  .router-detail{scroll-margin-top:12px}
 }
+
+/* InHand routers not linked to a unit (Owner and IT) */
+.router-workspace .router-unlinked{margin:18px 0;padding:14px;border:1px solid rgba(255,255,255,.12);border-radius:12px}
+.router-workspace .router-unlinked h3{margin:0 0 6px;display:flex;gap:8px;align-items:baseline}
+.router-workspace .router-unlinked h3 small{opacity:.7}
+.router-workspace .router-unlinked ul{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}
+.router-workspace .router-unlinked-row{display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center;padding:10px;border-radius:10px;background:rgba(255,255,255,.04);border-left:4px solid #888}
+.router-workspace .router-unlinked-row.on{border-left-color:#2ecc71}
+.router-workspace .router-unlinked-row.off{border-left-color:#e74c3c}
+.router-workspace .router-unlinked-row > small{grid-column:1 / -1}
+.router-workspace .router-unlinked-pick{display:flex;gap:6px}
+.router-workspace .router-unlinked-pick input{min-width:200px}
+.router-workspace .router-ok{color:#2ecc71}
+@media (max-width:700px){.router-workspace .router-unlinked-row{grid-template-columns:1fr}.router-workspace .router-unlinked-pick input{min-width:0;flex:1}}
