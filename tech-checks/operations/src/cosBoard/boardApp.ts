@@ -397,8 +397,14 @@ function camsBox(v){
   if(v.u.s==="a" || v.mhOnly) return null;
   const list = S.dev && S.dev[v.k];
   if(!list || !list.length) return null;
+  /* James, 25 Nov: "a link to each cameras interface directly." Each camera's own page through the router's forwarded
+     port (1400 → .14, 1500 → .15, 1600 → .16, 1700 → .17, 1900 → .19; https on the same port + 43). */
+  const ip = v.ip && IPV4.test(v.ip) ? v.ip : "";
+  const camLinks = c => ip && c.p ? h("span",{class:"camlinks"},
+    h("a",{class:"lk camlk",href:"http://"+ip+":"+c.p,target:"_blank",rel:"noopener noreferrer"},"Web"),
+    h("a",{class:"lk camlk",href:"https://"+ip+":"+(c.p+43),target:"_blank",rel:"noopener noreferrer"},"HTTPS")) : null;
   return h("div",{class:"box"},h("h3",{text:"Cameras on this unit"}), list.map(c=>h("div",{class:"cam"},
-    h("div",null,h("b",{text:c.name}),h("span",{text:[c.type,c.model,c.fw ? "firmware "+c.fw : ""].filter(Boolean).join(" · ")})),
+    h("div",null,h("b",{text:c.name}),h("span",{text:[c.type,c.model,c.fw ? "firmware "+c.fw : ""].filter(Boolean).join(" · ")}),camLinks(c)),
     h("span",{class:"cst "+(c.st===1?"ok":c.st===0?"bad":"unk"),text: c.st===1 ? "Online" : c.st===0 ? "Offline"+(c.lo ? " since "+when(c.lo) : "") : "No reading"}))),
     S.devAt ? h("p",{class:"note",text:"Camera list read "+when(S.devAt)+"."}) : null); }
 /* The cameras COS has as off right now, by name, with when each was last online. The camera list first; the unit's own list as a fallback. */
@@ -488,8 +494,8 @@ const ipShort = ip => { ip=String(ip||""); return IPV4.test(ip) ? "ending ."+ip.
 function openBox(v){
   const u=v.u, m = S.mh && S.rec ? S.rec.match[v.id] : (v.mhOnly ? {rec:v.rec} : null), sys=[], own=[];
   const lk=(label,url)=>h("a",{class:"lk",href:url,target:"_blank",rel:"noopener noreferrer"},label);
-  /* James, 25 Nov: keep the Star4Live button on the card. */
-  if(u.s==="v") sys.push(lk("Star4Live","https://global.star4live.com/userWeb/device/device-management"));
+  /* James, 25 Nov: keep the Star4Live button, and a VCC button (Vigilant Control Center, the address he gave). */
+  if(u.s==="v"){ sys.push(lk("VCC","https://www.vigilantcontrolcenter.com/login")); sys.push(lk("Star4Live","https://global.star4live.com/userWeb/device/device-management")); }
   if(u.rs || u.rr || u.ri) sys.push(lk("InHand routers","https://iot.inhandnetworks.com/device/list"));
   if(v.type==="Helios" || /^Helios/.test(v.type)) sys.push(lk("Victron VRM","https://vrm.victronenergy.com/"));
   sys.push(lk("Watchful","https://v2.watchful.co.nz/alerts"));
