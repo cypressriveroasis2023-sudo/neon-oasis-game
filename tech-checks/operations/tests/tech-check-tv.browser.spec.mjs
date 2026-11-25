@@ -323,7 +323,7 @@ test('TV uses the Field Map background and retains pins when optional feeds fail
  await expect(frame.locator('.tv-fleet-warning')).toContainText('Camera Health: Connection unavailable');
  await expect(frame.locator('.tv-fleet-warning')).toContainText('Routers: Connection unavailable');
  await expect(frame.locator('.tv-fleet-summary')).toHaveText(completedSummary);
- await expect(frame.locator('.tv-fleet-map .leaflet-tile').first()).toHaveAttribute('src',/^https:\/\/tile\.openstreetmap\.org\//);
+ await expect(frame.locator('.tv-fleet-map .leaflet-tile').first()).toHaveAttribute('src',/^https:\/\/[abcd]\.basemaps\.cartocdn\.com\/dark_all\//);
  expect(state.writes).toEqual([]);
 });
 

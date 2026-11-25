@@ -18,7 +18,7 @@ async function mount(page,{failed=false}={}){
   const request=route.request(),url=new URL(request.url());
   if(url.pathname==='/camera-last-known-fixture')return route.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}iframe{width:100%;height:100vh;border:0}</style><iframe src="/#fleet-dashboard"></iframe><script>addEventListener('message',e=>{if(e.origin===location.origin&&e.data.type==='COS_OPERATIONS_TOKEN_REQUEST')e.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:e.data.requestId,role:'owner',accessToken:'synthetic-last-known-only'},location.origin)})</script>`});
   if(url.hostname==='127.0.0.1')return route.continue();
-  if(/(?:^|\.)tile\.openstreetmap\.org$/.test(url.hostname))return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#dce5df"/></svg>'});
+  if(/(?:^|\.)(?:tile\.openstreetmap\.org|basemaps\.cartocdn\.com)$/.test(url.hostname))return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#dce5df"/></svg>'});
   if(!url.pathname.endsWith('/functions/v1/cos-operations-pages'))return route.abort('blockedbyclient');
   const headers={'access-control-allow-origin':request.headers().origin||'*','access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'authorization, content-type'};
   if(request.method()==='OPTIONS')return route.fulfill({status:204,headers});
