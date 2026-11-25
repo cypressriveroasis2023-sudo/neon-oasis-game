@@ -41,6 +41,8 @@ export type ManagerGaps = {
   noHandoff: {tech: string; unit: string; by: string; at: string | null; listed: boolean}[];
   loaded: {tech: string; unit: string; by: string; reason: string; at: string | null; kind: ManagerGapKind}[];
   late: {units: string[]; from: string; to: string; state: string; hours: number | null}[];
+  /** Units Service sent back that IT has not checked in after 4 hours. */
+  returns: {unit: string; from: string; state: string; hours: number | null}[];
 };
 /** One truck as it should be after the save. A blank unit comes off the truck; a blank SIM is left as it is. */
 export type TruckKit = {units: Record<string, string>; sims: Record<string, string>; stock: Record<string, number>};
@@ -122,6 +124,8 @@ function parseGaps(value: unknown): ManagerGaps | null {
     noHandoff: list(value.noHandoff, 100).filter(record).map(row => ({tech: text(row.tech, 80) || 'Service tech', unit: text(row.unit, 90), by: text(row.by, 80), at: time(row.at), listed: row.listed !== false})).filter(row => row.unit),
     loaded: list(value.loaded, 100).filter(record).map(row => ({tech: text(row.tech, 80) || 'Service tech', unit: text(row.unit, 90), by: text(row.by, 80) || 'Unknown', reason: text(row.reason, 200), at: time(row.at),
       kind: gapKinds.includes(row.kind as ManagerGapKind) ? row.kind as ManagerGapKind : 'other'})).filter(row => row.unit),
+    returns: list(value.returns, 100).filter(record).map(row => ({unit: text(row.unit, 90), from: text(row.from, 80) || 'Service', state: text(row.state, 40) || 'waiting_it',
+      hours: typeof row.hours === 'number' && Number.isFinite(row.hours) ? Math.max(0, Math.min(99999, row.hours)) : null})).filter(row => row.unit),
     late: list(value.late, 100).filter(record).map(row => ({units: list(row.units, 20).map(item => text(item, 90)).filter(Boolean), from: text(row.from, 80) || 'IT', to: text(row.to, 80) || 'Service',
       state: text(row.state, 40) || 'unknown', hours: typeof row.hours === 'number' && Number.isFinite(row.hours) ? Math.max(0, Math.min(99999, row.hours)) : null})),
   };
