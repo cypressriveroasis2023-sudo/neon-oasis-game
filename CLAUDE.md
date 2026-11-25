@@ -59,6 +59,13 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-25** — Tech Check: `public.cos_mhelp_hand_link_state_v1` and
+  `public.cos_mhelp_hand_link_v1` (A# linked by hand from the unit card; Owner or
+  approved IT; writes `app_private.cos_mhelp_unit_link` `decided_by='hand'`, and
+  `camera_devices.mhelp_product_id` only for single-camera units). No audit row.
+  Operations patch `cos-unit-camera-status/a-links-v19` is **prepared, not
+  deployed**; it starts from live v19. Record in
+  `tech-checks/docs/db-changes/20261125_mhelp_hand_link_functions.md`.
 - **2026-11-25** — `camera_devices`: Spotter 265 matched to VCC (row 275 moved
   from SOLARSPOTTER 253 to SPOTTER 265 as CAM 4 by serial, 3340/3341 renamed,
   new row 3342 for CAM 1, NVR row 384 `deactivated`). Approved by James. No audit

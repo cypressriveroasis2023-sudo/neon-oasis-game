@@ -31,10 +31,13 @@ test('the board is isolated from the rest of COS and sends nothing itself', () =
   assert.doesNotMatch(app, /unit-camera-status|\bapi\.(?:get|post)\(|from '\.\.?\/api'/);
   const landing = read('../src/CosBoardLanding.tsx');
   assert.equal(landing.split("api.post('/api/unit-camera-status/edit', handFixRequest(unit, step, crypto.randomUUID()))").length - 1, 1);
-  // Exactly three sends, each named here on purpose: the hand fix, checking one unit on demand, and sending a
+  // Exactly four sends, each named here on purpose: the hand fix, checking one unit on demand, sending a
   // Troubleshoot result to IT (James, 25 Nov: it goes on the next IT sheet instead of being copied by hand; it
-  // schedules nothing and changes no unit). The count stays exact so a fourth has to be argued for here.
-  assert.equal(landing.split('api.post(').length - 1, 3);
+  // schedules nothing and changes no unit), and linking an A# by hand (James, 25 Nov: "build a# button"; Tech Check
+  // checks the person and the A#). The count stays exact so a fifth has to be argued for here.
+  assert.equal(landing.split('api.post(').length - 1, 4);
+  assert.equal(landing.split("api.post('/api/unit-camera-status/link-a', {unitKey, productId})").length - 1, 1);
+  assert.match(app, /await hooks\.onLinkA\(v\.k, pid\)/);
   assert.equal(landing.split("api.post('/api/unit-camera-status/troubleshoot', report)").length - 1, 1);
   assert.match(app, /await hooks\.onSendTrouble\(\{requestId: tr\.sent\.id/);
   assert.equal(landing.split("api.post('/api/product-connections/verify', {productIds: [productId]})").length - 1, 1);
