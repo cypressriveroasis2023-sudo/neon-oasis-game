@@ -944,6 +944,30 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
         keepPermitForResponse = true;
         return json(await readPrivateOwnerEvidence(context.actorId, documentId));
       }
+      // Troubleshoot result sent to IT from a unit card (James, 25 Nov: "Send to IT").
+      // A record of what a tech found, for the next daily IT sheet. It schedules
+      // nothing and changes no unit, camera, mHelp, Star4Live or InHand data. The
+      // person is the verified session; the database checks Owner-or-IT again.
+      if (path === '/api/unit-camera-status/troubleshoot') {
+        if (method !== 'POST') fail('Use POST to send a troubleshoot result.', 405);
+        if (body === null) body = await requestBody(request);
+        const b = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
+        const text = (value, max) => typeof value === 'string' && value.trim() !== '' && value.length <= max ? value.trim() : null;
+        const requestId = typeof b.requestId === 'string' && UUID.test(b.requestId) ? b.requestId : null;
+        const report = {unitKey: text(b.unitKey, 120), unitName: text(b.unitName, 160), result: text(b.result, 160),
+          next: b.next == null || b.next === '' ? null : text(b.next, 200), note: text(b.note, 4000)};
+        if (!requestId || !report.unitKey || !report.unitName || !report.result || !report.note || typeof b.managerHelp !== 'boolean' || (b.next && !report.next))
+          return json({error: 'The troubleshoot result is incomplete. Nothing was sent.'}, 422);
+        if (/(\d{1,3}\.){3}\d{1,3}/.test(report.note)) return json({error: 'Notes carry last octets only, not a whole IP address. Nothing was sent.'}, 422);
+        const actorRole = context.legacyOwner && context.actorId ? 'owner' : 'it';
+        const actorName = (context.name || '').trim() || (actorRole === 'owner' ? 'Owner' : 'IT technician');
+        const receipt = await rpc('cos_troubleshoot_report_v1', {
+          ...actorPayload, p_request_id: requestId,
+          p_payload: {...report, managerHelp: b.managerHelp, actorName, actorRole},
+        }, request.signal);
+        if (receipt?.contract !== 'COS_TROUBLESHOOT_REPORT_RESULT_V1') fail('The troubleshoot result could not be saved. Nothing was sent.', 503);
+        return json({contract: 'COS_TROUBLESHOOT_SENT_V1', id: receipt.id, recordedAt: receipt.recordedAt, by: actorName, duplicate: receipt.repeat === true});
+      }
       // Camera status read and its hand edit. Kept above the GET-only section so
       // the POST edit is reachable; each path checks its own method.
       if (path === '/api/unit-camera-status' || path === '/api/unit-camera-status/edit') {

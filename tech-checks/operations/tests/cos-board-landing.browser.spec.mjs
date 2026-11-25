@@ -874,6 +874,23 @@ test('a unit with cameras off names them and walks a tech through it without lea
     if (!(await answer(label))) break;
   }
   await expect.poll(() => inBoard(host, root => root.querySelector('#panel .trres')?.textContent || '')).toContain('Manager help');
+  // Send to IT: the result goes to COS for the next IT sheet, with the note as shown and nothing scheduled.
+  const sent = [];
+  await page.route('**/functions/v1/cos-unit-camera-status', async route => {
+    const request = route.request();
+    if (request.method() === 'OPTIONS') return route.fallback();
+    const envelope = JSON.parse(request.postData() || '{}');
+    if (envelope.path !== '/api/unit-camera-status/troubleshoot') return route.fallback();
+    sent.push(envelope.body);
+    return route.fulfill({status: 200, headers: {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+      json: {contract: 'COS_TROUBLESHOOT_SENT_V1', id: envelope.body.requestId, recordedAt: '2026-11-25T18:00:00Z', by: 'Fixture Owner', duplicate: false}});
+  });
+  expect(await inBoard(host, root => { const b = root.querySelector('#panel .trsend'); b?.click(); return Boolean(b); })).toBe(true);
+  await expect.poll(() => inBoard(host, root => root.querySelector('#panel .trsent')?.textContent || '')).toContain('Sent to IT by Fixture Owner');
+  expect(sent).toHaveLength(1);
+  expect(sent[0]).toMatchObject({unitName: 'Spotter 003', managerHelp: true, result: 'The camera itself is likely bad'});
+  expect(sent[0].note).toContain('SPOTTER 003 / Cam 2 is off');
+  expect(sent[0].note).not.toMatch(/\d+\.\d+\.\d+\.\d+/);
   expect(await inBoard(host, root => root.querySelector('#panel .trnote').textContent)).toContain('SPOTTER 003 / Cam 2 is off');
   // Answering troubleshooting writes nothing anywhere.
   expect(state.errors).toEqual([]);

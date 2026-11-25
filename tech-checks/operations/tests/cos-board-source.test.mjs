@@ -30,9 +30,12 @@ test('the board is isolated from the rest of COS and sends nothing itself', () =
   assert.doesNotMatch(app, /unit-camera-status|\bapi\.(?:get|post)\(|from '\.\.?\/api'/);
   const landing = read('../src/CosBoardLanding.tsx');
   assert.equal(landing.split("api.post('/api/unit-camera-status/edit', handFixRequest(unit, step, crypto.randomUUID()))").length - 1, 1);
-  // Exactly two sends, both named here on purpose: the hand fix, and checking one unit on demand. The count stays
-  // exact so a third has to be argued for in this test rather than appearing quietly.
-  assert.equal(landing.split('api.post(').length - 1, 2);
+  // Exactly three sends, each named here on purpose: the hand fix, checking one unit on demand, and sending a
+  // Troubleshoot result to IT (James, 25 Nov: it goes on the next IT sheet instead of being copied by hand; it
+  // schedules nothing and changes no unit). The count stays exact so a fourth has to be argued for here.
+  assert.equal(landing.split('api.post(').length - 1, 3);
+  assert.equal(landing.split("api.post('/api/unit-camera-status/troubleshoot', report)").length - 1, 1);
+  assert.match(app, /await hooks\.onSendTrouble\(\{requestId: tr\.sent\.id/);
   assert.equal(landing.split("api.post('/api/product-connections/verify', {productIds: [productId]})").length - 1, 1);
   // The work log and the board's own tech check form would need that store, so they are off.
   assert.match(app, /function logBox\(\)\{ return null; \}/);

@@ -1,0 +1,53 @@
+{
+  "slug": "cos-unit-camera-status",
+  "projectRef": "tughscoxralhofrckvxy",
+  "sourceDir": "tech-checks/docs/cos-unit-camera-status-v17-entry",
+  "sourceCommit": "95e3e5a4f81f0f823e7e646a01a8235da7c5f425",
+  "deployedFileNames": {
+    "index.ts": "cos-unit-camera-status/index.ts",
+    "deno.json": "cos-unit-camera-status/deno.json"
+  },
+  "entrypointPath": "cos-unit-camera-status/index.ts",
+  "importMapPath": "cos-unit-camera-status/deno.json",
+  "verifyJwt": false,
+  "description": "Add POST /api/unit-camera-status/troubleshoot to live v17: a Troubleshoot result sent to IT from the unit card, saved through public.cos_troubleshoot_report_v1 (Operations). Three exact edits: the route in the bundled handler (before the existing camera-status route), and the new path in the served-path list and in the v17 route gate. Every other route, the authentication, origin checks and CORS are unchanged.",
+  "authorization": "James, 2026-11-25: 'do 1' (Send to IT). Running the deploy still needs his explicit go for that run.",
+  "releaseStatus": "PREPARED",
+  "sourceRecord": "tech-checks/docs/cos-unit-camera-status-v17-entry/index.ts",
+  "requireLiveBeforeDeploy": {
+    "status": "ACTIVE",
+    "version": 17,
+    "ezbr_sha256": "6d64057b39af2a496ab907d7a20e2103bdeb61272be64e10564692b5d82f3726"
+  },
+  "edits": [
+    {
+      "file": "index.ts",
+      "needle": "      if (path === \"/api/unit-camera-status\" || path === \"/api/unit-camera-status/edit\") {\n",
+      "replacement": "      if (path === \"/api/unit-camera-status/troubleshoot\") {\n        if (method !== \"POST\") fail16(\"Use POST to send a troubleshoot result.\", 405);\n        if (body === null) body = await requestBody(request);\n        const tsb = body && typeof body === \"object\" && !Array.isArray(body) ? body : {};\n        const tst = (value, max) => typeof value === \"string\" && value.trim() !== \"\" && value.length <= max ? value.trim() : null;\n        const tsRequestId = typeof tsb.requestId === \"string\" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tsb.requestId) ? tsb.requestId : null;\n        const tsReport = { unitKey: tst(tsb.unitKey, 120), unitName: tst(tsb.unitName, 160), result: tst(tsb.result, 160), next: tsb.next == null || tsb.next === \"\" ? null : tst(tsb.next, 200), note: tst(tsb.note, 4e3) };\n        if (!tsRequestId || !tsReport.unitKey || !tsReport.unitName || !tsReport.result || !tsReport.note || typeof tsb.managerHelp !== \"boolean\" || tsb.next && !tsReport.next)\n          return json({ error: \"The troubleshoot result is incomplete. Nothing was sent.\" }, 422);\n        if (/(\\d{1,3}\\.){3}\\d{1,3}/.test(tsReport.note)) return json({ error: \"Notes carry last octets only, not a whole IP address. Nothing was sent.\" }, 422);\n        const tsRole = context.legacyOwner && context.actorId ? \"owner\" : \"it\";\n        const tsName = (context.name || \"\").trim() || (tsRole === \"owner\" ? \"Owner\" : \"IT technician\");\n        const tsReceipt = await rpc(\"cos_troubleshoot_report_v1\", { ...actorPayload, p_request_id: tsRequestId, p_payload: { ...tsReport, managerHelp: tsb.managerHelp, actorName: tsName, actorRole: tsRole } }, request.signal);\n        if (tsReceipt?.contract !== \"COS_TROUBLESHOOT_REPORT_RESULT_V1\") fail16(\"The troubleshoot result could not be saved. Nothing was sent.\", 503);\n        return json({ contract: \"COS_TROUBLESHOOT_SENT_V1\", id: tsReceipt.id, recordedAt: tsReceipt.recordedAt, by: tsName, duplicate: tsReceipt.repeat === true });\n      }\n      if (path === \"/api/unit-camera-status\" || path === \"/api/unit-camera-status/edit\") {\n",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "var UNIT_CAMERA_STATUS_PATHS = [\"/api/unit-camera-status\", \"/api/unit-camera-status/edit\"];",
+      "replacement": "var UNIT_CAMERA_STATUS_PATHS = [\"/api/unit-camera-status\", \"/api/unit-camera-status/edit\", \"/api/unit-camera-status/troubleshoot\"];",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "const CAMERA_STATUS_ROUTES=[\"/api/unit-camera-status\",\"/api/unit-camera-status/edit\"];",
+      "replacement": "const CAMERA_STATUS_ROUTES=[\"/api/unit-camera-status\",\"/api/unit-camera-status/edit\",\"/api/unit-camera-status/troubleshoot\"];",
+      "occurrences": 1
+    }
+  ],
+  "expectedBefore": {
+    "index.ts": "a9c7c08bb6fbb22e80c51792d28a8c0ea22fbf84cd84bf0128671ed890140b1f",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "expectedAfter": {
+    "index.ts": "ee7e57864dabadab6fd0b03500bc8793afcdb84f5ff65be2fbbab0e59782d7e8",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "dryRun": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/troubleshoot-route-v17.json --dry-run",
+  "deploy": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/troubleshoot-route-v17.json --deploy",
+  "rollback": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/rollback-to-v17-entry.json --deploy"
+}

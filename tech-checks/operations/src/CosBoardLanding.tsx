@@ -193,6 +193,13 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
         take.current(result);
         return {said: found + '.', tone};
       },
+      // Troubleshoot result sent to IT for the next daily IT sheet (James, 25 Nov). It schedules nothing and
+      // changes no unit. A reply that is not the server's receipt is not called sent.
+      onSendTrouble: async (report: {requestId: string; unitKey: string; unitName: string; result: string; next: string; managerHelp: boolean; note: string}) => {
+        const reply = (await api.post('/api/unit-camera-status/troubleshoot', report)).data as {contract?: string; recordedAt?: string; by?: string} | null;
+        if (reply?.contract !== 'COS_TROUBLESHOOT_SENT_V1' || !reply.recordedAt) throw new Error('COS could not confirm it was sent. Copy the note instead.');
+        return {at: reply.recordedAt, by: reply.by || ''};
+      },
       // Tech checks are their own screen in COS.
       // An IT sign-in keeps its tech checks in the Tech Check app around this frame, so the tab opens them there.
       // James: "i clicked tech check on the IT board and it is showing return to my IT tech checks."

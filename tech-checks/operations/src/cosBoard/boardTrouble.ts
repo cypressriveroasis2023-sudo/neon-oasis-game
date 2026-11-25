@@ -185,6 +185,8 @@ export const TROUBLE_CSS = `
 .trres{border-left:5px solid var(--warn);padding:2px 0 2px 12px;margin:6px 0 10px}
 .trres.t-good{border-left-color:var(--up)}.trres.t-bad{border-left-color:var(--down)}.trres.t-info{border-left-color:var(--shop)}
 .trres ul{margin:0 0 8px;padding-left:20px}.trres li{margin:3px 0}
+.trsend{width:100%;text-align:center;margin:10px 0 0;min-height:54px;font-size:17px}
+.trsent{margin-top:10px!important;font-weight:650}
 .trhelp{font-weight:700;background:var(--s2);border-radius:10px;padding:8px 11px}
 .trnote{white-space:pre-wrap;font-size:13px;line-height:1.45;background:var(--bg2);border:1px solid var(--line2);border-radius:10px;padding:10px 12px;margin:0;color:var(--tx2);overflow-wrap:anywhere}
 `;
