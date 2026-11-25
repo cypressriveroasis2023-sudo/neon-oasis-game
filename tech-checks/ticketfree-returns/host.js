@@ -37,13 +37,16 @@ export function openTicketfreeReturns(context,{onSaved=()=>{}}={}) {
  }
  function renderService() {
   const root=section('');
-  servicePicker(root,{data,draft,save:keep,redraw:render,appendEvidence:appendNotesPhotos,submit:()=>void submit(),tell});
+  servicePicker(root,{data,draft,save:keep,redraw:render,appendEvidence:appendNotes,appendPhotos,submit:()=>void submit(),tell});
  }
- function appendNotesPhotos(fields) {
+ function appendNotesPhotos(fields) {appendNotes(fields);appendPhotos(fields);}
+ function appendNotes(fields) {
   const notes=node('textarea');notes.rows=3;notes.maxLength=2000;notes.value=draft.notes;notes.placeholder=draft.kind==='receive'?'Intake notes; required when repair is needed':'Location or condition notes (optional)';notes.oninput=()=>{draft.notes=notes.value;void keep().catch(e=>tell(e.message,true));};fields.append(labeled('Notes',notes));
-  const photos=node('input');photos.type='file';photos.accept='image/*';photos.multiple=true;photos.setAttribute('capture','environment');photos.setAttribute('aria-label','Add optional equipment photos');
+ }
+ function appendPhotos(fields) {
+  const photos=node('input');photos.type='file';photos.accept='image/*';photos.multiple=true;photos.setAttribute('capture','environment');photos.setAttribute('aria-label','Add equipment photos');
   photos.onchange=async()=>{if(busy)return;busy=true;const rev=generation;try{for(const file of photos.files){if(draft.photos.length>=8)throw new Error('Use no more than eight photos.');const jpeg=await transferJpeg(file);if(!valid()||rev!==generation)return;draft.photos.push(jpeg);}await keep();if(valid()){render();tell('Photos kept in this device draft until submission.');}}catch(e){tell(e.message,true);}finally{busy=false;}};
-  fields.append(labeled('Photos (optional)',photos),node('small',draft.photos.length+' photo(s) in this draft'));
+  fields.append(labeled(draft.kind==='receive'?'Photos (required — at least one of the unit as it arrived)':'Photos (required — at least one of what you are bringing back)',photos),node('small',draft.photos.length+' photo(s) in this draft'));
   if(draft.photos.length)fields.append(button('Clear draft photos',()=>{draft.photos=[];void keep();render();}));
  }
  function renderReturns(parent=body) {
@@ -92,6 +95,7 @@ export function openTicketfreeReturns(context,{onSaved=()=>{}}={}) {
   try{
    client.assert();
    if(!draft.request){
+    if(!draft.photos.length)throw new Error(draft.kind==='receive'?'Take at least one photo of the unit as it arrived before checking it in.':'Take at least one photo of the equipment you are bringing back before saving.');
     if(draft.kind==='submit')draft.request=await prepareBatch(draft,client);
     else {
      assertIntake(draft);

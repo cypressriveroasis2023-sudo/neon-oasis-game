@@ -52,7 +52,9 @@ async function jpeg(file) {
   if(!file || file.size>25*1024*1024)throw new Error('Choose a photo smaller than 25 MB.');
   const url=URL.createObjectURL(file), image=new Image();
   try {
-    image.src=url;await image.decode();
+    // Safari can reject decode() with "Loading was canceled"; wait for load instead.
+    await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=()=>reject(new Error('This photo could not be read. Take it again.'));image.src=url;});
+    await Promise.resolve(image.decode?.()).catch(()=>{});
     const scale=Math.min(1,1920/Math.max(image.naturalWidth,image.naturalHeight));
     const canvas=document.createElement('canvas');canvas.width=Math.round(image.naturalWidth*scale);canvas.height=Math.round(image.naturalHeight*scale);
     canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);
