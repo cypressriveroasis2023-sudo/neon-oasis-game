@@ -181,7 +181,7 @@
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-source-details{border:1px solid #2d3a4c;border-radius:10px;margin:12px 0;padding:0 12px}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-source-details>summary{cursor:pointer;font-size:12px;min-height:44px;align-content:center}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-fleet-map-canvas{background:#18232e}
-#root#root .cos-fleet-board.cos-fleet-dashboard .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.72) saturate(.4)}
+/* Tiles are dark at source (CARTO dark_all); a filter here erases street detail. */
 /* Keep the three family summaries at the compact height shown in the mockup. */
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-card{display:grid;grid-template-columns:1fr 1.35fr;grid-template-rows:auto auto auto 1fr auto;column-gap:12px;align-content:stretch}
 #root#root .cos-fleet-board.cos-fleet-dashboard .cos-equipment-total-card h2{grid-column:1/-1}

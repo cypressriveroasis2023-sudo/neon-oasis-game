@@ -37,6 +37,17 @@ import {createHash} from 'node:crypto';
 // polled window is unchanged, and tests/recon-event-window.test.mjs holds both
 // boundaries exactly, including that a wider window never turns Unknown into
 // online and never softens a fresh confirmed miss.
+// Reviewed 2026-11-25 at James's instruction: the maps draw a dark basemap
+// instead of inverting a light one. Every map drew OpenStreetMap's light tiles
+// and darkened them in CSS with grayscale(1) invert(1) ... contrast(.75);
+// greyscaling discards the colour that separates a motorway from a side street
+// from water before the re-tint, so the street network and the labels washed
+// out and the map read as empty at every zoom. fieldMapBasemap.ts now points at
+// CARTO dark_all, which is drawn dark at source, and the three
+// .leaflet-tile-pane filters are gone. fleetAppearance.css carries one of those
+// three and its pin moves with it; the change is the removal of that one filter
+// rule and nothing else in the file. No unit is presented or counted
+// differently.
 const expected={
   "FleetDashboard.tsx": "8d711a97853b5f646d892f5552a792656623a9f8",
   "FleetUnitHealth.tsx": "3ba1f2507241a63d839424bc1db28b6d584659c1",
@@ -52,7 +63,7 @@ const expected={
   "workspaceNavigation.ts": "0c38aa7afc6489940bb3a358ff8c26e2236faeb7",
   "App.tsx": "fadbee7d7bdc5e22ef47be8352675fb4433c9997",
   "fleetDashboard.css": "817194345766e341303cad8e636207afbe5b71ba",
-  "fleetAppearance.css": "72d26de6af0f7be19268998515c953fa7d58a23f",
+  "fleetAppearance.css": "03354e6ba86adfacf4afa144a56c68f370afcaa3",
   "fleetSimpleCards.css": "289a23208e902651cd9f3afcf9ff7a7a9ccbc3c5",
   "fleetBoardLayout.css": "8c4962032a589287f75854b581dfc57f5d579b8f"
 };

@@ -24,7 +24,7 @@ async function mount(page,{role='Owner',marker=true,holdPost=false,response=rece
   const url=route.request().url();
   if(url===origin+'/owner-preparation-fixture')return route.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;height:100%}iframe{width:100%;height:100%;border:0}</style><iframe src="/${role==='IT'?'?mode=fleet':''}#field-map"></iframe><script>addEventListener('message',e=>{if(e.origin===location.origin&&e.data.type==='COS_OPERATIONS_TOKEN_REQUEST')e.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:e.data.requestId,role:'${role.toLowerCase()}',accessToken:'synthetic-only'},location.origin)})</script>`});
   if(url.startsWith(origin+'/'))return route.continue();
-  if(/^https:\/\/[abc]\.tile\.openstreetmap\.org\//.test(url))return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#34495b"/></svg>'});
+  if(/^https:\/\/(?:(?:[abc]\.)?tile\.openstreetmap\.org|[abcd]\.basemaps\.cartocdn\.com)\//.test(url))return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#34495b"/></svg>'});
   if(!url.endsWith('/functions/v1/cos-operations-pages'))return route.abort('blockedbyclient');
   const headers={'access-control-allow-origin':origin,'access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'authorization, content-type'};
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
