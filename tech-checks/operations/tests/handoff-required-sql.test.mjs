@@ -67,6 +67,12 @@ before(async () => {
     await db.query('insert into public.service_truck_units(service_tech_id,equipment_type) values($1,$2)', [tech, type]);
   await db.exec(await readFile(new URL('../../database-maintenance/techcheck-handoff-required-v1.sql', import.meta.url), 'utf8'));
 });
+
+async function withBaseline(fn) {
+  // the starting point is recorded once, from whatever is on the trucks at that moment
+  await db.exec(await readFile(new URL('../../database-maintenance/techcheck-handoff-baseline-v1.sql', import.meta.url), 'utf8'));
+  return fn();
+}
 after(async () => db?.close());
 
 test('typing a unit with no handoff is refused, nothing is saved, and the message gives the next step', async () => {
@@ -150,4 +156,17 @@ test('the daily list shows trucks without handoffs, loads without handoffs and u
   // a report run with no signed-in person can read it
   await db.query("select set_config('test.actor','',false)");
   assert.ok((await db.query('select public.techcheck_handoff_gaps_v1() r')).rows[0].r.checked_at);
+});
+
+test('the starting point counts what is on the trucks as handed over; new units still need a handoff', async () => {
+  await withBaseline(async () => {
+    const [{r}] = await as(owner, 'select public.techcheck_handoff_gaps_v1() r');
+    assert.deepEqual(r.on_truck_without_handoff, []);
+    // off the truck and back on again, no handoff needed
+    await save(abel, {Sniper: ''});
+    await save(abel, {Sniper: '332'});
+    assert.equal(await slot(abel, 'Sniper'), '332');
+    // a unit that was not on a truck at that moment still needs one
+    await assert.rejects(save(abel, {Spotter: '268'}), /NEXT STEP/);
+  });
 });
