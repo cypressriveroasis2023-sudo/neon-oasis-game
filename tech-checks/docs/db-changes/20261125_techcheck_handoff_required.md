@@ -2,7 +2,7 @@
 
 Project: Tech Check `goqrnolcvqnirjmzaeyk`
 SQL: `tech-checks/database-maintenance/techcheck-handoff-required-v1.sql`
-Status: **not applied yet.** Dry-run on the live database inside a rolled-back
+Status: **applied 2026-11-25 06:54 UTC** at the owner's direction; live check as Josh refused a new unit with the NEXT STEP message and allowed re-saving an existing one. Earlier: Dry-run on the live database inside a rolled-back
 transaction on 2026-11-25 ~06:55 UTC; afterwards confirmed the trigger and tables
 do not exist.
 
