@@ -20,7 +20,7 @@ function loadStyle(){if(document.querySelector('[data-transfer-style]'))return;c
 // Mounts inside the original TechCheck page, using its current account and database.
 export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}){
  loadStyle();root.classList.add('tc-transfer');root.setAttribute('aria-label',role==='it'?'IT equipment check in and check out':'Equipment received from IT');
- const client=transferClient(context),urls=new Set();let disposed=false,data=null,contract=null,draft=null,storageKey='',busy=false,pending=0,statusNode=null,revision=0;
+ const client=transferClient(context),urls=new Set();let disposed=false,data=null,drawerSims=null,contract=null,draft=null,storageKey='',busy=false,pending=0,statusNode=null,revision=0;
  const picker={query:'',selected:''};
  const current=()=>!disposed&&client.current()&&root.isConnected;
  const guard=()=>{client.assert();if(disposed||!root.isConnected)throw new Error('This transfer screen is no longer active.');};
@@ -103,7 +103,7 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
  function heading(text,detail){root.append(element('small','CAMERAS ONSITE · TECHCHECK'),element('h1',text));if(detail)root.append(element('p',detail));}
  async function load(notice=''){
   const turn=++revision;reset();heading(role==='it'?'Equipment handoffs':'Equipment received from IT');message('Reading your saved handoffs…');
-  try{const [result,rules]=await Promise.all([client.read(),contract?Promise.resolve(contract):fetch(new URL('./checklist-contract.json',import.meta.url)).then(r=>{if(!r.ok)throw new Error('Equipment checks unavailable.');return r.json();})]);guard();if(turn!==revision)return;if(result.role!==role)throw new Error('Your current role does not match this screen.');data=result;contract=rules;home(notice);}
+  try{const [result,rules,sims]=await Promise.all([client.read(),contract?Promise.resolve(contract):fetch(new URL('./checklist-contract.json',import.meta.url)).then(r=>{if(!r.ok)throw new Error('Equipment checks unavailable.');return r.json();}),role==='it'&&client.simDrawer?client.simDrawer():Promise.resolve(null)]);guard();if(turn!==revision)return;if(result.role!==role)throw new Error('Your current role does not match this screen.');data=result;drawerSims=sims;contract=rules;home(notice);}
   catch(e){if(current()&&turn===revision){if(onUnavailable){onUnavailable(e.reason||'unavailable');return;}message('Handoffs unavailable. '+e.message+' Saved handoff status could not be verified.',true);root.append(button('Retry handoffs',()=>load()));}}
  }
  function home(notice=''){
@@ -318,6 +318,14 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
     }
     for(const [field,caption,type] of inputs){
      const n=input(type,item[field],value=>{item[field]=value;changed();});n.setAttribute('aria-label',caption+' '+(index+1));n.dataset.transferItem=String(index);n.dataset.transferField=field;if(['family','unit_tag','batteryText'].includes(field))n.required=true;if(draft.kind==='return')n.readOnly=true;if(type==='number'){n.min='0';n.max='9999';n.step='1';}group.append(label(field==='partsText'?'Additional parts (optional — name | quantity, or N/A for none)':caption,n));if(field==='partsText')group.append(element('small','Example: SD card | 1. Leave blank if no additional parts.'));
+     if(draft.kind==='checkout'&&field==='simText'&&Array.isArray(drawerSims)){
+      const inUse=new Set(draft.items.flatMap(i=>lines(i.simText)).map(v=>String(v).replace(/[^0-9A-Za-z]/g,'').toUpperCase()));
+      const pick=element('select');pick.setAttribute('aria-label','Pick a SIM from the drawer '+(index+1));
+      pick.append(new Option(drawerSims.length?'Pick a SIM from the drawer ('+drawerSims.length+' in the drawer)':'The SIM drawer is empty — ask James to add cards',''));
+      for(const c of drawerSims)if(!inUse.has(c.sim))pick.append(new Option('…'+c.sim.slice(-6)+' · '+c.sim+(c.carrier?' · '+c.carrier:''),c.sim));
+      pick.onchange=()=>{if(!pick.value)return;item.simText=[...lines(item.simText).filter(v=>!/^N\/?A$/i.test(String(v).trim())),pick.value].join('\n');changed();render(transfer);};
+      group.append(label('SIM from the drawer',pick),element('small','Picking a SIM adds its full number above. A SIM handed over here leaves the drawer list.'));
+     }
      if(draft.kind==='receipt'&&field==='batteryText')group.append(element('small','Count batteries of the required installation type shown above. If that type was not received, enter 0 and explain the difference in Notes.'));
     }
     const skippedBatteryChecks=['delivery_batteries_charged_ok','helios_battery_box_installed_ok','helios_battery_120v_charged_ok'];

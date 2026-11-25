@@ -59,6 +59,11 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-25** — Tech Check: SIM drawer. AFTER INSERT trigger on
+  `app_private.techcheck_transfer_events` and AFTER UPDATE trigger on
+  `public.service_truck_sims` keep `app_private.sim_drawer` in step; both
+  swallow their own errors. Record in
+  `tech-checks/docs/db-changes/20261125_techcheck_sim_drawer.md`.
 - **2026-11-25** — Tech Check: `app_private.submit_techcheck_transfer_v2` now
   requires Service to answer every equipment check (Pass/Problem) on a receipt.
   The held `operations/transfer-placement-review/` package replaces this

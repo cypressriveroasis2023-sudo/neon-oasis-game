@@ -15,7 +15,7 @@ import {readVrmHistory, type HistoryPoint} from './vrmHistory';
 import {boardEditState, handFixRequest, type BoardEditFlags, type BoardEditState, type BoardFixStep} from './cosBoard/boardEdit';
 import {mountCosBoard} from './cosBoard/boardApp';
 import {loadBoardFonts} from './cosBoard/boardFonts';
-import {managerHost, managerKnown, managerPhoto, readManager, rememberManager, saveTruck, takeBoardView, type TruckKit} from './managerBridge';
+import {addSims, managerHost, managerKnown, managerPhoto, markSim, readManager, rememberManager, saveTruck, takeBoardView, type TruckKit} from './managerBridge';
 
 /**
  * Tells the page around the frame that the board is, or is no longer, the TV display, so it gives the frame the
@@ -210,6 +210,8 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
         read: (fresh: boolean) => readManager(fresh, true),
         save: (techId: string, kit: TruckKit) => saveTruck(techId, kit),
         photo: (path: string) => managerPhoto(path),
+        simAdd: (numbers: string[], carrier: string, note: string) => addSims(numbers, carrier, note),
+        simMark: (sim: string, status: 'in_drawer' | 'bad' | 'deactivated' | 'removed', note: string) => markSim(sim, status, note),
         open: (route: string) => openLegacy(route),
         known: (shown: boolean) => rememberManager(shown),
         wasKnown: () => managerKnown(),
