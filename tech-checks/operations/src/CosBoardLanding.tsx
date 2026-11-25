@@ -10,6 +10,7 @@ import {workspaceHash} from './workspaceNavigation';
 import {setBoardSessionHold} from './tvSessionHold';
 import {boardData} from './cosBoard/boardData';
 import {boardPowerByUnit, type BoardPower} from './cosBoard/boardPower';
+import {heliosSpots, readSunForecast, sunOutlook, type OutlookDay, type SunDay} from './vrmWeather';
 import {getVrmFleet} from './vrmFleetApi';
 import {readVrmHistory, type HistoryPoint} from './vrmHistory';
 import {boardEditState, handFixRequest, type BoardEditFlags, type BoardEditState, type BoardFixStep} from './cosBoard/boardEdit';
@@ -99,7 +100,28 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
     window.addEventListener('cos-private-data-invalidated', drop);
     return () => { live = false; window.clearInterval(timer); window.removeEventListener('cos-private-data-invalidated', drop); };
   }, []);
-  const power = useMemo<Map<string, BoardPower> | null>(() => vrm ? boardPowerByUnit(vrm.data, Math.max(vrm.at, now), history) : null, [vrm, now, history]);
+  // Sun forecast for Field Helios sites (best-effort, every 3 hours): "cloudy days ahead" on Helios cards. Nothing is stored.
+  const [sky, setSky] = useState<Map<string, SunDay[]> | null>(null);
+  const spots = useMemo(() => {
+    const m = fieldMap as {inventoryItems?: unknown; items?: unknown} | null | undefined;
+    return heliosSpots(Array.isArray(m?.inventoryItems) ? m.inventoryItems : Array.isArray(m?.items) ? m.items : null);
+  }, [fieldMap]);
+  const spotsKey = [...spots].map(([k, v]) => k + '@' + v.lat + ',' + v.lon).join(';');
+  useEffect(() => {
+    if (!spotsKey) return;
+    let live = true;
+    const read = () => { void readSunForecast(spots).then(map => { if (live && map) setSky(map); }); };
+    read();
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') read(); }, 3 * 3600 * 1000);
+    return () => { live = false; window.clearInterval(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spotsKey]);
+  const weather = useMemo(() => {
+    const out = new Map<string, OutlookDay[]>();
+    if (sky) for (const [key, days] of sky) { const o = sunOutlook(days, now); if (o.length) out.set(key, o); }
+    return out;
+  }, [sky, now]);
+  const power = useMemo<Map<string, BoardPower> | null>(() => vrm ? boardPowerByUnit(vrm.data, Math.max(vrm.at, now), history, weather) : null, [vrm, now, history, weather]);
   const data = useMemo(() => {
     if (!feed) return null;
     const clock = cameraFeedClock(feed, now);

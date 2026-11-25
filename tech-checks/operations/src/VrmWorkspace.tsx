@@ -6,8 +6,12 @@ import './vrm.css';
 import VrmReadOnlyDashboard from './VrmReadOnlyDashboard';
 import { readDashboardPower, shortDate, unitTileSummary } from './vrmReadOnlyModel';
 import { heliosPlacement, placementLabel, victronNeedsAttention } from './victronAttention';
+import { canonicalCameraUnit } from './fieldCameraHealth';
+import { cloudyWarning, heliosSpots, outlookLine, readSunForecast, sunOutlook, type SunDay } from './vrmWeather';
 import { dayPeak, historyFlags, isNightForecastTime, nightLoad, last24h, overnightLow, readVrmHistory, solarVsYesterday, tonightBasis, tonightForecast, tonightHeadline, tonightSteps, type HistoryPoint, type Tonight } from './vrmHistory';
 import VrmTechGuide from './VrmTechGuide';
+import VrmNightReport from './VrmNightReport';
+import { nightReport } from './vrmNightReport';
 import VrmHistoryChart from './VrmHistoryChart';
 
 type FleetSync = ReturnType<typeof readVrmFleetConfig>['sync'];
@@ -62,6 +66,18 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
   const [expanded, setExpanded] = useState(false);
   // Field or Shop per mHelp, read once. Until it loads (or if it fails) every unit stays "Placement unknown" and nothing is flagged.
   const [inventory, setInventory] = useState<{unitNumber?: string}[] | null>(null);
+  // Sun forecast for Field Helios units (best-effort, every 3 hours). Nothing is stored.
+  const [sky, setSky] = useState<Map<string, SunDay[]> | null>(null);
+  const spotsKey = inventory ? [...heliosSpots(inventory)].map(([k, v]) => k + '@' + v.lat + ',' + v.lon).join(';') : '';
+  useEffect(() => {
+    if (!spotsKey || !inventory) return;
+    let live = true;
+    const read = () => { void readSunForecast(heliosSpots(inventory)).then(map => { if (live && map) setSky(map); }); };
+    read();
+    const timer = window.setInterval(() => { if (workspaceVisible()) read(); }, 3 * 3600_000);
+    return () => { live = false; window.clearInterval(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spotsKey]);
   // Saved Victron history by installation, read separately and best-effort. Absent = no history shown.
   const [history, setHistory] = useState<Map<number, HistoryPoint[]> | null>(null);
   const mounted = useRef(false);
@@ -149,7 +165,9 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
   const tiles0 = (item: typeof units[number]) => unitTileSummary(item, power.rows, now).fresh;
   const tonight = new Map<number, Tonight>();
   for (const item of units) { const t = history && tiles0(item) ? tonightForecast(history.get(item.installationId) ?? [], now) : null; if (t) tonight.set(item.installationId, t); }
-  const attention = victronNeedsAttention(units, power.rows, inventory, now, history, tonight);
+  const weather = new Map<string, ReturnType<typeof sunOutlook>>();
+  if (sky) for (const [key, days] of sky) { const o = sunOutlook(days, now); if (o.length) weather.set(key, o); }
+  const attention = victronNeedsAttention(units, power.rows, inventory, now, history, tonight, weather);
   // Only speak about Field power once at least one unit's Field/Shop is known from mHelp.
   const placed = units.filter(item => heliosPlacement(item.name, inventory) !== 'unknown').length;
   const tiles = new Map(units.map(item => [item.installationId, unitTileSummary(item, power.rows, now)]));
@@ -177,6 +195,7 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
       <h3>{attention.length ? 'Needs attention · Field units' : 'No Field power issues'}</h3>
       {attention.length > 0 && <ul>{attention.map(item => <li key={item.installationId}><button type='button' className={'vrm-attn-'+item.kind} onClick={() => select(item.installationId)}><strong>{item.name}</strong><span>{item.line}</span></button></li>)}</ul>}
     </section>}
+    {units.length > 0 && history && <VrmNightReport report={nightReport(units, history, now, name => heliosPlacement(name, inventory) === 'shop')} now={now} place={name => { const p = heliosPlacement(name, inventory); return p === 'unknown' ? '' : placementLabel(p); }} onOpen={select}/>}
     {units.length > 0 && <VrmTechGuide/>}
     {!loaded && loading && <p role='status'>Loading your Victron installations…</p>}
     {loaded && units.length === 0 && <div className='vrm-awaiting' role='status'><h3>No installations in the saved fleet</h3><p>{canDiscover ? 'Refresh the fleet to check the connected Victron account.' : 'No saved installations are available. Ask an Owner to check the fleet sync.'} No installation IDs or dashboards are assumed.</p></div>}
@@ -237,6 +256,12 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
           {(() => { const peak = dayPeak(points, now); return <li className={peak && peak.peak < 95 ? 'warn' : ''}><span>{peak ? 'Best battery ' + peak.label : 'Best battery today'}</span><b>{peak ? peak.peak + '%' : '—'}</b></li>; })()}
           {(() => { const load = nightLoad(points, now); return <li className={load?.high ? 'warn' : ''}><span>Night power use</span><b>{load ? load.recent + ' W' + (load.high ? ' (normal ' + load.normal + ')' : '') : '—'}</b></li>; })()}
         </ul>
+        {(() => {
+          const key = canonicalCameraUnit(unit.name), o = key ? weather.get(key) : undefined;
+          if (!o?.length) return null;
+          const tile = unitTileSummary(unit, power.rows, now), warn = cloudyWarning(o, tile.soc?.value);
+          return <p className={'vrm-sky' + (warn ? ' vrm-sky-warn' : '')}><span>Sun ahead</span><b>{outlookLine(o)}</b>{warn && <em>{warn}</em>}</p>;
+        })()}
         {flags.length > 0 && <p className='vrm-history-flag'>{flags.map(f => f.line).join(' · ')}</p>}
       </section>;
     })()}

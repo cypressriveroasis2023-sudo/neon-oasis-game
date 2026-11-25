@@ -364,6 +364,7 @@ function diagnose(v){
   if(!u.rs && !u.rr) ck.push({k:"Router", s:"unk", t: S.meta && S.meta.rl===false ? "Router readings have not loaded yet" : "No router on record for this unit"});
   if(u.pw && u.pw.tn && (u.pw.tn.v==="low"||u.pw.tn.v==="tight")) ck.push({k:"Tonight, Victron", s:u.pw.tn.v==="low" ? "bad" : "warn", t:u.pw.tn.h});
   if(u.pw && u.pw.hf) ck.push({k:"Victron history", s:"warn", t:u.pw.hf.join(" · ")});
+  if(u.pw && u.pw.sk && u.pw.sk.w) ck.push({k:"Weather, Victron", s:"warn", t:u.pw.sk.w});
   if(u.pw) ck.push({k:"Battery, Victron", s:u.pw.al && u.pw.q!=="stale" && u.pw.q!=="off" ? (u.pw.al.l===2 ? "bad" : "warn") : (PWQ[u.pw.q]||"unk"), t:powerText(u.pw)+(u.pw.t ? " · "+when(u.pw.t) : "")});
   if(fs==="issues"){ const off=offCams(v); if(off.length) ck.unshift({k:"Off now", s:"bad", t:off.map(c=>c.name+(c.since ? " · since "+when(c.since)+" · "+ago(c.since)+" ago" : "")).join(" · ")}); }
   if(u.lo && fs!=="up") ck.push({k:"Last online", s:"info", t:when(u.lo)+" · "+ago(u.lo)+" ago"});
@@ -533,7 +534,8 @@ function powerBox(v){
   const tn = p.tn && p.q!=="stale" && p.q!=="off" ? h("div",{class:"pwnight n-"+p.tn.v},
     h("span",{class:"pwnight-k",text:"Tonight"}),h("b",{text:p.tn.h}),h("small",{text:p.tn.b}),
     p.tn.s.length ? h("ol",null,...p.tn.s.map(step => h("li",{text:step}))) : null) : null;
-  return h("div",{class:"box pwbox"},h("h3",{text:"Power"}),alarm,tn,tiles,hist,h("p",{class:"note",text:note}),go?h("div",{class:"links"},go):null);
+  const sky = p.sk ? h("p",{class:"pwsky"+(p.sk.w ? " flag" : "")},h("span",{text:"Sun ahead "}),h("b",{text:p.sk.o}),p.sk.w ? h("small",{text:p.sk.w}) : null) : null;
+  return h("div",{class:"box pwbox"},h("h3",{text:"Power"}),alarm,tn,tiles,hist,sky,h("p",{class:"note",text:note}),go?h("div",{class:"links"},go):null);
 }
 function drawPanel(){
   const v = S.vmap && S.vmap[S.openId]; if(!v){ closeUnit(); return; }
