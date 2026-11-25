@@ -61,11 +61,11 @@ Newest first. One line: date, what changed, what to watch.
 
 - **2026-11-25** — Operations: `cos_troubleshoot_private.reports` and
   `public.cos_troubleshoot_report_v1` (Send to IT from the unit card; append-only,
-  service_role only). Prepared, not deployed: patch
-  `cos-unit-camera-status/troubleshoot-route-v17` adds one route to the frozen
-  live v17 bundle (record in `tech-checks/docs/cos-unit-camera-status-v17-entry`,
-  rebuilt byte-for-byte from v16 + camera-routes-only). After it deploys, the live
-  pin becomes v18 and `preflight-live-function-pins` needs the new archive hash.
+  service_role only). Deployed 2026-11-25 17:31 UTC: patch
+  `cos-unit-camera-status/troubleshoot-route-v17` added one route to the frozen
+  v17 bundle, so live is now **v18 `3c521a58`** (pins updated). Source record
+  `tech-checks/docs/cos-unit-camera-status-v17-entry`; rollback
+  `rollback-to-v17-entry`. A next patch to this function must start from v18.
   Record in `tech-checks/docs/db-changes/20261125_troubleshoot_reports.md`.
 - **2026-11-25** — Linked four more field camera units to their mHelp A#
   in `app_private.cos_mhelp_unit_link` (`decided_by='hand'`, approved by James):
