@@ -6,6 +6,8 @@ import './vrm.css';
 import VrmReadOnlyDashboard from './VrmReadOnlyDashboard';
 import { readDashboardPower, shortDate, unitTileSummary } from './vrmReadOnlyModel';
 import { heliosPlacement, placementLabel, victronNeedsAttention } from './victronAttention';
+import { historyFlags, last24h, overnightLow, readVrmHistory, solarVsYesterday, type HistoryPoint } from './vrmHistory';
+import VrmHistoryChart from './VrmHistoryChart';
 
 type FleetSync = ReturnType<typeof readVrmFleetConfig>['sync'];
 type SelectionHint = { initialUnit?:number; initialInstallationId?:number };
@@ -59,6 +61,8 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
   const [expanded, setExpanded] = useState(false);
   // Field or Shop per mHelp, read once. Until it loads (or if it fails) every unit stays "Placement unknown" and nothing is flagged.
   const [inventory, setInventory] = useState<{unitNumber?: string}[] | null>(null);
+  // Saved Victron history by installation, read separately and best-effort. Absent = no history shown.
+  const [history, setHistory] = useState<Map<number, HistoryPoint[]> | null>(null);
   const mounted = useRef(false);
   const running = useRef(false);
   const request = useRef(0);
@@ -117,11 +121,16 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
       const items = Array.isArray(data?.inventoryItems) ? data.inventoryItems : Array.isArray(data?.items) ? data.items : null;
       setInventory(items ? items.filter((item): item is {unitNumber?: string} => Boolean(item) && typeof item === 'object') : null);
     }).catch(() => { if (active) setInventory(null); });
+    const readHistory = () => { void readVrmHistory().then(units => { if (active && units) setHistory(new Map(units.map(u => [u.installationId, u.points]))); }); };
+    readHistory();
+    const historyTimer = window.setInterval(() => { if (workspaceVisible()) readHistory(); }, 15 * 60_000);
+    const dropHistory = () => setHistory(null);
+    window.addEventListener('cos-private-data-invalidated', dropHistory);
     const timer = window.setInterval(() => {
       setNow(Date.now());
       if (workspaceVisible()) void refresh();
     }, 60_000);
-    return () => { active = false; valid.current = false; mounted.current = false; request.current += 1; running.current = false; window.clearInterval(timer); window.removeEventListener('cos-private-data-invalidated',clear); window.removeEventListener('message',parentMessage); };
+    return () => { window.clearInterval(historyTimer); window.removeEventListener('cos-private-data-invalidated', dropHistory); active = false; valid.current = false; mounted.current = false; request.current += 1; running.current = false; window.clearInterval(timer); window.removeEventListener('cos-private-data-invalidated',clear); window.removeEventListener('message',parentMessage); };
   }, [refresh]);
   useEffect(() => {
     hint.current = {initialUnit,initialInstallationId};
@@ -136,7 +145,7 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
   const enabled = units.filter(item => item.embedUrl).length;
   const nameCounts = new Map<string,number>();
   for (const item of units) nameCounts.set(item.name, (nameCounts.get(item.name) ?? 0) + 1);
-  const attention = victronNeedsAttention(units, power.rows, inventory, now);
+  const attention = victronNeedsAttention(units, power.rows, inventory, now, history);
   // Only speak about Field power once at least one unit's Field/Shop is known from mHelp.
   const placed = units.filter(item => heliosPlacement(item.name, inventory) !== 'unknown').length;
   const tiles = new Map(units.map(item => [item.installationId, unitTileSummary(item, power.rows, now)]));
@@ -198,6 +207,21 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
     {unit.embedUrl ? <iframe id='vrm-dashboard' key={unit.installationId + '-' + revision} className='vrm-dashboard' title={unit.name + ' Victron dashboard'} src={unit.embedUrl} referrerPolicy='no-referrer' sandbox='allow-scripts allow-same-origin allow-forms allow-popups' allow='fullscreen'/>
       : <VrmReadOnlyDashboard unit={unit} rows={power.rows} invalid={power.invalid} readFailed={Boolean(error)} now={now}/> }
     </div>
+    {history && (() => {
+      const points = history.get(unit.installationId) ?? [];
+      const day = last24h(points, now);
+      if (day.length < 2) return <section className='vrm-history'><h4>Last 24 hours</h4><p className='vrm-note'>History is building up. It starts from when it was switched on and fills in with each Victron sync.</p></section>;
+      const night = overnightLow(points, now), sun = solarVsYesterday(points, now), flags = historyFlags(points, now);
+      return <section className='vrm-history'>
+        <h4>Last 24 hours</h4>
+        <VrmHistoryChart points={day} now={now}/>
+        <ul className='vrm-history-facts'>
+          <li className={night && night.low < 30 ? 'bad' : ''}><span>Overnight low</span><b>{night ? night.low + '%' : '—'}</b></li>
+          <li className={sun && sun.share < 0.5 ? 'warn' : ''}><span>Solar vs yesterday</span><b>{sun ? Math.round(sun.share * 100) + '%' : '—'}</b></li>
+        </ul>
+        {flags.length > 0 && <p className='vrm-history-flag'>{flags.map(f => f.line).join(' · ')}</p>}
+      </section>;
+    })()}
     <p className='vrm-note'>{enabled} embedded dashboards · {units.length-enabled} COS read-only power views. New installations appear automatically after discovery. Installation names and portal links come from the saved fleet; battery and solar readings come from Victron.</p>
     </>}
     <details className='vrm-help'><summary>Dashboard help &amp; reporting</summary><p>Battery, solar, and load readings are supplied by Victron. Additional measurements depend on the equipment reporting from this installation. Use its VRM portal for history, alarms, and detailed charts. Tile colors: green 50% and up, amber 20–49%, red under 20%, grey when the reading is older than 45 minutes or missing.</p><p>Readings update at this unit’s configured VRM reporting interval. Check the dashboard’s last-update time before treating a reading as current. Reload view reloads the selected dashboard. {canDiscover ? 'Refresh fleet asks the server to discover installations now.' : 'Reload saved fleet reads the current saved installations. Fleet discovery and sharing settings remain with your Owner.'} This visible workspace checks the saved fleet every minute; automatic discovery runs separately every 15 minutes when configured.</p><p>For history, alarms, trends, and installation settings, use Open in VRM with your Victron account. COS displays existing approved Victron embeds or its own read-only power view. New installations do not need public sharing for the COS view. Neither view changes equipment settings.</p></details>

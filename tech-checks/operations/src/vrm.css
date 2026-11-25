@@ -126,3 +126,19 @@ html[data-theme='light'] .vrm-fleet-summary li,html[data-theme='light'] .vrm-wor
 .vrm-tile-alarm{color:#ff6b78}.vrm-tile-alarm.vrm-alarm-1{color:#f5b942}
 .vrm-attention .vrm-attn-alarm span{color:#ff6b78;font-weight:700}
 .vrm-tile-seen{white-space:normal;line-height:1.3}
+/* Last 24 hours (saved Victron history) */
+.vrm-history{margin:14px 0 4px;padding:14px;border:1px solid var(--vt-line,#253447);border-radius:12px;background:var(--vt-panel,#0d1622)}
+.vrm-history h4{margin:0 0 8px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#a3b3ca}
+.vrm-history-chart{margin:0}.vrm-history-chart svg{display:block;width:100%;height:auto}
+.vrm-hc-grid{stroke:#1d2a3a;stroke-width:1}.vrm-hc-low{stroke:#ff4d5e;stroke-width:1;stroke-dasharray:4 4;opacity:.6}
+.vrm-hc-solar{fill:#f5b942;opacity:.22}.vrm-hc-soc{fill:none;stroke:#3ddc84;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.vrm-hc-label{fill:#7b8ba0;font-size:9px}
+.vrm-history-chart figcaption{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px;font-size:11px;color:#a3b3ca}
+.vrm-hc-key::before{content:'';display:inline-block;width:10px;height:3px;margin-right:5px;vertical-align:middle;border-radius:2px}
+.vrm-hc-key-soc::before{background:#3ddc84}.vrm-hc-key-solar::before{background:#f5b94266;height:8px}.vrm-hc-key-low::before{background:#ff4d5e}
+.vrm-history-facts{list-style:none;margin:10px 0 0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.vrm-history-facts li{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border:1px solid var(--vt-line,#253447);border-radius:9px;background:#111c2a}
+.vrm-history-facts span{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#7b8ba0}.vrm-history-facts b{font-size:18px;color:#fff}
+.vrm-history-facts .bad b{color:#ff6b78}.vrm-history-facts .warn b{color:#f5b942}
+.vrm-history-flag{margin:10px 0 0;font-size:12.5px;color:#f5d27a}
+.vrm-attention .vrm-attn-overnight span{color:#ff8a93}.vrm-attention .vrm-attn-solar span{color:#f5b942}
