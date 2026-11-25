@@ -1019,11 +1019,16 @@ function mgTools(){
 const W = { wide:false, side:false };
 /* The one map lives on the Map tab, and on a wide Board tab it sits beside the list. */
 function placeMap(){
-  const side = W.wide && S.view==="board", block=$("mapBlock"), home = side ? $("boardSide") : $("viewMap");
-  if(block.parentNode!==home) home.append(block);
+  /* The board is the first screen of the day, so the map is on it, not a tab away. On a desk it sits beside the
+     list; on a phone there is no room beside, so it goes under the counts and above the list. Same map either way. */
+  const side = W.wide && S.view==="board", onBoard = !W.wide && S.view==="board";
+  const block=$("mapBlock"), home = side ? $("boardSide") : onBoard ? $("boardMain") : $("viewMap");
+  if(block.parentNode!==home){ if(onBoard) $("boardMain").insertBefore(block, $("boardList")); else home.append(block); }
+  block.classList.toggle("onboard", onBoard);
   $("boardSide").hidden = !side;
-  /* Beside the list the count tiles choose what the map shows. Back on its own tab the map shows everything again. */
-  if(W.side!==side){ W.side=side; M.fitted=false; M.sel=null; M.w=0; if(!side) M.f="all"; }
+  /* On the board the count tiles choose what the map shows. On its own tab the map shows everything again. */
+  const withList = side || onBoard;
+  if(W.side!==withList){ W.side=withList; M.fitted=false; M.sel=null; M.w=0; if(!withList) M.f="all"; }
   sideFilter();
 }
 function sideFilter(){ if(!W.side) return; const f=["down","issues","unknown","up"].includes(S.filter) ? S.filter : "all"; if(M.f!==f){ M.f=f; M.sel=null; } }

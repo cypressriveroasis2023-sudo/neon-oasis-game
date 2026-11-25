@@ -55,10 +55,11 @@ test('on a desk the board is one screen, with one map that keeps the drawing\'s 
   assert.match(app, /new ResizeObserver\(\(\)=>\{ measureWide\(\);/);
   assert.match(app, /cleanups\.push\(\(\)=>seen\.disconnect\(\)\);/);
   // One map. Beside the list on a wide Board tab, otherwise on its own tab; beside the list the count tiles choose what it shows.
-  assert.match(app, /const side = W\.wide && S\.view==="board", block=\$\("mapBlock"\), home = side \? \$\("boardSide"\) : \$\("viewMap"\);/);
+  // The map now lives on the board on a phone too, so the desk case names boardSide and the phone case boardMain.
+  assert.match(app, /const block=\$\("mapBlock"\), home = side \? \$\("boardSide"\) : onBoard \? \$\("boardMain"\) : \$\("viewMap"\);/);
   assert.equal(app.split('id=\\"mapSvg\\"').length - 1, 1);
   assert.match(app, /function sideFilter\(\)\{ if\(!W\.side\) return; const f=\["down","issues","unknown","up"\]\.includes\(S\.filter\) \? S\.filter : "all";/);
-  assert.match(app, /if\(!side\) M\.f="all";/);
+  assert.match(app, /if\(!withList\) M\.f="all";/);
   // One screen: the board is as tall as the window, the tabs sit in its top bar, and each tab scrolls inside it.
   assert.match(style, /\.cosb\.wide:not\(\.tv\)\{height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden\}/);
   assert.match(style, /\.cosb\.wide>main>section\{flex:1;min-height:0;overflow-y:auto;/);
@@ -299,4 +300,19 @@ test('no totals are published until the official list has loaded', () => {
 
   // The list below still works while the totals wait, so the board is not blank.
   assert.match(app, /the units below are what the camera systems can see/i);
+});
+
+test('the map is on the board itself, on a phone as well as a desk', () => {
+  // James: "I wish this would show me the map and all units online and offline in the field right when I log in
+  // and go to the home page." On a desk the map already sat beside the list; on a phone it was a tab away.
+  assert.match(app, /const side = W\.wide && S\.view==="board", onBoard = !W\.wide && S\.view==="board";/);
+  // On a phone it goes under the counts and above the list, not after it.
+  assert.match(app, /if\(onBoard\) \$\("boardMain"\)\.insertBefore\(block, \$\("boardList"\)\);/);
+  // One map, moved: never a second copy drawn somewhere else.
+  assert.equal(app.split('id=\\"mapSvg\\"').length - 1, 1);
+  // The count tiles filter the map in both places, so tapping Down shows the down units on the map too.
+  assert.match(app, /const withList = side \|\| onBoard;/);
+  assert.match(app, /if\(W\.side!==withList\)\{ W\.side=withList;/);
+  // On the board the map shows only the map: its own tab keeps the filters and the list under it.
+  assert.match(style, /#mapBlock\.onboard #mapChips,#mapBlock\.onboard #mapNote,#mapBlock\.onboard #mapList\{display:none\}/);
 });
