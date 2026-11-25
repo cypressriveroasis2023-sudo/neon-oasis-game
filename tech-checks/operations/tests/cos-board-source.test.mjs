@@ -290,10 +290,9 @@ test('checking one unit asks the app, never the network, and never fakes a readi
   assert.match(app, /mm && !mm\.fuzzy && mm\.rec && mm\.rec\.id/);
 });
 
-test('the card has no Star4Live link', () => {
-  // James, 25 Nov: "We shouldn't have to go to Star4Live for anything ever again."
-  assert.doesNotMatch(app, /star4live\.com/);
-  assert.doesNotMatch(app, /lk\("Star4Live"/);
+test('the card keeps its Star4Live button', () => {
+  // James, 25 Nov: "keep star4live button." Troubleshoot never sends a tech there; the button stays for when they choose to.
+  assert.match(app, /if\(u\.s==="v"\) sys\.push\(lk\("Star4Live","https:\/\/global\.star4live\.com\/userWeb\/device\/device-management"\)\);/);
 });
 
 test('a full battery with a Victron alarm is not called out of power', () => {

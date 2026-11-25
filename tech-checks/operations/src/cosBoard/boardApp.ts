@@ -488,7 +488,8 @@ const ipShort = ip => { ip=String(ip||""); return IPV4.test(ip) ? "ending ."+ip.
 function openBox(v){
   const u=v.u, m = S.mh && S.rec ? S.rec.match[v.id] : (v.mhOnly ? {rec:v.rec} : null), sys=[], own=[];
   const lk=(label,url)=>h("a",{class:"lk",href:url,target:"_blank",rel:"noopener noreferrer"},label);
-  /* No Star4Live link: James, 25 Nov — "We shouldn't have to go to Star4Live for anything ever again." */
+  /* James, 25 Nov: keep the Star4Live button on the card. */
+  if(u.s==="v") sys.push(lk("Star4Live","https://global.star4live.com/userWeb/device/device-management"));
   if(u.rs || u.rr || u.ri) sys.push(lk("InHand routers","https://iot.inhandnetworks.com/device/list"));
   if(v.type==="Helios" || /^Helios/.test(v.type)) sys.push(lk("Victron VRM","https://vrm.victronenergy.com/"));
   sys.push(lk("Watchful","https://v2.watchful.co.nz/alerts"));
