@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-import {mountTransfers,IT,SERVICE,OWNER,passServiceChecks} from './helpers/transfer-fixture.mjs';
+import {mountTransfers,IT,SERVICE,OWNER,passServiceChecks,setFamily} from './helpers/transfer-fixture.mjs';
 
 const photo={name:'synthetic.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=','base64')};
 const solar={equipment_key:'solar_spotter:039',family:'Solar Spotter',unit_tag:'039',sims:['00123456789012345670'],battery_count:null,battery_configuration:null,parts:[]};
@@ -12,7 +12,7 @@ async function sign(page,name='Synthetic Service'){await passServiceChecks(page)
  await page.getByRole('checkbox',{name:'I confirm this report is accurate',exact:true}).check();
 }
 async function details(page,{family='Solar spotter',tag='039',sim=solar.sims[0],batteries=null}={}){
- await page.getByLabel('Unit family / name 1',{exact:true}).fill(family);
+ await setFamily(page,family);
  await page.getByLabel('Unit number 1',{exact:true}).fill(tag);
  await page.getByLabel('Exact SIM numbers (one per line; blank only when none) 1',{exact:true}).fill(sim);
  await page.getByLabel('Additional parts (one per line: name | quantity) 1',{exact:true}).fill('N/A');
@@ -102,7 +102,7 @@ test('truck discrepancy asks for actual unit evidence, ignores battery counts, a
  await expect(page.getByRole('region',{name:'Saved Service receipt'})).toContainText('Receipt saved — needs review');
  await expect(page.getByRole('button',{name:'Verify equipment received',exact:true})).toHaveCount(0);
  const event=(await f.db.query("select snapshot from app_private.techcheck_transfer_events where kind='receipt'")).rows[0].snapshot;
- expect(event.differences.map(diff=>diff.field)).toEqual(['unit_tag']);expect(event.actual[0].family).toBe('Solar spotter');expect(f.errors).toEqual([]);
+ expect(event.differences.map(diff=>diff.field)).toEqual(['unit_tag']);expect(event.actual[0].family).toBe('Solar Spotter');expect(f.errors).toEqual([]);
 });
 
 test('one missing truck unit does not require a new photo for another unchanged unit',async({page})=>{

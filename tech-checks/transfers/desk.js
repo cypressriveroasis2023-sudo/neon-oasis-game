@@ -8,6 +8,9 @@ const button=(text,fn,secondary=false)=>{const b=element('button',text,secondary
 const label=(text,input)=>{const l=element('label',text);l.append(input);return l;};
 const number=value=>value===''?NaN:Number(value);
 const lines=value=>String(value||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+// Same rule as the database: a note that says something is still needed.
+const noteSaysNeeded=value=>{const t=String(value||'').trim().toLowerCase();if(/^(n\/?a|none|no notes?|-|\.)?$/.test(t))return false;return /\b(need|needs|needed|missing|broken|bad|replace|replaced|waiting|pending|without|lost|cracked|dead|damaged)\b|not (working|installed|charged|programmed|online|recording)|no (sim|sd|battery|batteries|power|video|signal)/.test(t);};
+const TRANSFER_FAMILIES=['Sniper','Ranger','Spotter','Solar Spotter','Recon 2','Helios'];
 const noExtraParts=value=>/^(?:none|n\/?a|no(?:\s+additional|\s+extra)?\s+parts?)\.?$/i.test(String(value||'').trim());
 const parts=value=>noExtraParts(value)?[]:lines(value).map((line,index)=>{const match=line.match(/^(.+?)\s*(?:\|\s*|:\s*|\s+[x×]\s*)(\d+)$/i);if(!match||!match[1].trim())throw new Error('Additional parts, line '+(index+1)+': use part name | quantity (example: SD card | 1). Leave this field blank or enter N/A if there are no extra parts.');return {name:match[1].trim(),quantity:number(match[2])};});
 const itemInput=(item,purpose)=>({equipment_key:item.equipment_key,family:item.family,unit_tag:item.unit_tag,sims:lines(item.simText),battery_count:purpose==='truck_replenishment'?null:number(item.batteryText),battery_configuration:purpose==='truck_replenishment'?null:installationBatteryPlan(item.family,item.batteryConfiguration).configuration||null,parts:parts(item.partsText)});
@@ -67,6 +70,8 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
    return {detail:invalid.type==='checkbox'?'Finish the required equipment check before sending. Every required check must pass; report failed checks instead of marking them as passed.':'Complete '+caption+' before sending.',control:invalid};
   }
   if(draft.kind==='checkout'&&!draft.items.some(item=>!item.missing))return {detail:'Add at least one equipment unit to this handoff.'};
+  if(draft.kind==='checkout'&&noteSaysNeeded(draft.notes)&&draft.noteReady!==true)return {detail:'Your note says something is still needed. Fix it before handing over, or tick "This note is only information — the equipment is ready".'};
+  if(draft.kind==='receipt'&&noteSaysNeeded(draft.notes)&&draft.noteReady!==true&&!draft.items.some(i=>i.missing||i.receiptMode==='difference'||Object.values(i.checks||{}).includes(false)))return {detail:'Your note says something is wrong or missing. Mark that check as Problem, or tick "This note is only information — the equipment is ready".'};
   if(draft.kind==='receipt'&&!String(draft.notes||'').trim()&&draft.items.some(item=>!item.missing&&Object.values(item.checks||{}).includes(false)))return {detail:'You marked a check as Problem. Write in Notes what is wrong before you sign.'};
   if(draft.kind!=='return'&&!hasTransferPurpose(draft.purpose))return {detail:'IT / Owner must choose whether this handoff is for truck replenishment or installation before it can be signed.'};
   for(let index=0;index<draft.items.length;index++){
@@ -317,6 +322,7 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
      else group.append(element('p','Required installation package: '+plan.description,'tc-purpose-note'));
     }
     for(const [field,caption,type] of inputs){
+     if(field==='family'&&draft.kind==='receipt'){const OTHER='__other__';const pick=element('select');pick.required=true;pick.setAttribute('aria-label',caption+' '+(index+1));pick.dataset.transferItem=String(index);pick.dataset.transferField=field;pick.append(new Option('Choose the unit type',''));for(const f of TRANSFER_FAMILIES)pick.append(new Option(f,f));pick.append(new Option('Something else (type it)',OTHER));const typed=String(item.family||'').trim(),known=TRANSFER_FAMILIES.find(f=>f.toLowerCase()===typed.toLowerCase());if(known&&known!==item.family)item.family=known;const other=Boolean(typed&&!known)||item.familyOther===true;pick.value=other?OTHER:(known||'');group.append(label(caption,pick));if(other){const box=input('text',known?'':item.family,value=>{item.family=value;changed();});box.required=true;box.setAttribute('aria-label','Other unit type '+(index+1));group.append(label('What unit type did you receive?',box));}pick.onchange=()=>{if(pick.value===OTHER){item.familyOther=true;item.family='';}else{item.familyOther=false;item.family=pick.value;}changed();render(transfer);};continue;}
      const n=input(type,item[field],value=>{item[field]=value;changed();});n.setAttribute('aria-label',caption+' '+(index+1));n.dataset.transferItem=String(index);n.dataset.transferField=field;if(['family','unit_tag','batteryText'].includes(field))n.required=true;if(draft.kind==='return')n.readOnly=true;if(type==='number'){n.min='0';n.max='9999';n.step='1';}group.append(label(field==='partsText'?'Additional parts (optional — name | quantity, or N/A for none)':caption,n));if(field==='partsText')group.append(element('small','Example: SD card | 1. Leave blank if no additional parts.'));
      if(draft.kind==='checkout'&&field==='simText'&&Array.isArray(drawerSims)){
       const inUse=new Set(draft.items.flatMap(i=>lines(i.simText)).map(v=>String(v).replace(/[^0-9A-Za-z]/g,'').toUpperCase()));
@@ -337,6 +343,13 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
    if(draft.kind==='checkout')group.append(button('Remove unit',()=>{draft.items.splice(index,1);draft.photos=draft.photos.filter(p=>p.equipment_key!==item.equipment_key);changed();render(transfer);},true));form.append(group);
   });
   const notes=input('textarea',draft.notes,value=>{draft.notes=value;changed();});notes.maxLength=2000;notes.setAttribute('aria-label','Transfer notes');const notesLabel=label('Notes / problems / missing parts',notes);if(draft.kind==='receipt'&&draft.purpose==='truck_replenishment'){const optional=element('details');optional.append(element('summary','Add a note (optional)'),notesLabel);form.append(optional);}else form.append(notesLabel);
+  if(draft.kind==='checkout'||draft.kind==='receipt'){
+   const box=element('div','','tc-note-ready');box.dataset.noteReady='';
+   const sync=()=>{const problem=draft.kind==='receipt'&&draft.items.some(i=>i.missing||i.receiptMode==='difference'||Object.values(i.checks||{}).includes(false));box.hidden=!noteSaysNeeded(draft.notes)||problem;};
+   const ok=element('input');ok.type='checkbox';ok.checked=draft.noteReady===true;ok.onchange=()=>{draft.noteReady=ok.checked;changed();};
+   box.append(element('p',draft.kind==='checkout'?'Your note says something is still needed. Fix it before handing over, or confirm:':'Your note says something is wrong or missing. Mark that check as Problem, or confirm:','tc-purpose-note'),label('This note is only information — the equipment is ready',ok));
+   notes.addEventListener('input',sync);form.addEventListener('change',sync);sync();form.append(box);
+  }
   if(draft.kind==='receipt'){const review=element('section','','tc-receipt-comparison');review.dataset.receiptComparison='';review.setAttribute('aria-label','Receipt comparison');form.append(review);}
   const name=context.getProfile()?.full_name||context.getProfile()?.username||'';
   form.append(createDailySignoff({state:draft.signature,actorName:name,statementText:TRANSFER_STATEMENT,isBusy:()=>busy,onChange:()=>persist().catch(e=>message(e.message,true))}));
@@ -358,7 +371,7 @@ export function mountTransferDesk(root,context,{role='it',onUnavailable=null}={}
     if(draft.items.some(i=>!i.missing&&needsPhoto(i)&&!photos.some(p=>p.equipment_key===i.equipment_key)))throw new Error('Photograph each received or transferred unit.');
     if(sig.method==='drawn'){const blob=draft.signature.blob||await signatureJpeg(draft.signature);photos=photos.concat({kind:'signature',equipment_key:'',blob});}
     const paths=await client.paths(draft.id,photos);guard();if(sig.method==='drawn')sig.path=paths.find(p=>p.kind==='signature').path;
-    draft.request={p_request_id:draft.id,p_transfer_id:draft.transferId||draft.id,p_kind:draft.kind,p_expected_revision:draft.revision,p_service_actor:draft.serviceActor,p_items:items,p_checks:Object.fromEntries(draft.items.map(i=>[i.equipment_key,i.checks])),p_signature:sig,p_photos:paths,p_notes:draft.notes,...(hasTransferPurpose(draft.purpose)?{p_purpose:draft.purpose}:{})};draft.submissionPhotos=photos;await persist();
+    draft.request={p_request_id:draft.id,p_transfer_id:draft.transferId||draft.id,p_kind:draft.kind,p_expected_revision:draft.revision,p_service_actor:draft.serviceActor,p_items:items,p_checks:{...Object.fromEntries(draft.items.map(i=>[i.equipment_key,i.checks])),...((draft.kind==='checkout'||draft.kind==='receipt')&&draft.noteReady===true&&noteSaysNeeded(draft.notes)?{_note_ready:true}:{})},p_signature:sig,p_photos:paths,p_notes:draft.notes,...(hasTransferPurpose(draft.purpose)?{p_purpose:draft.purpose}:{})};draft.submissionPhotos=photos;await persist();
    }else photos=draft.submissionPhotos;
    const result=await client.submit(draft.request,photos,(n,total)=>message(`Saving evidence ${n} of ${total}…`));guard();
    await deviceDraft(storageKey,null,true).catch(()=>{});guard();
