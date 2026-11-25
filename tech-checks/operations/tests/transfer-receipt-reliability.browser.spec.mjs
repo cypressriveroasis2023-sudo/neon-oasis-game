@@ -1,10 +1,10 @@
 import {test,expect} from '@playwright/test';
-import {mountTransfers} from './helpers/transfer-fixture.mjs';
+import {mountTransfers,passServiceChecks} from './helpers/transfer-fixture.mjs';
 
 const photo={name:'synthetic.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=','base64')};
 let f;
 test.afterEach(async()=>{await f?.close();f=null;});
-async function sign(page){
+async function sign(page){await passServiceChecks(page);
   await page.getByRole('radio',{name:'Type signature',exact:true}).check();
   await page.getByRole('textbox',{name:'Type your full name',exact:true}).fill('Synthetic Service');
   await page.getByRole('checkbox',{name:'I confirm this report is accurate',exact:true}).check();
