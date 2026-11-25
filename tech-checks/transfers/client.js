@@ -36,9 +36,14 @@ function database(){if(!storePromise)storePromise=new Promise((resolve,reject)=>
 export async function deviceDraft(key,value,remove=false){
  const db=await database();return new Promise((resolve,reject)=>{const tx=db.transaction('drafts',value===undefined&&!remove?'readonly':'readwrite'),store=tx.objectStore('drafts');const r=remove?store.delete(key):value===undefined?store.get(key):store.put(value,key);tx.oncomplete=()=>resolve(r.result);tx.onerror=()=>reject(new Error('The transfer draft could not be preserved on this device.'));tx.onabort=tx.onerror;});
 }
+// Safari can reject image.decode() with "Loading was canceled" for an image that is
+// not on the page. Wait for the load event instead; decode() is only a bonus.
+export function loadPhotoImage(url){
+ return new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>{Promise.resolve(image.decode?.()).catch(()=>{}).then(()=>resolve(image));};image.onerror=()=>reject(new Error('This photo could not be read. Take it again.'));image.src=url;});
+}
 export async function transferJpeg(file){
  if(!file||file.size>25*1024*1024)throw new Error('Choose an image smaller than 25 MB.');
  const url=URL.createObjectURL(file);
- try{const image=new Image();image.src=url;await image.decode();const scale=Math.min(1,1920/Math.max(image.width,image.height)),c=document.createElement('canvas');c.width=Math.round(image.width*scale);c.height=Math.round(image.height*scale);c.getContext('2d').drawImage(image,0,0,c.width,c.height);const blob=await new Promise(resolve=>c.toBlob(resolve,'image/jpeg',.88));if(!blob||blob.size>5*1024*1024)throw new Error('Image too large.');return blob;}
+ try{const image=await loadPhotoImage(url);const scale=Math.min(1,1920/Math.max(image.width,image.height)),c=document.createElement('canvas');c.width=Math.round(image.width*scale);c.height=Math.round(image.height*scale);c.getContext('2d').drawImage(image,0,0,c.width,c.height);const blob=await new Promise(resolve=>c.toBlob(resolve,'image/jpeg',.88));if(!blob||blob.size>5*1024*1024)throw new Error('Image too large.');return blob;}
  finally{URL.revokeObjectURL(url);}
 }
