@@ -56,7 +56,7 @@ begin
   if p_observed_at is null or p_observed_at > now() + interval '1 minute' or p_observed_at < now() - interval '15 minutes' then
     raise exception 'observed_at out of range';
   end if;
-  delete from inhand_private.unmatched_routers;
+  delete from inhand_private.unmatched_routers where true;  -- PostgREST runs with safeupdate: a bare DELETE is refused
 
   for r in select value from jsonb_array_elements(p_readings) loop
     c_seen := c_seen + 1;

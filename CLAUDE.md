@@ -66,6 +66,21 @@ Newest first. One line: date, what changed, what to watch.
   Operations patch `cos-unit-camera-status/a-links-v19` is **prepared, not
   deployed**; it starts from live v19. Record in
   `tech-checks/docs/db-changes/20261125_mhelp_hand_link_functions.md`.
+- **2026-11-25** — `camera_devices`: Spotter 265 matched to VCC (row 275 moved
+  from SOLARSPOTTER 253 to SPOTTER 265 as CAM 4 by serial, 3340/3341 renamed,
+  new row 3342 for CAM 1, NVR row 384 `deactivated`). Approved by James. No audit
+  row. Backup `app_private.camera_devices_265_253_fix_backup_20261125`. Record in
+  `tech-checks/docs/db-changes/20261125_spotter265_ss253_camera_records.md`.
+- **2026-11-25** — Tech Check: InHand router details (#529). `camera_unit_routers`
+  gained `inhand_public_ip`, `inhand_signal`, `inhand_carrier`, `inhand_firmware`,
+  `inhand_gps`, `inhand_details_at` (written only by the InHand pull; `router_public_ip`
+  untouched); `inhand_private.unmatched_routers`; `cos_inhand_router_status_apply`
+  replaced; new `cos_router_details_v1` / `cos_router_link_v1` (service_role only) and
+  edge function `cos-router-details` (Owner/IT; Link router writes the existing
+  `ADD_ROUTER_LINK` action, same safe after_state). `inhand-router-status-pull` now v6.
+  Note: a bare `DELETE` is refused through PostgREST (safeupdate), so use `where true`.
+  First pull: 248 updated, 68 unmatched; watchdog `ok`. Record in
+  `tech-checks/docs/db-changes/20261125_inhand_router_details_and_link.sql`.
 - **2026-11-25** — Linked `SOLARSPOTTER 253` to mHelp A# 2226712 in
   `app_private.cos_mhelp_unit_link` (`decided_by='hand'`, approved by James). No
   audit row; watchdog `ok`. Record in
