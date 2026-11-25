@@ -6,7 +6,8 @@ import './vrm.css';
 import VrmReadOnlyDashboard from './VrmReadOnlyDashboard';
 import { readDashboardPower, shortDate, unitTileSummary } from './vrmReadOnlyModel';
 import { heliosPlacement, placementLabel, victronNeedsAttention } from './victronAttention';
-import { historyFlags, last24h, overnightLow, readVrmHistory, solarVsYesterday, type HistoryPoint } from './vrmHistory';
+import { dayPeak, historyFlags, isNightForecastTime, nightLoad, last24h, overnightLow, readVrmHistory, solarVsYesterday, tonightBasis, tonightForecast, tonightHeadline, tonightSteps, type HistoryPoint, type Tonight } from './vrmHistory';
+import VrmTechGuide from './VrmTechGuide';
 import VrmHistoryChart from './VrmHistoryChart';
 
 type FleetSync = ReturnType<typeof readVrmFleetConfig>['sync'];
@@ -145,7 +146,10 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
   const enabled = units.filter(item => item.embedUrl).length;
   const nameCounts = new Map<string,number>();
   for (const item of units) nameCounts.set(item.name, (nameCounts.get(item.name) ?? 0) + 1);
-  const attention = victronNeedsAttention(units, power.rows, inventory, now, history);
+  const tiles0 = (item: typeof units[number]) => unitTileSummary(item, power.rows, now).fresh;
+  const tonight = new Map<number, Tonight>();
+  for (const item of units) { const t = history && tiles0(item) ? tonightForecast(history.get(item.installationId) ?? [], now) : null; if (t) tonight.set(item.installationId, t); }
+  const attention = victronNeedsAttention(units, power.rows, inventory, now, history, tonight);
   // Only speak about Field power once at least one unit's Field/Shop is known from mHelp.
   const placed = units.filter(item => heliosPlacement(item.name, inventory) !== 'unknown').length;
   const tiles = new Map(units.map(item => [item.installationId, unitTileSummary(item, power.rows, now)]));
@@ -173,6 +177,7 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
       <h3>{attention.length ? 'Needs attention · Field units' : 'No Field power issues'}</h3>
       {attention.length > 0 && <ul>{attention.map(item => <li key={item.installationId}><button type='button' className={'vrm-attn-'+item.kind} onClick={() => select(item.installationId)}><strong>{item.name}</strong><span>{item.line}</span></button></li>)}</ul>}
     </section>}
+    {units.length > 0 && <VrmTechGuide/>}
     {!loaded && loading && <p role='status'>Loading your Victron installations…</p>}
     {loaded && units.length === 0 && <div className='vrm-awaiting' role='status'><h3>No installations in the saved fleet</h3><p>{canDiscover ? 'Refresh the fleet to check the connected Victron account.' : 'No saved installations are available. Ask an Owner to check the fleet sync.'} No installation IDs or dashboards are assumed.</p></div>}
     {units.length > 0 && <nav className='tabs vrm-unit-grid' aria-label='Helios installations'>{units.map(item => <button key={item.installationId} className={(selected === item.installationId ? 'selected' : 'secondary') + ' vrm-tone-' + tiles.get(item.installationId)!.tone} aria-pressed={selected === item.installationId} onClick={() => select(item.installationId)}>
@@ -185,7 +190,9 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
           : <span className='vrm-tile-solar'>☀ {tile.solar ? Math.round(tile.solar.value) + ' ' + tile.solar.unit : '—'}</span>}
         {tile.alarms.length > 0
           ? <span className={'vrm-tile-alarm vrm-alarm-' + tile.alarms[0].level}>⚠ {tile.alarms[0].kind}{tile.alarms[0].level === 1 ? ' warning' : ''}</span>
-          : tile.flow && <span className={'vrm-tile-flow vrm-flow-' + tile.flow.state} title={tile.flow.state === 'charging' ? 'Charging' : tile.flow.state === 'draining' ? 'Draining' : 'Idle'}>{tile.flow.state === 'idle' ? 'Idle' : (tile.flow.state === 'charging' ? '↑ ' : '↓ ') + (tile.flow.watts !== null ? Math.abs(tile.flow.watts) + ' W' : tile.flow.amps !== null ? Math.abs(tile.flow.amps) + ' A' : '') + (tile.flow.state === 'charging' ? ' in' : ' out')}</span>}
+          : (t => t && (t.verdict === 'low' || t.verdict === 'tight')
+            ? <span className={'vrm-tile-night vrm-night-' + t.verdict} title={tonightHeadline(t)}>{t.verdict === 'low' ? (t.floorAt !== null ? '🌙 20% by ' + new Date(t.floorAt * 1000).toLocaleTimeString(undefined, {hour: 'numeric', minute: '2-digit'}) : '🌙 Low tonight') : '🌙 Tight tonight'}</span>
+            : null)(tonight.get(item.installationId)) || tile.flow && <span className={'vrm-tile-flow vrm-flow-' + tile.flow.state} title={tile.flow.state === 'charging' ? 'Charging' : tile.flow.state === 'draining' ? 'Draining' : 'Idle'}>{tile.flow.state === 'idle' ? 'Idle' : (tile.flow.state === 'charging' ? '↑ ' : '↓ ') + (tile.flow.watts !== null ? Math.abs(tile.flow.watts) + ' W' : tile.flow.amps !== null ? Math.abs(tile.flow.amps) + ' A' : '') + (tile.flow.state === 'charging' ? ' in' : ' out')}</span>}
       </span>; })()}
     </button>)}</nav>}
     {unit && <>
@@ -212,12 +219,23 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
       const day = last24h(points, now);
       if (day.length < 2) return <section className='vrm-history'><h4>Last 24 hours</h4><p className='vrm-note'>History is building up. It starts from when it was switched on and fills in with each Victron sync.</p></section>;
       const night = overnightLow(points, now), sun = solarVsYesterday(points, now), flags = historyFlags(points, now);
+      const t = tonightForecast(points, now), steps = t ? tonightSteps(t) : [];
       return <section className='vrm-history'>
+        <div className={'vrm-tonight vrm-tonight-' + (t ? t.verdict : 'none')}>
+          <h4>Tonight</h4>
+          {t ? <>
+            <p className='vrm-tonight-headline'>{tonightHeadline(t)}</p>
+            <p className='vrm-tonight-basis'>{tonightBasis(t)}</p>
+            {steps.length > 0 && <><p className='vrm-tonight-todo'>What to do</p><ol>{steps.map(step => <li key={step}>{step}</li>)}</ol></>}
+          </> : <p className='vrm-tonight-basis'>{isNightForecastTime(now) ? 'Not enough recent readings to estimate tonight yet. It needs about an hour of readings from this unit.' : 'The tonight estimate starts at 5 PM, when the sun stops charging the battery.'}</p>}
+        </div>
         <h4>Last 24 hours</h4>
         <VrmHistoryChart points={day} now={now}/>
         <ul className='vrm-history-facts'>
           <li className={night && night.low < 30 ? 'bad' : ''}><span>Overnight low</span><b>{night ? night.low + '%' : '—'}</b></li>
           <li className={sun && sun.share < 0.5 ? 'warn' : ''}><span>Solar vs yesterday</span><b>{sun ? Math.round(sun.share * 100) + '%' : '—'}</b></li>
+          {(() => { const peak = dayPeak(points, now); return <li className={peak && peak.peak < 95 ? 'warn' : ''}><span>{peak ? 'Best battery ' + peak.label : 'Best battery today'}</span><b>{peak ? peak.peak + '%' : '—'}</b></li>; })()}
+          {(() => { const load = nightLoad(points, now); return <li className={load?.high ? 'warn' : ''}><span>Night power use</span><b>{load ? load.recent + ' W' + (load.high ? ' (normal ' + load.normal + ')' : '') : '—'}</b></li>; })()}
         </ul>
         {flags.length > 0 && <p className='vrm-history-flag'>{flags.map(f => f.line).join(' · ')}</p>}
       </section>;

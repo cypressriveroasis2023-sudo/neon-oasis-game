@@ -201,11 +201,21 @@ test('the board has one count: mHelp once its list has loaded, with no other way
   expect(state.errors).toEqual([]);
 });
 
-test('until the mHelp list has loaded the board says its count is only what the camera systems see', async ({page}) => {
+test('until the mHelp list has loaded the board marks its count as not the official one', async ({page}) => {
+  // James read the board twice within a minute and got two different counts, because the first read came before
+  // the mHelp list arrived. Both were honest: without mHelp the board counts the camera records COS holds, a
+  // different set of units. That count still shows, because a board with no numbers is worse, but it is marked
+  // so it cannot be taken for the official one. A sentence above the tiles did not do that; this does.
   const {host, state} = await phoneBoard(page);
   await expect.poll(() => tiles(host)).toEqual({Down: '1', 'Camera issues': '1', Unknown: '1', Up: '1'});
   expect(await inBoard(host, root => [root.getElementById('modeRow').textContent, root.querySelectorAll('#modeRow button').length])).toEqual(['The mHelp list has not loaded, so this shows only what the camera systems can see. It is not the official count.', 0]);
   expect(await minis(host)).toEqual(['4in the field', '1in the shop', '0online in shop']);
+  // The mark sits with the numbers: the block carries it, and the caveat is inside the counts, not above them.
+  expect(await inBoard(host, root => [
+    root.getElementById('kpi').classList.contains('prov'),
+    root.getElementById('provNote').hidden,
+    root.getElementById('provNote').textContent,
+  ])).toEqual([true, false, 'Not the official count. These are what the camera systems can see, until mHelp has loaded.']);
   expect(state.errors).toEqual([]);
 });
 

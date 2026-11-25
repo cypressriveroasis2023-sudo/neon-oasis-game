@@ -26,6 +26,15 @@ export type ManagerSnapshot = {
   day: string; at: string; techs: ManagerTech[]; it: {name: string; test: boolean}[];
   /** Null when the handoff log could not be read. The rest of the view still stands. */
   exchanges: ManagerExchange[] | null;
+  /** Null when the handoff check could not be read. */
+  gaps: ManagerGaps | null;
+};
+export type ManagerGapKind = 'owner_override' | 'owner_edit_no_reason' | 'system' | 'log_mode' | 'other';
+export type ManagerGaps = {
+  enforced: boolean;
+  noHandoff: {tech: string; unit: string; by: string; at: string | null; listed: boolean}[];
+  loaded: {tech: string; unit: string; by: string; reason: string; at: string | null; kind: ManagerGapKind}[];
+  late: {units: string[]; from: string; to: string; state: string; hours: number | null}[];
 };
 /** One truck as it should be after the save. A blank unit comes off the truck; a blank SIM is left as it is. */
 export type TruckKit = {units: Record<string, string>; sims: Record<string, string>; stock: Record<string, number>};
@@ -99,6 +108,19 @@ function parseExchange(value: unknown): ManagerExchange | null {
   };
 }
 
+const gapKinds: ManagerGapKind[] = ['owner_override', 'owner_edit_no_reason', 'system', 'log_mode'];
+function parseGaps(value: unknown): ManagerGaps | null {
+  if (!record(value)) return null;
+  return {
+    enforced: value.enforced !== false,
+    noHandoff: list(value.noHandoff, 100).filter(record).map(row => ({tech: text(row.tech, 80) || 'Service tech', unit: text(row.unit, 90), by: text(row.by, 80), at: time(row.at), listed: row.listed !== false})).filter(row => row.unit),
+    loaded: list(value.loaded, 100).filter(record).map(row => ({tech: text(row.tech, 80) || 'Service tech', unit: text(row.unit, 90), by: text(row.by, 80) || 'Unknown', reason: text(row.reason, 200), at: time(row.at),
+      kind: gapKinds.includes(row.kind as ManagerGapKind) ? row.kind as ManagerGapKind : 'other'})).filter(row => row.unit),
+    late: list(value.late, 100).filter(record).map(row => ({units: list(row.units, 20).map(item => text(item, 90)).filter(Boolean), from: text(row.from, 80) || 'IT', to: text(row.to, 80) || 'Service',
+      state: text(row.state, 40) || 'unknown', hours: typeof row.hours === 'number' && Number.isFinite(row.hours) ? Math.max(0, Math.min(99999, row.hours)) : null})),
+  };
+}
+
 export function parseManagerSnapshot(value: unknown): ManagerSnapshot {
   if (!record(value) || typeof value.day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value.day) || !Array.isArray(value.techs)) throw new ManagerError(said.unavailable);
   return {
@@ -106,6 +128,7 @@ export function parseManagerSnapshot(value: unknown): ManagerSnapshot {
     techs: list(value.techs, 100).map(parseTech).filter((tech): tech is ManagerTech => tech !== null),
     it: list(value.it, 100).filter(record).map(tech => ({name: text(tech.name, 80), test: tech.test === true})).filter(tech => tech.name),
     exchanges: Array.isArray(value.exchanges) ? list(value.exchanges, 100).map(parseExchange).filter((row): row is ManagerExchange => row !== null) : null,
+    gaps: parseGaps(value.gaps),
   };
 }
 

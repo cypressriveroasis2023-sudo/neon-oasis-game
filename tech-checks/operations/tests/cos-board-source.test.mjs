@@ -288,20 +288,19 @@ test('the app checks one unit with the same verify the rest of COS uses, then re
   assert.match(landing, /started !== generation\.current/);
 });
 
-test('no totals are published until the official list has loaded', () => {
-  // James saw the board show one set of counts, then a different set seconds later when mHelp landed.
-  // Without mHelp the board can only count what the camera systems see, which is a different set of units.
-  // One count means one count: the tiles wait rather than publishing a number that is about to change.
-  assert.match(app, /if\(!S\.mh\)\{\s*\$\("tiles"\)\.replaceChildren\(h\("div",\{class:"empty",text:"Waiting for the official count from mHelp\./);
-  assert.match(app, /\$\("shoprow"\)\.replaceChildren\(\);/);
-
-  // The wall screen is read from across the shop with nobody there to notice a caveat line, so it holds too.
-  assert.match(app, /\$\("tvTiles"\)\.replaceChildren\(h\("div",\{class:"empty",style:"grid-column:1\/-1"\},"Waiting for the official count from mHelp\."\)\)/);
-  assert.match(app, /\$\("tvMinis"\)\.replaceChildren\(\);/);
-  assert.match(app, /No totals until mHelp, the official list, has loaded\./);
-
-  // The list below still works while the totals wait, so the board is not blank.
-  assert.match(app, /the units below are what the camera systems can see/i);
+test('the camera-systems count is shown but marked, never passed off as the official one', () => {
+  // James read two different counts within a minute. The earlier one came before the mHelp list arrived and was
+  // honest, just not official. It still shows, because a board with no numbers is worse than a marked one, but
+  // the mark is on the numbers rather than in a sentence above them, which a glance skips.
+  assert.match(app, /\$\("kpi"\)\.classList\.toggle\("prov", !S\.mh\);/);
+  assert.match(app, /\$\("provNote"\)\.textContent = S\.mh \? "" : "Not the official count\./);
+  assert.match(app, /\$\("provNote"\)\.hidden = Boolean\(S\.mh\);/);
+  // The wall screen is read from across the shop, so the whole block dims there too.
+  assert.match(app, /\$\("tvKpi"\)\.classList\.toggle\("prov", !S\.mh\);/);
+  assert.match(app, /Not the official count: what the camera systems see, until mHelp has loaded\./);
+  // Dimmed and dashed, so the difference carries without reading a word of it.
+  assert.match(style, /\.kpi\.prov \.tile,\.kpi\.prov \.mini\{opacity:\.6;border-style:dashed\}/);
+  assert.match(style, /\.tvleft\.prov \.tvtiles,\.tvleft\.prov \.tvminis\{opacity:\.6\}/);
 });
 
 test('the map is on the board itself, on a phone as well as a desk', () => {
