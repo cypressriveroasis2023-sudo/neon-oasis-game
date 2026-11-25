@@ -10,7 +10,7 @@ import { canonicalCameraUnit } from './fieldCameraHealth';
 import { cloudyWarning, heliosSpots, outlookLine, readSunForecast, sunOutlook, type SunDay } from './vrmWeather';
 import { dayPeak, historyFlags, isNightForecastTime, nightLoad, last24h, overnightLow, readVrmHistory, solarVsYesterday, tonightBasis, tonightForecast, tonightHeadline, tonightSteps, type HistoryPoint, type Tonight } from './vrmHistory';
 import VrmTechGuide from './VrmTechGuide';
-import VrmNightReport from './VrmNightReport';
+import VrmNightReport, { nightLevel } from './VrmNightReport';
 import { nightReport } from './vrmNightReport';
 import VrmHistoryChart from './VrmHistoryChart';
 
@@ -167,6 +167,8 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
   for (const item of units) { const t = history && tiles0(item) ? tonightForecast(history.get(item.installationId) ?? [], now) : null; if (t) tonight.set(item.installationId, t); }
   const weather = new Map<string, ReturnType<typeof sunOutlook>>();
   if (sky) for (const [key, days] of sky) { const o = sunOutlook(days, now); if (o.length) weather.set(key, o); }
+  const night = units.length > 0 && history ? nightReport(units, history, now, name => heliosPlacement(name, inventory) === 'shop') : null;
+  const nightRows = new Map((night?.rows ?? []).map(r => [r.installationId, r]));
   const attention = victronNeedsAttention(units, power.rows, inventory, now, history, tonight, weather);
   // Only speak about Field power once at least one unit's Field/Shop is known from mHelp.
   const placed = units.filter(item => heliosPlacement(item.name, inventory) !== 'unknown').length;
@@ -195,7 +197,7 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
       <h3>{attention.length ? 'Needs attention · Field units' : 'No Field power issues'}</h3>
       {attention.length > 0 && <ul>{attention.map(item => <li key={item.installationId}><button type='button' className={'vrm-attn-'+item.kind} onClick={() => select(item.installationId)}><strong>{item.name}</strong><span>{item.line}</span></button></li>)}</ul>}
     </section>}
-    {units.length > 0 && history && <VrmNightReport report={nightReport(units, history, now, name => heliosPlacement(name, inventory) === 'shop')} now={now} place={name => { const p = heliosPlacement(name, inventory); return p === 'unknown' ? '' : placementLabel(p); }} onOpen={select}/>}
+    {night && <VrmNightReport report={night}/>}
     {units.length > 0 && <VrmTechGuide/>}
     {!loaded && loading && <p role='status'>Loading your Victron installations…</p>}
     {loaded && units.length === 0 && <div className='vrm-awaiting' role='status'><h3>No installations in the saved fleet</h3><p>{canDiscover ? 'Refresh the fleet to check the connected Victron account.' : 'No saved installations are available. Ask an Owner to check the fleet sync.'} No installation IDs or dashboards are assumed.</p></div>}
@@ -212,6 +214,7 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
           : (t => t && (t.verdict === 'low' || t.verdict === 'tight')
             ? <span className={'vrm-tile-night vrm-night-' + t.verdict} title={tonightHeadline(t)}>{t.verdict === 'low' ? (t.floorAt !== null ? '🌙 20% by ' + new Date(t.floorAt * 1000).toLocaleTimeString(undefined, {hour: 'numeric', minute: '2-digit'}) : '🌙 Low tonight') : '🌙 Tight tonight'}</span>
             : null)(tonight.get(item.installationId)) || tile.flow && <span className={'vrm-tile-flow vrm-flow-' + tile.flow.state} title={tile.flow.state === 'charging' ? 'Charging' : tile.flow.state === 'draining' ? 'Draining' : 'Idle'}>{tile.flow.state === 'idle' ? 'Idle' : (tile.flow.state === 'charging' ? '↑ ' : '↓ ') + (tile.flow.watts !== null ? Math.abs(tile.flow.watts) + ' W' : tile.flow.amps !== null ? Math.abs(tile.flow.amps) + ' A' : '') + (tile.flow.state === 'charging' ? ' in' : ' out')}</span>}
+        {(r => r && r.status !== 'none' && <span className={'vrm-tile-low vrm-lvl-' + nightLevel(r)} title={night?.done ? 'Lowest battery last night (5 PM–7 AM)' : 'Lowest battery so far tonight'}>{r.status === 'power' ? '🔌 Plugged in' : '🌙 Low ' + r.low + '%'}</span>)(nightRows.get(item.installationId))}
       </span>; })()}
     </button>)}</nav>}
     {unit && <>
