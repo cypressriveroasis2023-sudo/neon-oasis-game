@@ -59,6 +59,11 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-25** — `camera_devices`: Spotter 265 matched to VCC (row 275 moved
+  from SOLARSPOTTER 253 to SPOTTER 265 as CAM 4 by serial, 3340/3341 renamed,
+  new row 3342 for CAM 1, NVR row 384 `deactivated`). Approved by James. No audit
+  row. Backup `app_private.camera_devices_265_253_fix_backup_20261125`. Record in
+  `tech-checks/docs/db-changes/20261125_spotter265_ss253_camera_records.md`.
 - **2026-11-25** — Linked `SOLARSPOTTER 253` to mHelp A# 2226712 in
   `app_private.cos_mhelp_unit_link` (`decided_by='hand'`, approved by James). No
   audit row; watchdog `ok`. Record in
