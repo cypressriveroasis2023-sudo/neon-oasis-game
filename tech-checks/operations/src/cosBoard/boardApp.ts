@@ -38,7 +38,31 @@ export function mountCosBoard(host, hooks){
 let root = ROOTS.get(host);
 if(!root){ root = host.attachShadow({mode:'closed'}); ROOTS.set(host, root); }
 root.replaceChildren();
-const style = document.createElement('style'); style.textContent = BOARD_CSS + TROUBLE_CSS + ROUTER_CSS;
+const VENDOR_CSS = `
+.ven .vlabel{margin:12px 0 6px;font-weight:800;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--tx2)}
+.ven .vbtns{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
+.ven .vbtn{min-height:52px;border:0;border-radius:12px;padding:12px 14px;font-weight:800;font-size:15.5px;background:var(--s2);color:var(--tx);box-shadow:inset 0 0 0 1px var(--line2);cursor:pointer}
+.ven .vbtn.vsend{background:#c8102e;color:#fff;box-shadow:none}
+.ven .vbtn.alt{background:transparent}
+.ven .vbtn:disabled{opacity:.5}
+.ven .vhead{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;font-size:16px}
+.ven .mgfield{display:flex;flex-direction:column;gap:4px;margin:10px 0;font-weight:700}
+.ven .vsec{border:1px solid var(--line2);border-radius:12px;margin:10px 0;padding:0 12px;background:var(--bg2)}
+.ven .vsec>summary{display:flex;justify-content:space-between;gap:8px;align-items:center;min-height:52px;font-weight:800;font-size:15.5px;cursor:pointer;list-style:none}
+.ven .vsec>summary::-webkit-details-marker{display:none}
+.ven .vsec[open]>summary{border-bottom:1px solid var(--line2);margin-bottom:6px}
+.ven .vcount{font-size:13px;font-weight:800;color:var(--tx2)}
+.ven select.tin{min-height:44px}
+.ven .vdays{display:grid;grid-template-columns:minmax(84px,1.1fr) 1fr 1fr 1fr;gap:6px;align-items:center;margin:10px 0;font-size:14px}
+.ven .vdays b{font-size:12px;text-transform:uppercase;color:var(--tx2)}
+.ven .vday{font-weight:700}
+.ven .vcam{border:1px solid var(--line2);border-radius:10px;padding:10px;margin:10px 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0 10px}
+.ven .vcam>b{grid-column:1/-1}
+.ven .vcam .mgfield{margin:6px 0}
+@media (max-width:520px){.ven .vdays{grid-template-columns:1fr 1fr 1fr}.ven .vdays b:first-child,.ven .vday{grid-column:1/-1}.ven .vdays b:first-child{display:none}}
+.ven .vmail{white-space:pre-wrap;font:13.5px/1.5 ui-monospace,Menlo,monospace;background:var(--bg2);border:1px solid var(--line2);border-radius:10px;padding:12px;margin:10px 0;overflow-wrap:anywhere}
+`;
+const style = document.createElement('style'); style.textContent = BOARD_CSS + TROUBLE_CSS + ROUTER_CSS + VENDOR_CSS;
 const frame = document.createElement('template'); frame.innerHTML = SHELL;
 root.append(style, frame.content);
 const cleanups=[];
@@ -639,6 +663,154 @@ function openBox(v){
     own.length ? h("p",{class:"note",style:"margin-top:10px",text:"This unit's own pages. They only open if the unit is online and your network can reach it."}) : null,
     own.length ? h("div",{class:"links"},own) : null); }
 function logBox(){ return null; }
+/* Email a vendor (James, 25 Nov): cancel a SIM with Vendera or Simetry, or add / remove / swap a unit at an Eyeforce
+   account (Stages and Watchful). The server keeps one template per request, the same every time; the card fills the
+   blanks it knows, shows the exact email, and sends it with one tap. Owner only: it goes out from James's Gmail. */
+const VEN = { conn:null, denied:false, unit:null, tpls:null, err:"", kind:null, vals:{}, mail:null, missing:[], busy:false, result:null, id:null, recent:null, open:{}, cams:0, camMsg:"", form:null };
+function vendorBox(v, mm){
+  if(!hooks || !hooks.vendor || VEN.denied) return null;
+  if(VEN.unit!==v.name){ Object.assign(VEN,{unit:v.name,kind:null,vals:{},mail:null,missing:[],result:null,id:null,recent:null}); vendorRecentLoad(v.name); }
+  const box=h("div",{class:"box ven",id:"venBox"},h("h3",{text:"Email a vendor"}));
+  if(!VEN.tpls){
+    if(!VEN.err && !VEN.busy){ VEN.busy=true; hooks.vendor.templates().then(t=>{ VEN.tpls=t; VEN.err=""; if(typeof hooks.vendor.check==="function") hooks.vendor.check().then(c=>{ VEN.conn=c; drawPanel(); },()=>{}); },e=>{ if(e&&e.denied) VEN.denied=true; else VEN.err=(e&&e.message)||"Vendor emails are not available right now."; }).finally(()=>{ VEN.busy=false; drawPanel(); }); }
+    box.append(h("p",{class:"note",text: VEN.err || "Loading…"})); return box;
+  }
+  const known={unit:v.name, customer:(mm&&mm.rec.cust)||"", site:v.site||"", address:(mm&&mm.rec.addr)||""};
+  const start=kind=>{ const t=VEN.tpls[kind]; VEN.kind=kind; VEN.mail=null; VEN.missing=[]; VEN.result=null; VEN.id=crypto.randomUUID();
+    VEN.vals=Object.assign({}, t.defaults||{}, Object.fromEntries(t.fields.map(f=>[f.key, known[f.key]!==undefined ? known[f.key] : (t.defaults||{})[f.key]||""])));
+    VEN.open={}; VEN.cams=0; VEN.camMsg=""; VEN.form=null;
+    // Eyeforce forms: today's date, and the unit's cameras from COS for the camera tab (an account add only; a swap asks which unit went in).
+    if(t.form){ VEN.vals.date=VEN.vals.date||new Intl.DateTimeFormat("en-US",{timeZone:TZ,month:"2-digit",day:"2-digit",year:"numeric"}).format(new Date());
+      if(t.fields.some(f=>f.key==="s_sun_start")) VEN.vals.cams_total=VEN.vals.cams_total||String((v.u&&v.u.n)||"");
+      VEN.cams=1; if(kind==="monitor_add") vendorCams(v.name); }
+    drawPanel(); };
+  const groups=[["SIM card",["sim_cancel_vendera","sim_cancel_simetry"]],["Monitoring account (Stages and Watchful)",["monitor_add","monitor_remove","monitor_swap"]]];
+  const c=VEN.conn, owner=!!VEN.tpls.sim_cancel_vendera;
+  if(c && (!c.account_ok || c.can_send===false)) box.append(h("p",{class:"note s-down",role:"alert",text:"COS cannot send email from "+(owner?"your":"James's")+" Gmail right now"+(c.error?": "+c.error:".")+" Nothing will be sent until the Google connection is fixed."}));
+  else if(owner && c && (c.can_edit_sheets===false || c.sheet_opens===false)) box.append(h("p",{class:"note s-issues",text:"COS can send the emails, but it cannot write to the deactivation sheet yet. After a SIM or monitoring cancellation, add the row by hand."}));
+  if(!VEN.kind){
+    box.append(h("p",{class:"note",text: owner ? "Pick what you need. COS fills in what it knows, shows you the exact email, and sends it from your Gmail with IT@ in copy."
+      : "Fill in Eyeforce's form here. COS emails it to Eyeforce TechOps from James's Gmail, with IT@ in copy and the filled form attached."}));
+    for(const [label,kinds] of groups) box.append(h("p",{class:"vlabel",text:label}),h("div",{class:"vbtns"},...kinds.filter(k=>VEN.tpls[k]).map(k=>h("button",{class:"vbtn",type:"button",onclick:()=>start(k)},VEN.tpls[k].button))));
+  } else {
+    const t=VEN.tpls[VEN.kind];
+    box.append(h("div",{class:"vhead"},h("b",{text:t.title}),h("button",{class:"lk",type:"button",disabled:VEN.busy,onclick:()=>{ VEN.kind=null; drawPanel(); }},"Back")));
+    if(VEN.result){
+      const r=VEN.result, ok=r.state==="sent";
+      box.append(h("p",{class:"big "+(ok?"s-up":"s-down"),role:ok?"status":"alert",text: ok ? "Sent to "+t.to+"." : r.state==="review" ? r.error : "Not sent. "+(r.error||"")}));
+      if(ok && t.sheet) box.append(h("p",{class:"note",text: /^added/.test(r.sheet) ? "Added to the deactivation sheet ("+r.sheet.replace(/^added /,"")+")." : "The deactivation sheet was NOT updated ("+r.sheet+"). Add the row by hand."}));
+      box.append(h("div",{class:"vbtns"},h("button",{class:"vbtn",type:"button",onclick:()=>{ VEN.kind=null; VEN.result=null; drawPanel(); }},"Done")));
+    } else if(VEN.mail){
+      const m=VEN.mail;
+      box.append(h("dl",{class:"kv"},h("dt",{text:"To"}),h("dd",{text:m.to}),h("dt",{text:"Copy"}),h("dd",{text:m.cc}),h("dt",{text:"Subject"}),h("dd",{text:m.subject}),
+          VEN.form?h("dt",{text:"Attached"}):null, VEN.form?h("dd",{},VEN.form," ",h("button",{class:"lk",type:"button",disabled:VEN.busy,onclick:()=>vendorOpenForm()},"Open it")):null),
+        h("pre",{class:"vmail",text:m.body}),
+        h("div",{class:"vbtns"},
+          h("button",{class:"vbtn vsend",type:"button",disabled:VEN.busy,onclick:()=>vendorSend()},VEN.busy?"Sending…":"Send email"),
+          h("button",{class:"vbtn alt",type:"button",disabled:VEN.busy,onclick:()=>{ VEN.mail=null; drawPanel(); }},"Change something")));
+    } else if(t.form){
+      vendorFormFields(t, box);
+      if(VEN.missing.length) box.append(h("p",{class:"note s-down",role:"alert",text:"Fill in: "+VEN.missing.join(", ")}));
+      box.append(h("div",{class:"vbtns"},h("button",{class:"vbtn vsend",type:"button",disabled:VEN.busy,onclick:()=>vendorPreview()},VEN.busy?"Preparing…":"Preview email and form")));
+    } else {
+      for(const f of t.fields){
+        const input=f.long ? h("textarea",{class:"tin",rows:"3","aria-label":f.label,oninput:e=>{ VEN.vals[f.key]=e.target.value; }},VEN.vals[f.key]||"")
+          : h("input",{class:"tin",type:"text","aria-label":f.label,value:VEN.vals[f.key]||"",oninput:e=>{ VEN.vals[f.key]=e.target.value; }});
+        box.append(h("label",{class:"mgfield"},f.label+(f.required?"":" (optional)"),input,f.hint?h("span",{class:"note",text:f.hint}):null));
+      }
+      if(VEN.missing.length) box.append(h("p",{class:"note s-down",role:"alert",text:"Fill in: "+VEN.missing.join(", ")}));
+      box.append(h("div",{class:"vbtns"},h("button",{class:"vbtn vsend",type:"button",disabled:VEN.busy,onclick:()=>vendorPreview()},VEN.busy?"Preparing…":"Preview email")));
+    }
+  }
+  if(VEN.recent && VEN.recent.length) box.append(h("p",{class:"vlabel",text:"Sent for "+v.name}),
+    ...VEN.recent.map(r=>h("p",{class:"note",text:(r.state==="sent"?"Sent":r.state==="review"?"Check Sent folder":"Not sent")+" · "+r.subject+" · "+r.by+(r.at?" · "+when(Math.round(Date.parse(r.at)/1000)):"")})));
+  return box;
+}
+// The Eyeforce form, section by section, with Eyeforce's own drop-down lists.
+function vendorFormFields(t, box){
+  const vals=VEN.vals, sections=[];
+  for(const f of t.fields){ const sec=f.section||""; let s=sections.find(x=>x.name===sec); if(!s){ s={name:sec,fields:[]}; sections.push(s); } s.fields.push(f); }
+  const control=(f, label)=>{
+    const set=e=>{ vals[f.key]=e.target.value; };
+    let input;
+    if(f.options){ input=h("select",{class:"tin","aria-label":label||f.label,onchange:set},h("option",{value:""},f.required?"Pick":"—"),
+        ...f.options.map(o=>h("option",{value:o,selected:vals[f.key]===o},(f.labels&&f.labels[o])||o)));
+      if(vals[f.key] && !f.options.includes(vals[f.key])) input.append(h("option",{value:vals[f.key],selected:true},vals[f.key])); }
+    else if(f.long) input=h("textarea",{class:"tin",rows:"3","aria-label":label||f.label,oninput:set},vals[f.key]||"");
+    else input=h("input",{class:"tin",type:f.secret?"password":"text",autocomplete:f.secret?"new-password":"off","aria-label":label||f.label,value:vals[f.key]||"",oninput:set});
+    return input;
+  };
+  const blank=s=>s.fields.filter(f=>f.required && !(vals[f.key]||"").trim()).length;
+  sections.forEach((s,i)=>{
+    const open = VEN.open[s.name]!==undefined ? VEN.open[s.name] : i===0;
+    const left=blank(s);
+    const d=h("details",{class:"vsec",open:open,ontoggle:e=>{ VEN.open[s.name]=e.target.open; }},
+      h("summary",{},h("span",{text:s.name}),h("span",{class:"vcount"+(left?" s-down":""),text:left?left+" to fill":"✓"})));
+    const days=s.fields.filter(f=>f.group==="day"), cams=s.fields.filter(f=>f.group==="cam"), rest=s.fields.filter(f=>!f.group);
+    for(const f of rest) d.append(h("label",{class:"mgfield"},f.label+(f.required?"":" (optional)"),control(f),f.hint?h("span",{class:"note",text:f.hint}):null));
+    if(days.length){
+      const rows=[]; for(const f of days){ const m=/^(\w)_(\w+)_(start|end|cams)$/.exec(f.key); if(!m) continue; let r=rows.find(x=>x.k===m[1]+m[2]); if(!r){ r={k:m[1]+m[2],p:m[1],d:m[2],name:f.label.replace(/ (start|end|cameras)$/,""),f:{}}; rows.push(r); } r.f[m[3]]=f; }
+      const p=rows[0].p;
+      d.append(h("div",{class:"vbtns"},h("button",{class:"vbtn alt",type:"button",onclick:()=>{ const a=vals[p+"_sun_start"], b=vals[p+"_sun_end"];
+        if(!a||!b){ toast("Pick Sunday's start and end first."); return; }
+        for(const r of rows) if(r.p===p && r.d!=="sun" && ["mon","tue","wed","thu","fri","sat"].includes(r.d)){ vals[r.k[0]+"_"+r.d+"_start"]="Same as above"; vals[r.k[0]+"_"+r.d+"_end"]="Same as above"; }
+        drawPanel(); }},"Same hours every day")));
+      const grid=h("div",{class:"vdays"},h("b",{text:"Day"}),h("b",{text:"Start"}),h("b",{text:"End"}),h("b",{text:"Cameras"}));
+      for(const r of rows) grid.append(h("span",{class:"vday",text:r.name+(r.f.start&&r.f.start.required?" *":"")}),
+        control(r.f.start,r.name+" start"),control(r.f.end,r.name+" end"),r.f.cams?control(r.f.cams,r.name+" cameras"):h("span"));
+      d.append(grid);
+    }
+    if(cams.length){
+      const unitFor = t.fields.some(f=>f.key==="new_unit") ? "new_unit" : "unit";
+      d.append(h("div",{class:"vbtns"},
+        h("button",{class:"vbtn alt",type:"button",disabled:VEN.busy,onclick:()=>{ const u=(vals[unitFor]||"").trim(); if(!u){ toast("Type the unit first."); return; } vendorCams(u); }},"Fill cameras from COS"),
+        h("button",{class:"vbtn alt",type:"button",onclick:()=>{ const n=Math.max(1,camCount()); for(let i=2;i<=n;i++){ if(!vals["cam"+i+"_login"]) vals["cam"+i+"_login"]=vals.cam1_login||""; if(!vals["cam"+i+"_password"]) vals["cam"+i+"_password"]=vals.cam1_password||""; } drawPanel(); }},"Use camera 1's login for all")));
+      if(VEN.camMsg) d.append(h("p",{class:"note",role:"status",text:VEN.camMsg}));
+      const n=Math.min(16,Math.max(VEN.cams,camCount(),1));
+      for(let i=1;i<=n;i++){
+        const card=h("div",{class:"vcam"},h("b",{text:"Camera "+i}));
+        for(const f of cams.filter(x=>x.row===i)) card.append(h("label",{class:"mgfield"},f.label,control(f,"Camera "+i+" "+f.label)));
+        d.append(card);
+      }
+      if(n<16) d.append(h("div",{class:"vbtns"},h("button",{class:"vbtn alt",type:"button",onclick:()=>{ VEN.cams=n+1; drawPanel(); }},"Add a camera")));
+    }
+    box.append(d);
+  });
+}
+function camCount(){ let n=0; for(let i=1;i<=16;i++) if(["name","type","ip","port","login","password","serial","audio"].some(k=>(VEN.vals["cam"+i+"_"+k]||"").trim())) n=i; return n; }
+async function vendorCams(unit){
+  if(!hooks.vendor.cameras) return;
+  VEN.camMsg="Looking up "+unit+"'s cameras in COS…"; drawPanel();
+  try{
+    const list=await hooks.vendor.cameras(unit);
+    if(!list.length){ VEN.camMsg="COS has no cameras on record for "+unit+". Type them in."; }
+    else {
+      for(let i=1;i<=16;i++) for(const k of ["name","type","ip","port","serial"]) delete VEN.vals["cam"+i+"_"+k];
+      list.forEach((c,i)=>{ const n=i+1; VEN.vals["cam"+n+"_name"]=c.name; VEN.vals["cam"+n+"_type"]=c.type; VEN.vals["cam"+n+"_ip"]=c.ip; VEN.vals["cam"+n+"_port"]=c.port; VEN.vals["cam"+n+"_serial"]=c.serial; });
+      VEN.cams=list.length;
+      VEN.camMsg=list.length+" camera"+(list.length===1?"":"s")+" filled in from COS. Add the login and password for each, and whether it has audio.";
+    }
+  }catch(_){ VEN.camMsg="COS could not look up the cameras. Type them in."; }
+  drawPanel();
+}
+async function vendorOpenForm(){
+  if(VEN.busy || !hooks.vendor.form) return; VEN.busy=true; drawPanel();
+  try{ await hooks.vendor.form(VEN.kind, VEN.vals); }catch(e){ toast((e&&e.message)||"The form could not be opened."); }
+  VEN.busy=false; drawPanel();
+}
+async function vendorRecentLoad(unit){ try{ const r=await hooks.vendor.recent(unit); if(VEN.unit===unit){ VEN.recent=r; drawPanel(); } }catch(_){} }
+async function vendorPreview(){
+  VEN.busy=true; VEN.missing=[]; drawPanel();
+  try{ const r=await hooks.vendor.preview(VEN.kind, VEN.vals); if(r.mail){ VEN.mail=r.mail; VEN.form=r.form||null; } else VEN.missing=r.missing||[]; }
+  catch(e){ VEN.missing=[(e&&e.message)||"The email could not be prepared."]; }
+  VEN.busy=false; drawPanel();
+}
+async function vendorSend(){
+  if(VEN.busy) return; VEN.busy=true; drawPanel();
+  try{ VEN.result=await hooks.vendor.send(VEN.kind, VEN.vals, VEN.id); }
+  catch(e){ VEN.result={state:"failed",sheet:"",error:(e&&e.message)||"The email could not be sent."}; }
+  VEN.busy=false; drawPanel(); vendorRecentLoad(VEN.unit);
+}
 function histBox(v){ const hist=(v.u && v.u.hx)||[]; return hist.length ? h("div",{class:"box"},h("h3",{text:"Set by hand on this unit"}),h("ul",{class:"hist"},hist.map(x=>histLi(x,null)))) : null; }
 function drawMhPanel(v){
   const P=$("panel"), r=v.rec, dl=h("dl",{class:"kv"});
@@ -700,7 +872,7 @@ function drawPanel(){
   const dg = diagBox(v);
   const body=[ resBox(resFor(v.name, v.k, mm&&mm.rec.label)), dg, camsBox(v), routerBox(v),
     tbx,
-    ob, locBox(v), logBox(v),
+    ob, vendorBox(v, mm), locBox(v), logBox(v),
     h("div",{class:"box"},h("h3",{text:"Details"}),dl, v.why?h("p",{class:"note",text:v.why}):null) ];
   if(v.type==="Helios") body.push(powerBox(v));
 

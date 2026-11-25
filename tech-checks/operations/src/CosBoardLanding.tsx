@@ -17,6 +17,7 @@ import {readRouterDetails} from './routerDetails';
 import {boardEditState, handFixRequest, type BoardEditFlags, type BoardEditState, type BoardFixStep} from './cosBoard/boardEdit';
 import {mountCosBoard} from './cosBoard/boardApp';
 import {loadBoardFonts} from './cosBoard/boardFonts';
+import {vendorCameras, vendorCheck, vendorForm, vendorPreview, vendorRecent, vendorSend, vendorTemplates} from './vendorRequest';
 import {addSims, managerHost, managerKnown, managerPhoto, markSim, readManager, rememberManager, removeTruckExtra, saveTruck, setTruckStandard, takeBoardView, type TruckKit, type TruckType} from './managerBridge';
 
 /**
@@ -276,6 +277,17 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
       // The board is the screen James works from, so the other COS screens open from it, not only from More.
       // The unit card's router box: InHand status, signal and the :8080 link, read from Tech Check.
       loadRouters: () => readRouterDetails(),
+      // Email a vendor from the unit card (James, 25 Nov): SIM cancellations and Eyeforce account changes.
+      // The server keeps the templates, decides who may send which, and sends from James's Gmail with IT@ in copy.
+      vendor: managerHost() ? {
+        templates: () => vendorTemplates(),
+        preview: (kind: string, values: Record<string, string>) => vendorPreview(kind, values),
+        send: (kind: string, values: Record<string, string>, requestId: string) => vendorSend(kind, values, requestId),
+        recent: (unit: string) => vendorRecent(unit),
+        check: () => vendorCheck(),
+        cameras: (unit: string) => vendorCameras(unit),
+        form: (kind: string, values: Record<string, string>) => vendorForm(kind, values),
+      } : undefined,
       onScreen: (workspace: string) => { window.location.hash = workspaceHash({workspace, jobId: '', detail: false}); },
       // The owner's manager view. The signed-in Tech Check app around this frame reads the trucks, inspections and
       // handoffs; the board only draws them. A sign-in with no manager view never gets an answer, and never a tab.
