@@ -1,12 +1,12 @@
 import {test,expect} from '@playwright/test';
-import {mountTransfers,IT,SERVICE,OWNER} from './helpers/transfer-fixture.mjs';
+import {mountTransfers,IT,SERVICE,OWNER,passServiceChecks} from './helpers/transfer-fixture.mjs';
 
 const photo={name:'synthetic.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=','base64')};
 const solar={equipment_key:'solar_spotter:039',family:'Solar Spotter',unit_tag:'039',sims:['00123456789012345670'],battery_count:null,battery_configuration:null,parts:[]};
 const sniper={equipment_key:'sniper:001',family:'Sniper',unit_tag:'001',sims:[],battery_count:null,battery_configuration:null,parts:[]};
 let f;
 test.afterEach(async()=>{await f?.close();f=null;});
-async function sign(page,name='Synthetic Service'){
+async function sign(page,name='Synthetic Service'){await passServiceChecks(page);
  await page.getByRole('radio',{name:'Type signature',exact:true}).check();
  await page.getByRole('textbox',{name:'Type your full name',exact:true}).fill(name);
  await page.getByRole('checkbox',{name:'I confirm this report is accurate',exact:true}).check();

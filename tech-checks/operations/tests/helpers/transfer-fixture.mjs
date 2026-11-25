@@ -7,6 +7,8 @@ export const IT='4f7044b5-86b6-411f-8898-39bb64b4ddbc',TEST_IT='05bf20fe-19f7-4d
 export const OWNER='00000000-0000-4000-8000-000000000004';
 const linkedIT=new Map([[IT,{name:'Synthetic IT',actorId:'d0757b64-9623-4adc-afff-21cc7853e88a'}],[TEST_IT,{name:'Test IT',actorId:'c9a7c3e9-953c-4ad6-a080-5eacbcd1d1c7'}]]);
 const root=new URL('../../../',import.meta.url).pathname;
+// Service answers every receipt check; tests that are not about those checks mark them all Pass.
+export async function passServiceChecks(page){for(const pick of await page.locator('select[data-service-check]').all())await pick.selectOption('true');}
 export async function mountTransfers(page,{role='it',itActor=IT,serviceActor=SERVICE,seedHandoff=false,handoffPurpose='installation',seedItems=null,legacyHandoff=false,legacyReceiptCounts=[],rollout='ready',readinessDelay=0,placementEvidence=false}={}){
  const itIdentity=linkedIT.get(itActor);if(!itIdentity)throw Error('Unknown synthetic IT identity');
  const db=new PGlite(),paths=new Map(),calls=[],unexpected=[],errors=[];
@@ -49,6 +51,8 @@ export async function mountTransfers(page,{role='it',itActor=IT,serviceActor=SER
  }
  if(legacyHandoff)await db.exec(purposeMigration);
  await db.exec(await readFile(root+'database-maintenance/techcheck-owner-handoff-resolution-v1.sql','utf8'));
+ // The held placement-review package replaces the same function and is not yet updated for the Service checklist.
+ if(!placementEvidence)await db.exec(await readFile(root+'database-maintenance/techcheck-service-receipt-checks-v1.sql','utf8'));
  if(placementEvidence){
   for(const file of ['storage.sql','wiring.sql'])await db.exec(await readFile(root+'operations/transfer-placement-review/'+file,'utf8'));
   const {projectTransferPlacement}=await import('../../transfer-placement-review/projectPlacement.mjs');
