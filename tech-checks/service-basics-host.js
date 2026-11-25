@@ -3,6 +3,7 @@
 import './auth-mobile-host.js?v=20261016';
 import './ticketfree-returns/host.js?v=simple-20261020';
 import './service-transfer-host.js?v=named-handoffs-v1';
+import './truck-moves/host.js?v=truck-extras-v1';
 import './service-daily-report-host.js?v=20261016-signoff';
 export const SERVICE_BASICS_ONLY = true;
 window.COS_SERVICE_BASICS_ONLY = SERVICE_BASICS_ONLY;

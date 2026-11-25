@@ -1,7 +1,7 @@
 import {selectionKey,itemName,itemReason,reasonLabel,selectItem,cataloguePage} from './batch-model.js?v=simple-20261020';
 const node=(tag,text='',cls='')=>{const e=document.createElement(tag);e.textContent=text;if(cls)e.className=cls;return e;};
 const button=(text,fn,cls='')=>{const b=node('button',text,cls);b.type='button';b.onclick=fn;return b;};
-export function servicePicker(root,{data,draft,save,redraw,appendEvidence,submit,tell}) {
+export function servicePicker(root,{data,draft,save,redraw,appendEvidence,appendPhotos,submit,tell}) {
  const dialog=root.closest('dialog'),locked=Boolean(draft.request),fields=node('fieldset');fields.disabled=locked;root.append(fields);
  const change=()=>{save().catch(e=>tell(e.message,true));};
  const render=()=>{change();redraw();if(dialog)dialog.scrollTop=0;};
@@ -22,7 +22,7 @@ export function servicePicker(root,{data,draft,save,redraw,appendEvidence,submit
   b.append(node('span',label),node('strong',item?itemName(item):'Choose equipment'),node('small',item?'Change':'Tap to choose'));
   return b;
  }
- function details(){const d=node('details','','cos-simple-details');d.append(node('summary','Notes, photos & more'),...extraActions);appendEvidence(d);root.append(d);}
+ function details(){const d=node('details','','cos-simple-details');d.append(node('summary',appendPhotos?'Notes & more':'Notes, photos & more'),...extraActions);appendEvidence(d);root.append(d);}
  function saveButton(text){
   root.append(button(locked?'Retry saved returns':text,()=>{if(!draft.items.length){tell('Choose the equipment you are bringing back.',true);return;}submit();},'cos-ticketfree-primary'));
  }
@@ -96,6 +96,7 @@ export function servicePicker(root,{data,draft,save,redraw,appendEvidence,submit
   }
   if(draft.items.length&&mode!=='batch')extraActions.push(button(mode==='swap'?'Add another swap':'Add another unit',()=>{draft.pendingUsedKey='';choose('returned');},'cos-simple-unused'));
  }
+ if(appendPhotos&&draft.items.length){const p=node('div','','cos-simple-photos');appendPhotos(p);root.append(p);}
  saveButton(mode==='swap'?'Save swap':mode==='pickup'?'Save pickup':'Save return');
  if(draft.items.length)root.append(node('small','IT will receive '+draft.items.map(itemName).join(', ')+'.','cos-simple-helper'));
  details();

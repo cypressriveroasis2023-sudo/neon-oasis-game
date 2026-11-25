@@ -66,6 +66,7 @@ const liveDb={auth:{onAuthStateChange:fn=>{subscriptions.push(fn);return {};},ge
       fixture.readiness.inventory_ready=fixture.readiness.inspection_ready&&fixture.readiness.units.every(u=>u.unit_tag&&args.p_unit_confirmations[u.equipment_type]?.confirmed)&&fixture.readiness.sims.every(s=>s.sim_number&&args.p_sim_confirmations[s.slot_no]?.confirmed)&&args.p_recon_battery_qty>=25&&args.p_agm_12v_110ah_qty>=4&&args.p_litime_12v_100ah_qty>=2&&args.p_battery_12v_35ah_qty>=4;
       return {data:structuredClone(fixture.readiness)};
     }
+    if(name==='truck_my_v1')return {data:{me:{id:fixture.actor,name:'Synthetic Service'},kinds:fixture.readiness.units.map(u=>({type:u.equipment_type,required:1,have:u.unit_tag?1:0,slot:u.unit_tag?{tag:u.unit_tag}:null,slot_used:false,extras:[]})),coming:[],sent:[],recent:[],from_it:[],techs:[]}};
     throw new Error('Unexpected synthetic RPC '+name);
   },
   from:()=>{const q={select:()=>q,eq:()=>q,gte:()=>q,order:()=>q,limit:async()=>({data:fixture.morning?[structuredClone(fixture.morning)]:[]})};return q;}
