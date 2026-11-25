@@ -1,10 +1,12 @@
-// Vendor emails from the unit card (cos-vendor-request, Tech Check). Owner only.
+// Vendor emails from the unit card (cos-vendor-request, Tech Check). The Owner sends all of them;
+// approved IT sends the Eyeforce account add and unit swap forms.
 // The server holds the templates and sends; the card only fills the blanks and shows the result.
 import {readParentAccessToken} from './cosPowerAlarms';
 
 const URL_ = 'https://goqrnolcvqnirjmzaeyk.supabase.co/functions/v1/cos-vendor-request';
-export type VendorField = {key: string; label: string; required: boolean; hint?: string; long?: boolean};
-export type VendorTemplate = {title: string; button: string; to: string; fields: VendorField[]; sheet: 'sim' | 'monitoring' | null; defaults: Record<string, string>};
+export type VendorField = {key: string; label: string; required: boolean; hint?: string; long?: boolean; options?: string[];
+  labels?: Record<string, string>; section?: string; secret?: boolean; row?: number; group?: string; col?: string};
+export type VendorTemplate = {title: string; button: string; to: string; fields: VendorField[]; sheet: 'sim' | 'monitoring' | null; who?: 'owner' | 'fleet'; form?: boolean; defaults: Record<string, string>};
 export type VendorMail = {to: string; cc: string; subject: string; body: string};
 export type VendorRecent = {kind: string; state: string; by: string; at: string; to: string; subject: string; sheet: string | null; error: string | null};
 
@@ -23,10 +25,24 @@ export async function vendorTemplates(): Promise<Record<string, VendorTemplate>>
   if (status !== 200 || !json?.templates) throw Object.assign(new Error(said(json, 'Vendor emails are not available right now.')), {denied: status === 401 || status === 403});
   return json.templates;
 }
-export async function vendorPreview(kind: string, values: Record<string, string>): Promise<{mail?: VendorMail; missing?: string[]}> {
+export async function vendorPreview(kind: string, values: Record<string, string>): Promise<{mail?: VendorMail; form?: string | null; missing?: string[]}> {
   const {status, json} = await call({action: 'preview', kind, values});
   if (status !== 200) throw new Error(said(json, 'The email could not be prepared.'));
-  return json.ok ? {mail: json.mail} : {missing: Array.isArray(json.missing) ? json.missing : ['Something is missing.']};
+  return json.ok ? {mail: json.mail, form: typeof json.form === 'string' ? json.form : null} : {missing: Array.isArray(json.missing) ? json.missing : ['Something is missing.']};
+}
+export type VendorCamera = {name: string; type: string; ip: string; port: string; serial: string};
+export async function vendorCameras(unit: string): Promise<VendorCamera[]> {
+  const {status, json} = await call({action: 'cameras', unit});
+  return status === 200 && Array.isArray(json?.cameras) ? json.cameras.slice(0, 16) : [];
+}
+/** Downloads the filled Eyeforce form exactly as it will be attached. */
+export async function vendorForm(kind: string, values: Record<string, string>): Promise<void> {
+  const {status, json} = await call({action: 'form', kind, values});
+  if (status !== 200 || !json?.b64) throw new Error(said(json, 'The form could not be prepared.'));
+  const bytes = Uint8Array.from(atob(json.b64), c => c.charCodeAt(0));
+  const url = URL.createObjectURL(new Blob([bytes], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+  const a = document.createElement('a'); a.href = url; a.download = String(json.name || 'Eyeforce form.xlsx');
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
 export async function vendorSend(kind: string, values: Record<string, string>, requestId: string): Promise<{state: string; sheet: string; error: string}> {
   const {status, json} = await call({action: 'send', kind, values, request_id: requestId});
