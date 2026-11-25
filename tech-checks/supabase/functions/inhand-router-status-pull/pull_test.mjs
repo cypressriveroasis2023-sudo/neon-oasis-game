@@ -51,6 +51,7 @@ test('refresh sign-in, three pages, readings normalized', async () => {
   assert.equal(out.seen, 240);
   assert.equal(out.readings.length, 240);
   assert.equal(out.readings[0].serial, 'RF3100000');
+  assert.equal(out.readings[0].online, 0);
   assert.equal(out.observedAt, '2026-11-24T14:00:00.000Z');
   assert.equal(h.saved.length, 1);
 });
@@ -119,7 +120,7 @@ test('unexpected device response shape is refused, not guessed', async () => {
 });
 
 test('readingOf only accepts a clear online flag and a plain serial', () => {
-  assert.deepEqual(readingOf({ serialNumber: ' rf3152533024049 ', online: 1 }), { serial: 'RF3152533024049', online: 1 });
+  assert.deepEqual(readingOf({ serialNumber: ' rf3152533024049 ', online: 1 }), { serial: 'RF3152533024049', online: 1, d: {} });
   assert.deepEqual(readingOf({ serialNumber: 'RF31', online: 0 }), null);
   assert.deepEqual(readingOf({ serialNumber: 'RF3152533024049', online: 'yes' }), null);
   assert.deepEqual(readingOf({ serialNumber: 'RF3152533024049' }), null);
@@ -177,4 +178,21 @@ test('a 20-digit clientId is sent exactly, not rounded', async () => {
   assert.equal(client.id, '17953450251798098136');
   const quoted = harness({ routes: () => new Response('{"result":{"auth":{"clientId":"abc-123_X","clientSecret":"cs"}}}', { status: 200 }) });
   assert.equal((await oauthClient(quoted.deps)).id, 'abc-123_X');
+});
+
+test('details: card fields kept, SIM numbers and junk dropped', async () => {
+  const { detailsOf } = await import('./pull.ts');
+  const d = detailsOf({ name: 'Helios 010', model: 'IR300', pubIp: '166.1.2.3', logtime: '2026-11-23T07:03:37Z',
+    info: { mcc: 310, mnc: 260, swVersion: 'V3.5.75', iccid: '8901', imsi: '3102', imei: '8612', pn: '555' },
+    signalStrength: { ts: '2026-11-25T17:00:00Z', level: 4, radio: '4G', band: '66', rsrp: -77, rsrq: -10, sinr: 26, cid: 1 },
+    location: { latitude: 29.82, longitude: -95.87, time: '2026-11-25T01:08:14Z', source: 'cellTower' } });
+  assert.deepEqual(d, { name: 'Helios 010', model: 'IR300', pub: '166.1.2.3', carrier: 'T-Mobile', fw: 'V3.5.75', seen: '2026-11-23T07:03:37Z',
+    sig: { level: 4, radio: '4G', band: '66', rsrp: -77, rsrq: -10, sinr: 26, ts: '2026-11-25T17:00:00Z' },
+    gps: { lat: 29.82, lng: -95.87, t: '2026-11-25T01:08:14Z' } });
+  assert.ok(!JSON.stringify(d).match(/8901|3102|8612|555/));
+  assert.equal(detailsOf({ pubIp: '999.1.1.1' }).pub, undefined);
+  assert.equal(detailsOf({ pubIp: '1.2.3.4; rm' }).pub, undefined);
+  assert.equal(detailsOf({ location: { latitude: 0, longitude: 0 } }).gps, undefined);
+  assert.equal(detailsOf({ info: { mcc: 311, mnc: 480 } }).carrier, 'Verizon');
+  assert.equal(detailsOf({ info: { mcc: 334, mnc: 20 } }).carrier, 'Carrier 334-020');
 });

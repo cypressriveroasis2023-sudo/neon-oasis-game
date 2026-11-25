@@ -13,6 +13,7 @@ import {boardPowerByUnit, type BoardPower} from './cosBoard/boardPower';
 import {heliosSpots, readSunForecast, sunOutlook, type OutlookDay, type SunDay} from './vrmWeather';
 import {getVrmFleet} from './vrmFleetApi';
 import {readVrmHistory, type HistoryPoint} from './vrmHistory';
+import {readRouterDetails} from './routerDetails';
 import {boardEditState, handFixRequest, type BoardEditFlags, type BoardEditState, type BoardFixStep} from './cosBoard/boardEdit';
 import {mountCosBoard} from './cosBoard/boardApp';
 import {loadBoardFonts} from './cosBoard/boardFonts';
@@ -232,6 +233,8 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
         window.location.hash = workspaceHash({workspace: 'Tech Check', jobId: '', detail: false});
       },
       // The board is the screen James works from, so the other COS screens open from it, not only from More.
+      // The unit card's router box: InHand status, signal and the :8080 link, read from Tech Check.
+      loadRouters: () => readRouterDetails(),
       onScreen: (workspace: string) => { window.location.hash = workspaceHash({workspace, jobId: '', detail: false}); },
       // The owner's manager view. The signed-in Tech Check app around this frame reads the trucks, inspections and
       // handoffs; the board only draws them. A sign-in with no manager view never gets an answer, and never a tab.

@@ -12,6 +12,21 @@
 import mapData from './boardMap.json';
 import {BOARD_CSS} from './boardStyle';
 import {troubleWalk, troubleKnown, troubleNote, TROUBLE_CSS} from './boardTrouble';
+import {ROUTER_DETAIL_FRESH_MS, signalWord, milesBetween, unitKeyOf} from '../routerDetails';
+
+/* The router box on a unit card: the open-router button, signal bars and the warnings. */
+const ROUTER_CSS = `
+.rtr .rtop{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.rtr .rbtn{display:flex;flex-direction:column;gap:2px;padding:12px 14px;margin:0 0 12px;border-radius:10px;background:#0e7a3c;color:#fff;text-decoration:none;border:1px solid #13a352}
+.rtr .rbtn b{font-size:16px}.rtr .rbtn span{font-size:12px;opacity:.85}
+.rtr .rbtn:hover,.rtr .rbtn:focus-visible{background:#11904a;outline:2px solid #fff;outline-offset:2px}
+.rtr .bars{display:inline-flex;align-items:flex-end;gap:2px;height:14px;vertical-align:middle}
+.rtr .bars i{display:block;width:4px;background:rgba(255,255,255,.18);border-radius:1px}
+.rtr .bars i:nth-child(1){height:20%}.rtr .bars i:nth-child(2){height:40%}.rtr .bars i:nth-child(3){height:60%}.rtr .bars i:nth-child(4){height:80%}.rtr .bars i:nth-child(5){height:100%}
+.rtr .bars.good i.on{background:#2ecc71}.rtr .bars.fair i.on{background:#f1c40f}.rtr .bars.poor i.on{background:#e74c3c}.rtr .bars i.on{background:#9aa}
+.rtr .note.warn{color:#ffcf66;border-left:3px solid #ffcf66;padding-left:8px}
+.rtr dd a{color:inherit}
+`;
 
 const SHELL = "<div class=\"cosb\" id=\"cosb\"><header class=\"top\"><div class=\"wrap\">\n  <div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div>\n  <span class=\"topbtns\"><button class=\"tvgo\" id=\"tvGo\" type=\"button\">TV board</button><button class=\"refresh\" id=\"refresh\" type=\"button\">Refresh</button></span>\n</div></header>\n<div class=\"asof\" id=\"asof\"><div class=\"wrap\"><span id=\"asofMain\">Loading the camera reading…</span><span id=\"asofSub\"></span></div></div>\n\n<main class=\"wrap\">\n  <div class=\"tabs\" role=\"tablist\">\n    <button class=\"tab\" role=\"tab\" id=\"tabBoard\" aria-selected=\"true\" type=\"button\">Board</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabMap\" aria-selected=\"false\" type=\"button\">Map</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabTech\" aria-selected=\"false\" type=\"button\">Tech check</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabManager\" aria-selected=\"false\" type=\"button\" hidden>Manager</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabPunch\" aria-selected=\"false\" type=\"button\">Punch list</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabActivity\" aria-selected=\"false\" type=\"button\">Changes</button>\n  </div>\n\n  <section id=\"viewBoard\">\n    <div id=\"boardMain\">\n    <div class=\"mode\" id=\"modeRow\"></div>\n    <div class=\"kpi\" id=\"kpi\">\n    <p class=\"provnote\" id=\"provNote\" hidden></p>\n    <div class=\"tiles\" id=\"tiles\"></div>\n    <div class=\"shoprow\" id=\"shoprow\"></div>\n    </div>\n    <div id=\"boardList\">\n    <div class=\"controls\">\n      <input class=\"search\" id=\"q\" type=\"search\" placeholder=\"Find a unit, site, A# or IP\" autocomplete=\"off\" aria-label=\"Find a unit, site, A number or IP\">\n      <div class=\"chips\" id=\"fam\"></div>\n    </div>\n    <div class=\"count\" id=\"count\"></div>\n    <div class=\"list\" id=\"list\"></div>\n    <div class=\"screens\" id=\"screensRow\"><h3>Other COS screens</h3><div class=\"links\" id=\"screensLinks\"></div></div><ul class=\"foot\"><li>One unit counts once, however many cameras it has.</li><li>One count here, and it is mHelp’s camera units. mHelp’s own field total is higher because it counts stands and poles as well. The camera systems see fewer, because some units in mHelp have no camera record in COS yet; those show Unknown.</li><li>A unit in the shop never counts as down.</li><li>A reading that is missing or too old shows Unknown, never Down.</li><li>Router checks are a reference only. A router online does not prove the cameras work.</li><li>Hand fixes made here are saved in COS with your name and the time. Nothing here changes mHelp, Star4Live or InHand.</li></ul>\n    </div>\n    </div>\n    <aside id=\"boardSide\" aria-label=\"Map of field units\" hidden></aside>\n  </section>\n\n  <section id=\"viewMap\" hidden>\n    <div id=\"mapBlock\">\n    <div class=\"chips\" id=\"mapChips\"></div>\n    <div class=\"chips\" id=\"mapGo\" style=\"margin-top:8px\"></div>\n    <div class=\"mapwrap\" id=\"mapWrap\">\n      <svg id=\"mapSvg\" role=\"img\" aria-label=\"Map of field units\"><g id=\"mapBase\"></g><g id=\"mapLabels\"></g><g id=\"mapPins\"></g></svg>\n      <div class=\"mapbtns\"><button type=\"button\" id=\"zin\" aria-label=\"Zoom in\">+</button><button type=\"button\" id=\"zout\" aria-label=\"Zoom out\">&minus;</button></div>\n      <div class=\"mapmsg\" id=\"mapMsg\" hidden></div>\n      <div class=\"mapsel\" id=\"mapSel\" hidden></div>\n    </div>\n    <p class=\"note\" id=\"mapNote\" style=\"margin-top:10px\"></p>\n    <div class=\"list\" id=\"mapList\"></div>\n    </div>\n  </section>\n\n  <section id=\"viewTech\" hidden>\n    <div id=\"techForm\"></div>\n    <div id=\"techList\"></div>\n  </section>\n\n  <section id=\"viewManager\" hidden>\n    <div id=\"mgNow\"></div>\n    <div id=\"mgChecks\"></div>\n    <div id=\"mgTrucks\"></div>\n    <div id=\"mgGap\"></div>\n    <div id=\"mgSim\"></div>\n    <div id=\"mgX\"></div>\n    <div id=\"mgTools\"></div>\n  </section>\n\n  <section id=\"viewPunch\" hidden>\n    <div class=\"box\" id=\"punchTop\"><p class=\"note\">Loading the mHelp list…</p></div>\n    <div class=\"chips\" id=\"punchChips\" style=\"margin-top:12px\"></div>\n    <div class=\"count\" id=\"punchCount\"></div>\n    <div class=\"list\" id=\"punchList\"></div>\n  </section>\n\n  <section id=\"viewActivity\" hidden>\n    <p class=\"note\" id=\"actNote\">Every change made by hand on this board, newest first.</p>\n    <ul class=\"hist\" id=\"activity\"></ul>\n  </section>\n</main>\n\n<section id=\"viewTv\" hidden><header class=\"tvtop\"><div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div><div class=\"tvread\" id=\"tvRead\" role=\"status\">Loading the camera reading…</div><div class=\"tvclock\"><b id=\"tvClock\"></b><span id=\"tvDate\"></span></div><button type=\"button\" class=\"tvx\" id=\"tvExitTop\">Exit TV</button></header><div class=\"tvgrid\" id=\"tvGrid\"><div class=\"tvleft\" id=\"tvKpi\"><div class=\"tvtiles\" id=\"tvTiles\"></div><div class=\"tvminis\" id=\"tvMinis\"></div><div class=\"tvhead\" id=\"tvHead\"></div><div class=\"tvlist\" id=\"tvList\"></div></div><div class=\"tvright\" id=\"tvRight\"><div class=\"tvmaptitle\" id=\"tvMapTitle\"></div><div class=\"tvmap\" id=\"tvMap\"></div></div></div><footer class=\"tvfoot\"><span id=\"tvNote\"></span><span class=\"tvbtns\"><button type=\"button\" id=\"tvRefresh\">Refresh</button><button type=\"button\" id=\"tvFull\">Full screen</button><button type=\"button\" id=\"tvExit\">Exit TV</button></span></footer></section><div class=\"sheet\" id=\"sheet\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"pname\"><div class=\"panel\" id=\"panel\"></div></div>\n<div class=\"toast\" id=\"toast\" role=\"status\" aria-live=\"polite\"></div></div>";
 /* A shadow root can be attached to an element only once, so a host that is mounted again gets its first root back. */
@@ -22,7 +37,7 @@ export function mountCosBoard(host, hooks){
 let root = ROOTS.get(host);
 if(!root){ root = host.attachShadow({mode:'closed'}); ROOTS.set(host, root); }
 root.replaceChildren();
-const style = document.createElement('style'); style.textContent = BOARD_CSS + TROUBLE_CSS;
+const style = document.createElement('style'); style.textContent = BOARD_CSS + TROUBLE_CSS + ROUTER_CSS;
 const frame = document.createElement('template'); frame.innerHTML = SHELL;
 root.append(style, frame.content);
 const cleanups=[];
@@ -407,6 +422,65 @@ function camsBox(v){
     h("div",null,h("b",{text:c.name}),h("span",{text:[c.type,c.model,c.fw ? "firmware "+c.fw : ""].filter(Boolean).join(" · ")}),camLinks(c)),
     h("span",{class:"cst "+(c.st===1?"ok":c.st===0?"bad":"unk"),text: c.st===1 ? "Online" : c.st===0 ? "Offline"+(c.lo ? " since "+when(c.lo) : "") : "No reading"}))),
     S.devAt ? h("p",{class:"note",text:"Camera list read "+when(S.devAt)+"."}) : null); }
+/* The unit's InHand router, from the 30-minute InHand pull. A hint only: router up never means the cameras are up.
+   No SIM numbers ever reach the board. The router page is plain http on a public address, so it opens in a new tab. */
+const secOf = iso => { const t=Date.parse(iso||""); return isFinite(t) ? Math.round(t/1000) : 0; };
+function routerBox(v){
+  if(v.mhOnly || !S.rd) return null;
+  const r = S.rd.get(unitKeyOf(v.k)) || S.rd.get(unitKeyOf(v.name));
+  const goScreen = hooks && typeof hooks.onScreen==="function" ? h("button",{class:"lk",type:"button",onclick:()=>hooks.onScreen("InHand Routers")},"Open InHand Routers") : null;
+  if(!r){
+    if(v.place!=="field") return null;
+    return h("div",{class:"box rtr"},h("h3",{text:"Router"}),
+      h("p",{class:"note",text:"No InHand router is linked to this unit in COS. Owner or IT can link one on the InHand Routers screen."}),
+      goScreen ? h("div",{class:"links"},goScreen) : null);
+  }
+  const fresh = r.at && Date.now()-Date.parse(r.at) < ROUTER_DETAIL_FRESH_MS;
+  const st = !fresh ? "unk" : r.status==="online" ? "ok" : r.status==="offline" ? "bad" : "unk";
+  const stText = st==="ok" ? "Connected" : st==="bad" ? "Offline" : "Unknown";
+  const kids=[h("h3",{text:"Router"}),
+    h("div",{class:"rtop"},h("span",{class:"cst "+st,text:stText}),
+      h("span",{class:"note",text: r.at ? (fresh ? "InHand read "+when(secOf(r.at)) : "No InHand reading since "+when(secOf(r.at))) : "No InHand reading yet"}))];
+  if(r.ip && IPV4.test(r.ip)) kids.push(h("a",{class:"rbtn",href:"http://"+r.ip+":"+(r.port||8080),target:"_blank",rel:"noopener noreferrer"},
+    h("b",{text:"Open router (:"+(r.port||8080)+")"}),h("span",{text:"Opens the router's own page in a new tab"})));
+  else kids.push(h("p",{class:"note",text:"No public IP for this router yet, so there is no router page to open."}));
+  const kv=[];
+  const word = signalWord(r.sig);
+  if(r.sig){
+    const lv = typeof r.sig.level==="number" ? Math.max(0,Math.min(5,Math.round(r.sig.level))) : (word==="Good"?4:word==="Fair"?3:word==="Poor"?1:0);
+    const bars=h("span",{class:"bars "+(word||"").toLowerCase(),"aria-label":(word||"Signal")+", "+lv+" of 5 bars"},...[1,2,3,4,5].map(i=>h("i",{class:i<=lv?"on":""})));
+    const parts=[word, r.sig.radio, r.sig.band ? "band "+r.sig.band : "", typeof r.sig.rsrp==="number" ? r.sig.rsrp+" dBm" : ""].filter(Boolean).join(" · ");
+    kv.push(["Signal", h("span",null,bars," ",parts||"No reading")]);
+  }
+  if(r.carrier) kv.push(["Carrier", r.carrier]);
+  kv.push(["Router", [r.model, r.serial].filter(Boolean).join(" · ")]);
+  if(r.fw) kv.push(["Firmware", r.fw]);
+  if(r.ip) kv.push(["Router IP", r.ip+(r.ipFrom==="cos" ? " (from the COS record)" : "")]);
+  let far=null;
+  if(r.gps){
+    const pin=pinOf(v), maps="https://www.google.com/maps?q="+r.gps.lat.toFixed(5)+","+r.gps.lng.toFixed(5);
+    const mi = pin ? milesBetween(r.gps, pin) : null;
+    kv.push(["Cell-tower spot", h("span",null, mi===null ? "No unit pin to compare" : mi<1 ? "Under a mile from the unit's pin" : Math.round(mi)+" mi from the unit's pin"," · ",
+      h("a",{href:maps,target:"_blank",rel:"noopener noreferrer"},"map"))]);
+    if(mi!==null && mi>25) far=h("p",{class:"note warn",text:"The router's cell tower is about "+Math.round(mi)+" miles from where COS has this unit. The unit may have moved, or the router may be on a different unit. Cell-tower spots are rough, so check before changing anything."});
+  }
+  const dl=h("dl",{class:"kv"}); for(const [a,b] of kv) dl.append(h("dt",{text:a}), typeof b==="string" ? h("dd",{text:b}) : h("dd",null,b));
+  kids.push(dl);
+  if(r.cosDiffers) kids.push(h("p",{class:"note warn",text:"InHand reports a different public IP than the COS record. The button uses InHand's, which is newer. Correct the COS record if the cameras use the same address."}));
+  if(far) kids.push(far);
+  kids.push(h("p",{class:"note",text:"Router status is a hint, not camera health. A connected router with offline cameras is still a camera problem."}));
+  if(goScreen) kids.push(h("div",{class:"links"},goScreen));
+  return h("div",{class:"box rtr",id:"rtrBox"},kids);
+}
+async function loadRouters(){
+  if(!hooks || typeof hooks.loadRouters!=="function") return;
+  try{
+    const res = await hooks.loadRouters();
+    if(!res || res.ok!==true || !res.data) return;
+    S.rd = new Map(res.data.routers.map(r=>[unitKeyOf(r.unit), r]));
+    if(S.openId) drawPanel();
+  }catch(_){ /* the card simply has no router box */ }
+}
 /* The cameras COS has as off right now, by name, with when each was last online. The camera list first; the unit's own list as a fallback. */
 function offCams(v){
   const list = S.dev && S.dev[v.k];
@@ -571,7 +645,7 @@ function drawPanel(){
   const tb = troubleBox(v), ob = openBox(v);
   const tbx = tb || h("div",{class:"box"},h("h3",{text:"What to do"}),h("ol",{class:"steps"},steps(v).map(s=>h("li",{text:s}))));
   const dg = diagBox(v);
-  const body=[ resBox(resFor(v.name, v.k, mm&&mm.rec.label)), dg, camsBox(v),
+  const body=[ resBox(resFor(v.name, v.k, mm&&mm.rec.label)), dg, camsBox(v), routerBox(v),
     tbx,
     ob, locBox(v), logBox(v),
     h("div",{class:"box"},h("h3",{text:"Details"}),dl, v.why?h("p",{class:"note",text:v.why}):null) ];
@@ -885,6 +959,7 @@ async function refresh(){
   const was = S.meta ? when(S.meta.v) : "the last reading";
   if(!hooks || typeof hooks.onRefresh!=="function"){ toast("Refresh isn't available here. Still showing the reading from "+was+"."); return; }
   btn.disabled=true; btn.textContent="Reading…";
+  void loadRouters();
   S.before = S.meta ? S.meta.v : null;
   try{ await hooks.onRefresh(); S.announce=true; clearTimeout(announceTimer); announceTimer=setTimeout(announce, 1500); }
   catch(_){ toast("Couldn't get a new reading. Still showing "+was+".", 12000); }
@@ -1411,6 +1486,9 @@ M.data = mapData;
 measureWide(); watchWidth();
 setView(MGK && hooks.startView==="manager" ? "manager" : "board");
 tvStart();
+void loadRouters();
+const rtrTick=setInterval(()=>{ void loadRouters(); }, 15*60000);
+cleanups.push(()=>clearInterval(rtrTick));
 
 /* ---------- data in ---------- */
 function update(data){
