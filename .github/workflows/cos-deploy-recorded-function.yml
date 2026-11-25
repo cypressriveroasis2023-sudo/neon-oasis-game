@@ -76,7 +76,7 @@ jobs:
         if: inputs.patch == 'rollback-to-v17-entry'
         run: printf '%s  %s\n' 'afe33a3d7574e08bbe3ea2b34cc711dbfd6b9332c89a08a63e427b81011127b3' '.github/function-patches/cos-unit-camera-status/rollback-to-v17-entry.json' | sha256sum -c -
       - name: Pin the read-only live archive preflight
-        run: printf '%s  %s\n' 'd2ad5f05bc7e4539516137f14451a66b2e5c1931e2fcf786188ceb5b42b7ed6d' '.github/scripts/preflight-live-function-pins.mjs' | sha256sum -c -
+        run: printf '%s  %s\n' 'f44d557feaeaf12347b7f2752086eae02f9cf2c9a9befd70446edaed06446526' '.github/scripts/preflight-live-function-pins.mjs' | sha256sum -c -
       - name: Choose the recorded patch path
         id: recorded
         run: |
