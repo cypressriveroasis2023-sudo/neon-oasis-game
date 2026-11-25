@@ -197,3 +197,8 @@ html[data-theme='light'] .vrm-fleet-summary li,html[data-theme='light'] .vrm-wor
 .vrm-night-table button{background:none;border:0;padding:0;font:inherit;font-weight:700;color:inherit;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
 .vrm-night-table small{margin-left:6px;font-size:10px;text-transform:uppercase;opacity:.6}
 .vrm-night-key{margin:8px 0 0;font-size:12px;opacity:.65}
+.vrm-attention .vrm-attn-cloudy span{color:#f5b942;font-weight:650}
+.vrm-sky{margin:8px 0 0;display:flex;flex-wrap:wrap;gap:3px 10px;align-items:baseline;font-size:13px}
+.vrm-sky span{text-transform:uppercase;letter-spacing:.06em;font-size:11px;font-weight:700;opacity:.7}
+.vrm-sky b{font-weight:650}
+.vrm-sky em{flex-basis:100%;font-style:normal;color:#f5b942;font-weight:650}

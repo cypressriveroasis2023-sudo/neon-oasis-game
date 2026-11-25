@@ -59,6 +59,11 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-25** — Tech Check: `app_private.submit_techcheck_transfer_v2` now
+  requires Service to answer every equipment check (Pass/Problem) on a receipt.
+  The held `operations/transfer-placement-review/` package replaces this
+  function and will abort on md5 drift until it carries the same block. Record
+  in `tech-checks/docs/db-changes/20261125_techcheck_service_receipt_checks.md`.
 - **2026-11-24** — Operations: added `cos_vrm_private.power_history` and an
   AFTER trigger on `cos_vrm_private.installations` (Victron battery history;
   errors are swallowed and the sync is unchanged), plus the
