@@ -887,6 +887,8 @@ test('a unit with cameras off names them and walks a tech through it without lea
   const card = await panel(host);
   const camLinks = await inBoard(host, root => [...root.querySelectorAll('#panel .camlinks a')].map(a => a.textContent + ' ' + new URL(a.href).port));
   expect(camLinks.slice(0, 4)).toEqual(['Web 1400', 'HTTPS 1443', 'Web 1500', 'HTTPS 1543']);
+  // SIM and cell signal tools sit in the Open box (James, 25 Nov).
+  expect(await inBoard(host, root => [...root.querySelectorAll('#panel .simtools a')].map(a => a.textContent + ' ' + new URL(a.href).host))).toEqual(['Coverage map map.coveragemap.com', 'Downdetector downdetector.com', 'Simetry simetry.onelogin.com']);
   if (process.env.SHOT) { await inBoard(host, root => root.querySelector('#panel .camlinks')?.closest('.box')?.scrollIntoView()); await page.screenshot({path: process.env.SHOT.replace('.png', '-cams.png')}); }
   // The diagnosis names the camera that is off, instead of saying "listed below".
   expect(card).toContain('Off: SPOTTER 003 / Cam 2');
