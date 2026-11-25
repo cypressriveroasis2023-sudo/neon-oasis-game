@@ -509,8 +509,10 @@ function drawPanel(){
   /* The fix comes first on the card, right under what is wrong. */
   body.splice(2,0,fx);
 
-  /* Checking comes before fixing: find out what is true now, then change it.
-     Drawn only where the app can actually run a check, and only where there is an A# to check against. */
+  /* Checking sits right after the fix, not before it. The board already decided the fix comes first on the card,
+     under what is wrong, and that still holds: most of the time the tech knows what to change. Checking is what
+     they reach for once they have changed it. Drawn only where the app can run a check and there is an A# to
+     check against. */
   if(!v.mhOnly && hooks && typeof hooks.onCheckUnit==="function"){
     const c = S.chk && S.chk.unit===v.id ? S.chk : null, pid = checkPid(v);
     const cb=h("div",{class:"box"},h("h3",{text:"Check it now"}));
@@ -521,7 +523,7 @@ function drawPanel(){
       if(c && c.state!=="run") cb.append(h("p",{class:"note s-"+(c.state==="fail"?"down":"up"),text:c.said}));
       cb.append(h("p",{class:"note",text:"This asks the cameras at this unit right now instead of waiting for the next reading. It changes nothing in mHelp, Star4Live or InHand."}));
     }
-    body.splice(2,0,cb);
+    body.splice(body.indexOf(fx)+1,0,cb);
   }
   body.push(histBox(v));
 

@@ -692,8 +692,17 @@ test('on a desk the board is one screen: a slim bar, the counts in a row, the li
   });
   const tile = label => inBoard(host, (root, wanted) => [...root.querySelectorAll('.tile')].find(item => item.querySelector('.lab').textContent === wanted).click(), label);
   if (info.project.name !== 'desktop-1440') {
-    // A phone or a small window keeps the map on its own tab, and the list keeps the full width.
-    expect(await layout()).toMatchObject({wide: false, side: false, mapIn: 'viewMap', pins: [], tabsInBar: false});
+    // James: "I wish this would show me the map and all units online and offline in the field right when I log
+    // in and go to the home page." There is no room beside the list on a phone or a small window, so the map
+    // goes under the counts and above the list instead of a tab away. It is the same map moved, with its pins,
+    // and the map tab's own filters and list stay off it there.
+    await expect.poll(async () => (await layout()).pins.length).toBeGreaterThan(0);
+    expect(await layout()).toMatchObject({wide: false, side: false, mapIn: 'boardMain', shown: [], tabsInBar: false});
+    // Moved, not copied: one map in the document, and it sits between the counts and the list.
+    expect(await inBoard(host, root => [
+      root.querySelectorAll('#mapWrap').length,
+      [...root.getElementById('boardMain').children].map(child => child.id),
+    ])).toEqual([1, ['modeRow', 'kpi', 'mapBlock', 'boardList']]);
     return;
   }
   await expect.poll(async () => (await layout()).pins.length).toBeGreaterThan(0);
