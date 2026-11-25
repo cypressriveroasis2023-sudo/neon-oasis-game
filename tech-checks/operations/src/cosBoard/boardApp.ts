@@ -12,7 +12,6 @@
 import mapData from './boardMap.json';
 import {BOARD_CSS} from './boardStyle';
 import {troubleWalk, troubleKnown, troubleNote, TROUBLE_CSS} from './boardTrouble';
-import {hasSite, loadSiteWeather, peekSiteWeather, weatherWords, roughDay, WEATHER_CSS} from './boardWeather';
 
 const SHELL = "<div class=\"cosb\" id=\"cosb\"><header class=\"top\"><div class=\"wrap\">\n  <div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div>\n  <span class=\"topbtns\"><button class=\"tvgo\" id=\"tvGo\" type=\"button\">TV board</button><button class=\"refresh\" id=\"refresh\" type=\"button\">Refresh</button></span>\n</div></header>\n<div class=\"asof\" id=\"asof\"><div class=\"wrap\"><span id=\"asofMain\">Loading the camera reading…</span><span id=\"asofSub\"></span></div></div>\n\n<main class=\"wrap\">\n  <div class=\"tabs\" role=\"tablist\">\n    <button class=\"tab\" role=\"tab\" id=\"tabBoard\" aria-selected=\"true\" type=\"button\">Board</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabMap\" aria-selected=\"false\" type=\"button\">Map</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabTech\" aria-selected=\"false\" type=\"button\">Tech check</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabManager\" aria-selected=\"false\" type=\"button\" hidden>Manager</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabPunch\" aria-selected=\"false\" type=\"button\">Punch list</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabActivity\" aria-selected=\"false\" type=\"button\">Changes</button>\n  </div>\n\n  <section id=\"viewBoard\">\n    <div id=\"boardMain\">\n    <div class=\"mode\" id=\"modeRow\"></div>\n    <div class=\"kpi\" id=\"kpi\">\n    <p class=\"provnote\" id=\"provNote\" hidden></p>\n    <div class=\"tiles\" id=\"tiles\"></div>\n    <div class=\"shoprow\" id=\"shoprow\"></div>\n    </div>\n    <div id=\"boardList\">\n    <div class=\"controls\">\n      <input class=\"search\" id=\"q\" type=\"search\" placeholder=\"Find a unit, site, A# or IP\" autocomplete=\"off\" aria-label=\"Find a unit, site, A number or IP\">\n      <div class=\"chips\" id=\"fam\"></div>\n    </div>\n    <div class=\"count\" id=\"count\"></div>\n    <div class=\"list\" id=\"list\"></div>\n    <div class=\"screens\" id=\"screensRow\"><h3>Other COS screens</h3><div class=\"links\" id=\"screensLinks\"></div></div><ul class=\"foot\"><li>One unit counts once, however many cameras it has.</li><li>One count here, and it is mHelp’s camera units. mHelp’s own field total is higher because it counts stands and poles as well. The camera systems see fewer, because some units in mHelp have no camera record in COS yet; those show Unknown.</li><li>A unit in the shop never counts as down.</li><li>A reading that is missing or too old shows Unknown, never Down.</li><li>Router checks are a reference only. A router online does not prove the cameras work.</li><li>Hand fixes made here are saved in COS with your name and the time. Nothing here changes mHelp, Star4Live or InHand.</li></ul>\n    </div>\n    </div>\n    <aside id=\"boardSide\" aria-label=\"Map of field units\" hidden></aside>\n  </section>\n\n  <section id=\"viewMap\" hidden>\n    <div id=\"mapBlock\">\n    <div class=\"chips\" id=\"mapChips\"></div>\n    <div class=\"chips\" id=\"mapGo\" style=\"margin-top:8px\"></div>\n    <div class=\"mapwrap\" id=\"mapWrap\">\n      <svg id=\"mapSvg\" role=\"img\" aria-label=\"Map of field units\"><g id=\"mapBase\"></g><g id=\"mapLabels\"></g><g id=\"mapPins\"></g></svg>\n      <div class=\"mapbtns\"><button type=\"button\" id=\"zin\" aria-label=\"Zoom in\">+</button><button type=\"button\" id=\"zout\" aria-label=\"Zoom out\">&minus;</button></div>\n      <div class=\"mapmsg\" id=\"mapMsg\" hidden></div>\n      <div class=\"mapsel\" id=\"mapSel\" hidden></div>\n    </div>\n    <p class=\"note\" id=\"mapNote\" style=\"margin-top:10px\"></p>\n    <div class=\"list\" id=\"mapList\"></div>\n    </div>\n  </section>\n\n  <section id=\"viewTech\" hidden>\n    <div id=\"techForm\"></div>\n    <div id=\"techList\"></div>\n  </section>\n\n  <section id=\"viewManager\" hidden>\n    <div id=\"mgNow\"></div>\n    <div id=\"mgChecks\"></div>\n    <div id=\"mgTrucks\"></div>\n    <div id=\"mgGap\"></div>\n    <div id=\"mgSim\"></div>\n    <div id=\"mgX\"></div>\n    <div id=\"mgTools\"></div>\n  </section>\n\n  <section id=\"viewPunch\" hidden>\n    <div class=\"box\" id=\"punchTop\"><p class=\"note\">Loading the mHelp list…</p></div>\n    <div class=\"chips\" id=\"punchChips\" style=\"margin-top:12px\"></div>\n    <div class=\"count\" id=\"punchCount\"></div>\n    <div class=\"list\" id=\"punchList\"></div>\n  </section>\n\n  <section id=\"viewActivity\" hidden>\n    <p class=\"note\" id=\"actNote\">Every change made by hand on this board, newest first.</p>\n    <ul class=\"hist\" id=\"activity\"></ul>\n  </section>\n</main>\n\n<section id=\"viewTv\" hidden><header class=\"tvtop\"><div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div><div class=\"tvread\" id=\"tvRead\" role=\"status\">Loading the camera reading…</div><div class=\"tvclock\"><b id=\"tvClock\"></b><span id=\"tvDate\"></span></div><button type=\"button\" class=\"tvx\" id=\"tvExitTop\">Exit TV</button></header><div class=\"tvgrid\" id=\"tvGrid\"><div class=\"tvleft\" id=\"tvKpi\"><div class=\"tvtiles\" id=\"tvTiles\"></div><div class=\"tvminis\" id=\"tvMinis\"></div><div class=\"tvhead\" id=\"tvHead\"></div><div class=\"tvlist\" id=\"tvList\"></div></div><div class=\"tvright\" id=\"tvRight\"><div class=\"tvmaptitle\" id=\"tvMapTitle\"></div><div class=\"tvmap\" id=\"tvMap\"></div></div></div><footer class=\"tvfoot\"><span id=\"tvNote\"></span><span class=\"tvbtns\"><button type=\"button\" id=\"tvRefresh\">Refresh</button><button type=\"button\" id=\"tvFull\">Full screen</button><button type=\"button\" id=\"tvExit\">Exit TV</button></span></footer></section><div class=\"sheet\" id=\"sheet\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"pname\"><div class=\"panel\" id=\"panel\"></div></div>\n<div class=\"toast\" id=\"toast\" role=\"status\" aria-live=\"polite\"></div></div>";
 /* A shadow root can be attached to an element only once, so a host that is mounted again gets its first root back. */
@@ -23,7 +22,7 @@ export function mountCosBoard(host, hooks){
 let root = ROOTS.get(host);
 if(!root){ root = host.attachShadow({mode:'closed'}); ROOTS.set(host, root); }
 root.replaceChildren();
-const style = document.createElement('style'); style.textContent = BOARD_CSS + TROUBLE_CSS + WEATHER_CSS;
+const style = document.createElement('style'); style.textContent = BOARD_CSS + TROUBLE_CSS;
 const frame = document.createElement('template'); frame.innerHTML = SHELL;
 root.append(style, frame.content);
 const cleanups=[];
@@ -574,7 +573,7 @@ function drawPanel(){
   const dg = diagBox(v);
   const body=[ resBox(resFor(v.name, v.k, mm&&mm.rec.label)), dg, camsBox(v),
     tbx,
-    ob, locBox(v), wxBox(v), logBox(v),
+    ob, locBox(v), logBox(v),
     h("div",{class:"box"},h("h3",{text:"Details"}),dl, v.why?h("p",{class:"note",text:v.why}):null) ];
   if(v.type==="Helios") body.push(powerBox(v));
 
@@ -662,52 +661,6 @@ function pinOf(v){
 const llText = p => p.lat.toFixed(5)+", "+p.lng.toFixed(5);
 /* Where a unit is. Inside COS a hand pin is an address a person typed: it is saved exactly as typed, and COS
    looks it up only to place the pin. */
-/* Weather where the unit actually stands.
- * A tech deciding whether to roll a truck wants the site's own sky, not the
- * office's. Shop units have no site, so they get nothing and ask for nothing.
- * The read is fired here and the panel is redrawn when it lands; the card is
- * never held up waiting for it, and a failure costs one line. */
-function wxBox(v){
-  if(!hasSite(v.lat, v.lng)) return null;
-  const pending = loadSiteWeather(v.lat, v.lng);
-  if(pending) pending.then(()=>{ if(S.openId===v.id) drawPanel(); });
-  const {value, error, loading} = peekSiteWeather(v.lat, v.lng);
-  const box = h("div",{class:"box"}, h("h3",{text:"Weather at this site"}));
-  if(error){ box.append(h("p",{class:"note",text:error})); return box; }
-  if(!value){ box.append(h("p",{class:"note",text: loading ? "Reading the forecast\u2026" : "No forecast yet."})); return box; }
-
-  const now = h("p",{class:"wx"});
-  if(value.nowF!=null) now.append(h("b",{text:Math.round(value.nowF)+"\u00b0"}));
-  const words = weatherWords(value.nowCode);
-  if(words) now.append(h("span",{text:words}));
-  if(value.windMph!=null) now.append(h("span",{text:"wind "+Math.round(value.windMph)+" mph"}));
-  if(now.childNodes.length) box.append(now);
-
-  if(value.days.length){
-    const strip = h("div",{class:"wxdays"});
-    for(const day of value.days){
-      const rough = roughDay(day.code, day.rain);
-      const cell = h("div",{class:"wxday"+(rough?" rough":""),title:weatherWords(day.code)});
-      cell.append(h("em",{text:dayName(day.date)}));
-      cell.append(h("strong",{text: day.hi!=null ? Math.round(day.hi)+"\u00b0" : "\u2014"}));
-      cell.append(h("u",{text: day.lo!=null ? Math.round(day.lo)+"\u00b0" : ""}));
-      if(day.rain!=null && day.rain>=20) cell.append(h("i",{text:day.rain+"%"}));
-      strip.append(cell);
-    }
-    box.append(strip);
-    box.append(h("p",{class:"wxnote",text:"Next "+value.days.length+" days. A red edge is weather that keeps a truck in the yard."}));
-  }
-  return box;
-}
-/* "Today", then short weekday names, read in the site's own local date. */
-function dayName(iso){
-  const parts = String(iso||"").split("-");
-  if(parts.length!==3) return "";
-  const date = new Date(Number(parts[0]), Number(parts[1])-1, Number(parts[2]));
-  const today = new Date();
-  if(date.getFullYear()===today.getFullYear() && date.getMonth()===today.getMonth() && date.getDate()===today.getDate()) return "Today";
-  return date.toLocaleDateString("en-US",{weekday:"short"});
-}
 function locBox(v){
   const rec=recOf(v), pin=pinOf(v), can = S.can===true && !v.mhOnly, hand = pin && pin.kind==="hand", typed = (v.u && v.u.ta) || "";
   if(v.place!=="field" && !hand) return null;
