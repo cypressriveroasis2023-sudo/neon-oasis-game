@@ -59,6 +59,11 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-25** — New edge function `cos-vendor-request` (Tech Check, v1) and
+  `app_private.vendor_requests`: the unit card's "Email a vendor" (SIM cancel to
+  Vendera/Simetry, Eyeforce add/remove/swap). Owner only; sends from James's Gmail
+  via `TECHCHECK_GOOGLE_*`, IT@ in CC; appends to the deactivation sheet. Record in
+  `tech-checks/docs/db-changes/20261125_cos_vendor_requests.md`.
 - **2026-11-25** — `camera_devices`: SolarSpotter 029 (3 renamed by serial, old
   029_4 row 158 `deactivated`), Helios 009 (Cam 001/002 swapped) and Solar Spotter
   002 CAM 2 matched to VCC's names. Moved in VCC also lists camera-number

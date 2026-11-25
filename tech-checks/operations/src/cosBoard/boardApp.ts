@@ -38,7 +38,18 @@ export function mountCosBoard(host, hooks){
 let root = ROOTS.get(host);
 if(!root){ root = host.attachShadow({mode:'closed'}); ROOTS.set(host, root); }
 root.replaceChildren();
-const style = document.createElement('style'); style.textContent = BOARD_CSS + TROUBLE_CSS + ROUTER_CSS;
+const VENDOR_CSS = `
+.ven .vlabel{margin:12px 0 6px;font-weight:800;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--tx2)}
+.ven .vbtns{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
+.ven .vbtn{min-height:52px;border:0;border-radius:12px;padding:12px 14px;font-weight:800;font-size:15.5px;background:var(--s2);color:var(--tx);box-shadow:inset 0 0 0 1px var(--line2);cursor:pointer}
+.ven .vbtn.vsend{background:#c8102e;color:#fff;box-shadow:none}
+.ven .vbtn.alt{background:transparent}
+.ven .vbtn:disabled{opacity:.5}
+.ven .vhead{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;font-size:16px}
+.ven .mgfield{display:flex;flex-direction:column;gap:4px;margin:10px 0;font-weight:700}
+.ven .vmail{white-space:pre-wrap;font:13.5px/1.5 ui-monospace,Menlo,monospace;background:var(--bg2);border:1px solid var(--line2);border-radius:10px;padding:12px;margin:10px 0;overflow-wrap:anywhere}
+`;
+const style = document.createElement('style'); style.textContent = BOARD_CSS + TROUBLE_CSS + ROUTER_CSS + VENDOR_CSS;
 const frame = document.createElement('template'); frame.innerHTML = SHELL;
 root.append(style, frame.content);
 const cleanups=[];
@@ -639,6 +650,70 @@ function openBox(v){
     own.length ? h("p",{class:"note",style:"margin-top:10px",text:"This unit's own pages. They only open if the unit is online and your network can reach it."}) : null,
     own.length ? h("div",{class:"links"},own) : null); }
 function logBox(){ return null; }
+/* Email a vendor (James, 25 Nov): cancel a SIM with Vendera or Simetry, or add / remove / swap a unit at an Eyeforce
+   account (Stages and Watchful). The server keeps one template per request, the same every time; the card fills the
+   blanks it knows, shows the exact email, and sends it with one tap. Owner only: it goes out from James's Gmail. */
+const VEN = { conn:null, denied:false, unit:null, tpls:null, err:"", kind:null, vals:{}, mail:null, missing:[], busy:false, result:null, id:null, recent:null };
+function vendorBox(v, mm){
+  if(!hooks || !hooks.vendor || VEN.denied) return null;
+  if(VEN.unit!==v.name){ Object.assign(VEN,{unit:v.name,kind:null,vals:{},mail:null,missing:[],result:null,id:null,recent:null}); vendorRecentLoad(v.name); }
+  const box=h("div",{class:"box ven",id:"venBox"},h("h3",{text:"Email a vendor"}));
+  if(!VEN.tpls){
+    if(!VEN.err && !VEN.busy){ VEN.busy=true; hooks.vendor.templates().then(t=>{ VEN.tpls=t; VEN.err=""; if(typeof hooks.vendor.check==="function") hooks.vendor.check().then(c=>{ VEN.conn=c; drawPanel(); },()=>{}); },e=>{ if(e&&e.denied) VEN.denied=true; else VEN.err=(e&&e.message)||"Vendor emails are not available right now."; }).finally(()=>{ VEN.busy=false; drawPanel(); }); }
+    box.append(h("p",{class:"note",text: VEN.err || "Loading…"})); return box;
+  }
+  const known={unit:v.name, customer:(mm&&mm.rec.cust)||"", site:v.site||"", address:(mm&&mm.rec.addr)||""};
+  const start=kind=>{ const t=VEN.tpls[kind]; VEN.kind=kind; VEN.mail=null; VEN.missing=[]; VEN.result=null; VEN.id=crypto.randomUUID();
+    VEN.vals=Object.assign({}, t.defaults||{}, Object.fromEntries(t.fields.map(f=>[f.key, known[f.key]!==undefined ? known[f.key] : (t.defaults||{})[f.key]||""]))); drawPanel(); };
+  const groups=[["SIM card",["sim_cancel_vendera","sim_cancel_simetry"]],["Monitoring account (Stages and Watchful)",["monitor_add","monitor_remove","monitor_swap"]]];
+  const c=VEN.conn;
+  if(c && (!c.account_ok || c.can_send===false)) box.append(h("p",{class:"note s-down",role:"alert",text:"COS cannot send email from your Gmail right now"+(c.error?": "+c.error:".")+" Nothing will be sent until the Google connection is fixed."}));
+  else if(c && (c.can_edit_sheets===false || c.sheet_opens===false)) box.append(h("p",{class:"note s-issues",text:"COS can send the emails, but it cannot write to the deactivation sheet yet. After a SIM or monitoring cancellation, add the row by hand."}));
+  if(!VEN.kind){
+    box.append(h("p",{class:"note",text:"Pick what you need. COS fills in what it knows, shows you the exact email, and sends it from your Gmail with IT@ in copy."}));
+    for(const [label,kinds] of groups) box.append(h("p",{class:"vlabel",text:label}),h("div",{class:"vbtns"},...kinds.filter(k=>VEN.tpls[k]).map(k=>h("button",{class:"vbtn",type:"button",onclick:()=>start(k)},VEN.tpls[k].button))));
+  } else {
+    const t=VEN.tpls[VEN.kind];
+    box.append(h("div",{class:"vhead"},h("b",{text:t.title}),h("button",{class:"lk",type:"button",disabled:VEN.busy,onclick:()=>{ VEN.kind=null; drawPanel(); }},"Back")));
+    if(VEN.result){
+      const r=VEN.result, ok=r.state==="sent";
+      box.append(h("p",{class:"big "+(ok?"s-up":"s-down"),role:ok?"status":"alert",text: ok ? "Sent to "+t.to+"." : r.state==="review" ? r.error : "Not sent. "+(r.error||"")}));
+      if(ok && t.sheet) box.append(h("p",{class:"note",text: /^added/.test(r.sheet) ? "Added to the deactivation sheet ("+r.sheet.replace(/^added /,"")+")." : "The deactivation sheet was NOT updated ("+r.sheet+"). Add the row by hand."}));
+      box.append(h("div",{class:"vbtns"},h("button",{class:"vbtn",type:"button",onclick:()=>{ VEN.kind=null; VEN.result=null; drawPanel(); }},"Done")));
+    } else if(VEN.mail){
+      const m=VEN.mail;
+      box.append(h("dl",{class:"kv"},h("dt",{text:"To"}),h("dd",{text:m.to}),h("dt",{text:"Copy"}),h("dd",{text:m.cc}),h("dt",{text:"Subject"}),h("dd",{text:m.subject})),
+        h("pre",{class:"vmail",text:m.body}),
+        h("div",{class:"vbtns"},
+          h("button",{class:"vbtn vsend",type:"button",disabled:VEN.busy,onclick:()=>vendorSend()},VEN.busy?"Sending…":"Send email"),
+          h("button",{class:"vbtn alt",type:"button",disabled:VEN.busy,onclick:()=>{ VEN.mail=null; drawPanel(); }},"Change something")));
+    } else {
+      for(const f of t.fields){
+        const input=f.long ? h("textarea",{class:"tin",rows:"3","aria-label":f.label,oninput:e=>{ VEN.vals[f.key]=e.target.value; }},VEN.vals[f.key]||"")
+          : h("input",{class:"tin",type:"text","aria-label":f.label,value:VEN.vals[f.key]||"",oninput:e=>{ VEN.vals[f.key]=e.target.value; }});
+        box.append(h("label",{class:"mgfield"},f.label+(f.required?"":" (optional)"),input,f.hint?h("span",{class:"note",text:f.hint}):null));
+      }
+      if(VEN.missing.length) box.append(h("p",{class:"note s-down",role:"alert",text:"Fill in: "+VEN.missing.join(", ")}));
+      box.append(h("div",{class:"vbtns"},h("button",{class:"vbtn vsend",type:"button",disabled:VEN.busy,onclick:()=>vendorPreview()},VEN.busy?"Preparing…":"Preview email")));
+    }
+  }
+  if(VEN.recent && VEN.recent.length) box.append(h("p",{class:"vlabel",text:"Sent for "+v.name}),
+    ...VEN.recent.map(r=>h("p",{class:"note",text:(r.state==="sent"?"Sent":r.state==="review"?"Check Sent folder":"Not sent")+" · "+r.subject+" · "+r.by+(r.at?" · "+when(Math.round(Date.parse(r.at)/1000)):"")})));
+  return box;
+}
+async function vendorRecentLoad(unit){ try{ const r=await hooks.vendor.recent(unit); if(VEN.unit===unit){ VEN.recent=r; drawPanel(); } }catch(_){} }
+async function vendorPreview(){
+  VEN.busy=true; VEN.missing=[]; drawPanel();
+  try{ const r=await hooks.vendor.preview(VEN.kind, VEN.vals); if(r.mail) VEN.mail=r.mail; else VEN.missing=r.missing||[]; }
+  catch(e){ VEN.missing=[(e&&e.message)||"The email could not be prepared."]; }
+  VEN.busy=false; drawPanel();
+}
+async function vendorSend(){
+  if(VEN.busy) return; VEN.busy=true; drawPanel();
+  try{ VEN.result=await hooks.vendor.send(VEN.kind, VEN.vals, VEN.id); }
+  catch(e){ VEN.result={state:"failed",sheet:"",error:(e&&e.message)||"The email could not be sent."}; }
+  VEN.busy=false; drawPanel(); vendorRecentLoad(VEN.unit);
+}
 function histBox(v){ const hist=(v.u && v.u.hx)||[]; return hist.length ? h("div",{class:"box"},h("h3",{text:"Set by hand on this unit"}),h("ul",{class:"hist"},hist.map(x=>histLi(x,null)))) : null; }
 function drawMhPanel(v){
   const P=$("panel"), r=v.rec, dl=h("dl",{class:"kv"});
@@ -700,7 +775,7 @@ function drawPanel(){
   const dg = diagBox(v);
   const body=[ resBox(resFor(v.name, v.k, mm&&mm.rec.label)), dg, camsBox(v), routerBox(v),
     tbx,
-    ob, locBox(v), logBox(v),
+    ob, vendorBox(v, mm), locBox(v), logBox(v),
     h("div",{class:"box"},h("h3",{text:"Details"}),dl, v.why?h("p",{class:"note",text:v.why}):null) ];
   if(v.type==="Helios") body.push(powerBox(v));
 
