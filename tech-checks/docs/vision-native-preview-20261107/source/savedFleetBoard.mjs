@@ -242,6 +242,7 @@ async function savedFleetBoard({ rpc, payloadText, read, force = false, waitUnti
 
 // src/cameraEvidence.ts
 var CAMERA_FRESH_MS = 20 * 60 * 1e3;
+var RECON_FRESH_MS = 6 * 60 * 60 * 1e3;
 var POWER_FRESH_MS = 45 * 60 * 1e3;
 var normalized = (value) => typeof value === "string" ? value.trim().replace(/\s+/g, " ").toUpperCase() : "";
 function powerTimestamp(value, now = Date.now()) {
