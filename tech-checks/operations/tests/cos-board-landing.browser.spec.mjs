@@ -817,7 +817,13 @@ test('a corrected IP can be saved on any unit, and the save names the system tha
 
 test('a unit with cameras off names them and walks a tech through it without leaving COS', async ({page}, info) => {
   test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');
-  const {host, state} = await phoneBoard(page);
+  const record = (id, unitNumber, placement) => ({recordId: 'mhelp_product:' + id, productId: String(id), unitNumber, category: 'Spotter', placement, uploadLifecycle: 'UNFLAGGED', customer: 'Fixture Homes'});
+  const value = structuredClone(field);
+  value.uploadInventory = {contract: 'COS_MHELP_UPLOAD_INVENTORY_V1', source: 'mhelpdesk_api', countBasis: 'mhelp_product_records_not_unique_physical_units', sourceSha256: 'a'.repeat(64), receivedAt: fresh, lastApiReadAt: fresh,
+    records: [record(3, 'Spotter 003', 'FIELD')], summary: {totalRecords: 1, fieldRecords: 1, shopRecords: 0, unflaggedFieldRecords: 1, doNotUseRecords: 0, missingRecords: 0}};
+  const {app, state} = await mountFleet(page, false, {cameraStatus: report, field: value, skipInitialFieldCount: true});
+  const host = app.locator('.cos-board-host');
+  await expect.poll(() => tiles(host)).toMatchObject({'Camera issues': '1'});
   await inBoard(host, root => [...root.querySelectorAll('.tile')].find(tile => tile.querySelector('.lab').textContent === 'Camera issues').click());
   await openUnit(host, 'Spotter 003');
   const card = await panel(host);
@@ -828,7 +834,9 @@ test('a unit with cameras off names them and walks a tech through it without lea
   expect(heads.indexOf('Troubleshoot')).toBeGreaterThan(heads.indexOf('Diagnosis'));
   expect(heads.indexOf('Troubleshoot')).toBeLessThan(heads.indexOf('Fix the record'));
   const answer = label => inBoard(host, (root, wanted) => { const b = [...root.querySelectorAll('#panel .trbtn')].find(x => x.textContent === wanted); b?.click(); return Boolean(b); }, label);
+  if (process.env.SHOT) { await inBoard(host, root => root.querySelector('#panel .box').scrollIntoView()); await page.screenshot({path: process.env.SHOT.replace('.png', '-top.png')}); }
   expect(await answer('No, or not sure')).toBe(true);
+  if (process.env.SHOT) { await inBoard(host, root => root.querySelector('#panel .trb').scrollIntoView()); await page.screenshot({path: process.env.SHOT.replace('.png', '-step.png')}); }
   // Every step points somewhere in COS, never to Star4Live.
   expect(await inBoard(host, root => root.querySelector('#panel .trb').textContent)).not.toMatch(/Star4Live/);
   for (const label of ['Still off', 'Yes, it answers', 'Still off']) {
