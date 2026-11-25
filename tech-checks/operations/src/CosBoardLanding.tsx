@@ -44,9 +44,11 @@ export type CosBoardLandingProps = {
   onReady?: () => void;
   /** Called when the board was opened ahead of the camera feed and the feed then could not be read. */
   onNone?: () => void;
+  /** A unit another COS screen asked for. The board opens its own card for it; n changes on every new ask. */
+  unitAsked?: {name: string; n: number} | null;
 };
 
-type Board = {update(data: unknown): void; setEdit(state: BoardEditState): void; destroy(): void; root: ShadowRoot};
+type Board = {update(data: unknown): void; setEdit(state: BoardEditState): void; destroy(): void; root: ShadowRoot; openByName(name: string): boolean};
 type Report = {
   contract?: string; units?: UnitCameraStatus[]; canEdit?: boolean; handEditsRead?: boolean;
   recorded?: {pinned?: boolean; pinNote?: string | null};
@@ -68,7 +70,7 @@ function checked(value: unknown): Reading {
  * holds and is counted by the shared count's own unit list, so its tiles are a
  * split of the Fleet headline and never a second count.
  */
-export default function CosBoardLanding({feed, recorderRows, now, fieldMap, routers, upload, addresses, onFeed, onReady, onNone}: CosBoardLandingProps) {
+export default function CosBoardLanding({feed, recorderRows, now, fieldMap, routers, upload, addresses, onFeed, onReady, onNone, unitAsked = null}: CosBoardLandingProps) {
   const host = useRef<HTMLDivElement>(null), board = useRef<Board | null>(null), tvOn = useRef(false), tvKeep = useRef(0);
   const deliver = useRef(onFeed);
   deliver.current = onFeed;
@@ -270,6 +272,8 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
   // While the board is up, a sign-in hiccup refreshes quietly instead of dropping it.
   useEffect(() => { setBoardSessionHold(true); return () => setBoardSessionHold(false); }, []);
   useEffect(() => { if (data) board.current?.update(data); }, [data]);
+  // "Take me to the unit in COS" lands on the board's own unit card, not the older Fleet details drawer.
+  useEffect(() => { if (unitAsked?.name) board.current?.openByName(unitAsked.name); }, [unitAsked?.n]);
   // COS has a bar across the bottom of a phone. Tell the board how much room it takes, so its messages sit above it.
   useEffect(() => {
     const element = host.current, bar = document.querySelector('.operations-bottom-nav');

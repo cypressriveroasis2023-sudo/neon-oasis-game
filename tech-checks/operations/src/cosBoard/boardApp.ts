@@ -1500,9 +1500,25 @@ function update(data){
   render();
   announce();
   saidSaved();
+  if(S.ask) openByName(S.ask);
+}
+/* Another COS screen asked for a unit ("take me to the unit in COS"). James: the unit card here is the troubleshooting
+   screen, so the unit opens on this card, never on the older Fleet details drawer. A name matches when it is the same
+   once spaces, dashes and case are ignored, against the unit's name, its key and its mHelp listing; only one unit may
+   match. Asked before the first reading arrives, it waits for it. Returns whether a unit was opened. */
+const squash = x => String(x||"").toUpperCase().replace(/\d+/g,d=>"#"+String(+d)).replace(/[^A-Z0-9#]/g,"").replace(/^SS(?=#)/,"SOLARSPOTTER");
+function openByName(name){
+  const want=squash(name); if(!want) return false;
+  if(!S.meta || !S.vmap){ S.ask=name; return false; }
+  S.ask=null;
+  const hits=Object.values(S.vmap).filter(v=>[v.k, v.name, v.mh && v.mh.rec && v.mh.rec.label, v.rec && v.rec.label].some(x=>x && squash(x)===want));
+  if(hits.length!==1){ toast(hits.length ? name+" matches more than one unit on the board. Search for it to pick the right one." : name+" is not on the board. Search for it, or check the Punch list."); return false; }
+  if(S.view!=="board") setView("board");
+  openUnit(hits[0].id);
+  return true;
 }
 /* Whether this person may make a hand fix right now, and the reason when not. */
 function setEdit(state){ S.can = !!(state && state.can===true); S.canWhy = (state && state.why) || ""; if(S.meta) render(); }
 function destroy(){ for(const fn of cleanups.splice(0)){ try{ fn(); }catch(_){} } clearTimeout(toastTimer); clearTimeout(announceTimer); clearTimeout(savedTimer); cancelAnimationFrame(M.raf); root.replaceChildren(); }
-return { update, setEdit, destroy, root, setTurn: tvTurn };
+return { update, setEdit, destroy, root, setTurn: tvTurn, openByName };
 }
