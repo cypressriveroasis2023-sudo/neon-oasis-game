@@ -4,6 +4,7 @@ import { type RouterRow } from '../../supabase/functions/cos-operations-pages/ro
 import { api } from './api';
 import { inventoryPlacement } from './fleetSnapshot';
 import { INHAND_ROUTER_FRESHNESS_MS, routerLiveReading } from './inhandRouterStatus';
+import { readRouterDetails, linkRouter, suggestUnit, type RouterDetails } from './routerDetails';
 import './routers.css';
 export const routerTime = (value: string | null) => value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString() : 'Not recorded';
 export { routerLiveReading };
@@ -118,6 +119,44 @@ export default function RouterWorkspace({ openMap }: { openMap: (unitId: string)
       <dl><div><dt>Model</dt><dd>{selected.model || 'Not recorded'}</dd></div><div><dt>InHand status</dt><dd>{selectedReading.label}</dd></div><div><dt>InHand time</dt><dd>{routerTime(selected.reportedAt)} <small>({routerAge(selected.reportedAt, now)})</small></dd></div><div><dt>Feed</dt><dd>{selected.reportedSource || 'Not recorded'}</dd></div><div><dt>GPS</dt><dd>Not available from this source</dd></div></dl>
       <section className='router-match'><b>COS unit</b><p>{selected.match === 'exact_name' ? 'Matched to the COS unit with the same name.' : selected.match === 'ambiguous' ? 'This name is duplicated. No unit is selected automatically.' : 'No exact same-name COS unit was found. Nothing is guessed from a partial name.'}</p>{selected.candidateUnit && <button className='secondary' onClick={() => openMap(selected.candidateUnit!.id)}>View same-name COS unit</button>}</section>
     </> : <p>Select a router.</p>}</section></div>}
+    <UnlinkedRouters/>
     <details className='router-help'><summary><b>Live InHand status</b><span>How these colors work</span></summary><ul><li>Online and Offline come straight from the InHand feed.</li><li>Unknown means the reading is older than {freshMinutes} minutes, the router is MOFI or Cradlepoint, or no single COS unit has the same name. Unknown is never counted as Offline.</li><li>Shop units show In Shop and are not outages. Only a field unit can be Offline.</li><li>Router status is not camera health. Refresh only re-reads the saved feed; this page does not show network addresses.</li></ul>{data && <p className='router-caption'>Inventory loaded {routerTime(data.generatedAt)}.</p>}</details>
+  </section>;
+}
+
+/* InHand routers that no COS unit has yet. Owner and IT link each one to its unit here; Tech Check writes who linked
+   it, when and why into the camera inventory audit. Anyone else sees nothing, because the read itself is refused. */
+export function UnlinkedRouters({ read = readRouterDetails, link = linkRouter }: { read?: typeof readRouterDetails; link?: typeof linkRouter } = {}) {
+  const [data, setData] = useState<RouterDetails | null>(null), [note, setNote] = useState(''), [busy, setBusy] = useState('');
+  const [picked, setPicked] = useState<Record<string, string>>({}), [said, setSaid] = useState<Record<string, {ok: boolean; text: string}>>({});
+  const load = async () => { const res = await read(); if (res.ok) { setData(res.data); setNote(''); } else setNote(res.denied ? '' : res.message); };
+  useEffect(() => { void load(); }, []);
+  if (!data) return note ? <p className='router-caption'>InHand routers not linked to a unit: {note}</p> : null;
+  const units = data.units;
+  const go = async (serial: string, unit: string) => {
+    setBusy(serial);
+    const res = await link(unit, serial);
+    setSaid(s => ({...s, [serial]: {ok: res.ok, text: res.message}}));
+    setBusy('');
+    if (res.ok) void load();
+  };
+  return <section className='router-unlinked' aria-label='InHand routers not linked to a unit'>
+    <h3>InHand routers not linked to a unit <small>{data.unmatched.length}</small></h3>
+    <p className='router-caption'>Owner and IT only. Pick the COS unit each router is on and press Link. COS saves your name, the time and the router serial. Nothing changes in InHand. Shop spares can stay unlinked.</p>
+    {!data.unmatched.length && <p className='router-empty'>Every InHand router is linked to a unit.</p>}
+    <datalist id='router-unit-list'>{units.map(u => <option key={u} value={u}/>)}</datalist>
+    <ul>{data.unmatched.map(r => {
+      const value = picked[r.serial] ?? suggestUnit(r.name, units) ?? '';
+      const valid = units.includes(value);
+      const msg = said[r.serial];
+      return <li key={r.serial} className={'router-unlinked-row ' + (r.online ? 'on' : 'off')}>
+        <span className='router-row-main'><strong>{r.name || 'No name in InHand'}</strong><small>{[r.model, r.serial, r.online ? 'Online' : 'Offline'].filter(Boolean).join(' · ')}</small></span>
+        <span className='router-unlinked-pick'>
+          <input aria-label={'COS unit for router ' + r.serial} list='router-unit-list' value={value} placeholder='COS unit name' onChange={e => setPicked(p => ({...p, [r.serial]: e.target.value}))}/>
+          <button type='button' disabled={!valid || busy !== ''} onClick={() => void go(r.serial, value)}>{busy === r.serial ? 'Linking…' : 'Link'}</button>
+        </span>
+        {msg && <small className={msg.ok ? 'router-ok' : 'operations-error'} role='status'>{msg.text}</small>}
+      </li>;
+    })}</ul>
   </section>;
 }
