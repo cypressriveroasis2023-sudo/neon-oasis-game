@@ -231,6 +231,15 @@ test('what is fixed by hand is off the punch list and stays off', async ({page},
   // mHelp wins over Star4Live for Spotter 002, so it is in the field and down. The hand fix wins for Spotter 003, so it is in the shop.
   await expect.poll(() => tiles(host)).toEqual({Down: '1', 'Camera issues': '0', Unknown: '0', Up: '1'});
   expect(await minis(host)).toEqual(['2in the field', '1in the shop', '1online in shop', '0not in mHelp']);
+  // A tile and the list under it can never disagree. Picking a family none of
+  // these units belongs to empties the list, so every tile reads zero too. The
+  // tiles used to count every unit whatever the chips said, which is how the
+  // board came to show "1 online in shop" over a list that said nothing matches.
+  await inBoard(host, root => [...root.querySelectorAll('#fam .chip')].find(chip => chip.textContent === 'Recon II').click());
+  expect(await minis(host)).toEqual(['0in the field', '0in the shop', '0online in shop', '0not in mHelp']);
+  await expect.poll(() => tiles(host)).toEqual({Down: '0', 'Camera issues': '0', Unknown: '0', Up: '0'});
+  await inBoard(host, root => [...root.querySelectorAll('#fam .chip')].find(chip => chip.textContent === 'All').click());
+  expect(await minis(host)).toEqual(['2in the field', '1in the shop', '1online in shop', '0not in mHelp']);
   await inBoard(host, root => root.getElementById('tabPunch').click());
   const chips = () => inBoard(host, root => [...root.querySelectorAll('#punchChips .chip')].map(chip => chip.textContent));
   // Only the unit nobody has settled is open. The one set by hand is under its own heading, with what mHelp still says.
