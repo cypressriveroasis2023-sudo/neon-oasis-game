@@ -194,3 +194,30 @@ test('an owner the database turns away is told so on the Manager tab and offered
   await press(host, '#mgChecks', 'Open the older truck screen');
   await expect.poll(() => page.evaluate(() => window.fixture.routes)).toEqual(['team']);
 });
+
+test('the Manager tab shows the handoff check: trucks with no handoff, loads without one, and unsigned handoffs', async ({page}) => {
+  const fixture = {manager: manager()};
+  fixture.manager.gaps = {mode: 'enforce',
+    on_truck_without_handoff: [{service_tech: 'Riley Fixture', equipment_type: 'Sniper', unit_tag: '102', loaded_by: 'Riley Fixture', loaded_at: '2026-11-25T14:00:00Z', in_equipment_list: false}],
+    loaded_without_handoff: [{service_tech: 'Riley Fixture', equipment_type: 'Ranger', unit_tag: '008', by: 'Owner Fixture', reason: 'Swapped on site', kind: 'owner_override', at: '2026-11-25T15:00:00Z'}],
+    handoffs_not_finished: [{state: 'awaiting_service', from: 'Jordan Fixture', to: 'Riley Fixture', hours_waiting: 5.4, units: ['Spotter 268']}]};
+  const {frame, host} = await mount(page, fixture);
+  await openManager(frame, host);
+  await expect.poll(() => textOf(host, 'mgGap')).toContain('3 things to look at.');
+  const text = await textOf(host, 'mgGap');
+  for (const part of ['On a truck with no handoff', 'Riley Fixture · Sniper 102', 'Not in the COS equipment list',
+    'Loaded without a handoff (last 7 days)', 'Riley Fixture · Ranger 008', 'You loaded it without a handoff', 'Swapped on site',
+    'Handoffs not finished after 4 hours', 'Spotter 268', 'Jordan Fixture to Riley Fixture', 'Waiting on Service', 'waiting 5 h']) expect(text).toContain(part);
+});
+
+test('the handoff check says all clear when nothing is missing, and says so when it cannot be read', async ({page}) => {
+  const clear = {manager: manager()};
+  clear.manager.gaps = {mode: 'enforce', on_truck_without_handoff: [], loaded_without_handoff: [], handoffs_not_finished: []};
+  let {frame, host} = await mount(page, clear);
+  await openManager(frame, host);
+  await expect.poll(() => textOf(host, 'mgGap')).toContain('All clear. Every unit on a truck came through a signed handoff.');
+  ({frame, host} = await mount(page, {manager: manager()}));
+  await openManager(frame, host);
+  await expect.poll(() => textOf(host, 'mgGap')).toContain('The handoff check could not be read just now.');
+  expect(await textOf(host, 'mgChecks')).toContain('1 of 2 trucks ready.');
+});

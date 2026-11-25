@@ -1,8 +1,8 @@
 import {test,expect} from '@playwright/test';
-import {mountTransfers,SERVICE,OTHER} from './helpers/transfer-fixture.mjs';
+import {mountTransfers,SERVICE,OTHER,passServiceChecks} from './helpers/transfer-fixture.mjs';
 const photo={name:'synthetic.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=','base64')};
 let f;test.afterEach(async()=>{await f?.close();f=null;});
-async function sign(page,name){await page.getByRole('radio',{name:'Type signature',exact:true}).check();await page.getByRole('textbox',{name:'Type your full name',exact:true}).fill(name);await page.getByRole('checkbox',{name:'I confirm this report is accurate',exact:true}).check();}
+async function sign(page,name){await passServiceChecks(page);await page.getByRole('radio',{name:'Type signature',exact:true}).check();await page.getByRole('textbox',{name:'Type your full name',exact:true}).fill(name);await page.getByRole('checkbox',{name:'I confirm this report is accurate',exact:true}).check();}
 async function fillUnit(page,tag='001',sim='00123456789012345670'){
  await page.getByLabel('Unit family / name 1',{exact:true}).fill('Sniper');await page.getByLabel('Unit number 1',{exact:true}).fill(tag);await page.getByLabel('Exact SIM numbers (one per line; blank only when none) 1',{exact:true}).fill(sim);await page.getByLabel('Batteries / battery boxes on this unit 1',{exact:true}).fill('2');await page.getByLabel('Additional parts (one per line: name | quantity) 1',{exact:true}).fill('SD card | 1');
  await page.getByLabel('Equipment photo 1',{exact:true}).setInputFiles(photo);await expect(page.locator('.tc-evidence img')).toBeVisible();
@@ -107,4 +107,39 @@ test('receipt and original daily sign-off keep independent signature controls',a
  await expect(original.getByRole('radio',{name:'Type signature',exact:true})).toBeChecked();
  await receipt.getByRole('radio',{name:'Draw signature',exact:true}).check();
  await expect(original.getByRole('radio',{name:'Type signature',exact:true})).toBeChecked();
+});
+
+test('Service must answer every check before signing, and a Problem needs a note and goes to review',async({page})=>{
+ await page.setViewportSize({width:390,height:844});f=await mountTransfers(page,{role:'service',seedHandoff:true});
+ await page.getByRole('button',{name:'Verify equipment received',exact:true}).click();await fillUnit(page);
+ await expect(page.getByText('Check it yourself before you sign',{exact:true})).toBeVisible();
+ const picks=page.locator('select[data-service-check]');expect(await picks.count()).toBeGreaterThan(3);
+ // signing with the checks left blank is stopped on the first unanswered check
+ await page.getByRole('radio',{name:'Type signature',exact:true}).check();await page.getByRole('textbox',{name:'Type your full name',exact:true}).fill('Synthetic Service');await page.getByRole('checkbox',{name:'I confirm this report is accurate',exact:true}).check();
+ await page.getByRole('button',{name:'Sign & verify received equipment'}).click();
+ await expect(picks.first()).toBeFocused();
+ expect((await f.db.query("select * from app_private.techcheck_transfer_events where kind='receipt'")).rows).toHaveLength(0);
+ // a Problem without a note is stopped too
+ await passServiceChecks(page);await picks.first().selectOption('false');
+ await page.getByRole('button',{name:'Sign & verify received equipment'}).click();
+ await expect(page.locator('.tc-submit-error')).toContainText('Write in Notes what is wrong');
+ expect((await f.db.query("select * from app_private.techcheck_transfer_events where kind='receipt'")).rows).toHaveLength(0);
+ // with a note it is saved for review, with the failed check recorded
+ await page.getByLabel('Transfer notes',{exact:true}).fill('Unit will not power on from 120V.');
+ const confirm=page.getByRole('checkbox',{name:'I confirm this report is accurate',exact:true});if(!(await confirm.isChecked()))await confirm.check();
+ await page.getByRole('button',{name:'Sign & verify received equipment'}).click();
+ await expect(page.getByText('Discrepancy — not accepted',{exact:true})).toBeVisible();
+ const [event]=(await f.db.query("select snapshot from app_private.techcheck_transfer_events where kind='receipt'")).rows;
+ expect(event.snapshot.differences.filter(d=>String(d.field).startsWith('check:')).map(d=>d.field)).toEqual(['check:power_ok']);
+ expect(event.snapshot.checks['sniper:001'].power_ok).toBe(false);
+});
+
+test('the database refuses a receipt with a blank check even if the screen is skipped',async({page})=>{
+ f=await mountTransfers(page,{role:'service',seedHandoff:true});
+ const [t]=(await f.db.query('select id,revision,purpose,manifest from app_private.techcheck_transfers')).rows;
+ await f.db.exec('reset role');await f.db.query("select set_config('test.actor',$1,false)",[SERVICE]);await f.db.exec('set role authenticated');
+ const items=t.manifest.map(({equipment_key,family,unit_tag,sims,parts,battery_count,battery_configuration})=>({equipment_key,family,unit_tag,sims,parts,battery_count,battery_configuration}));
+ await expect(f.db.query("select submit_techcheck_transfer_v2($1,$2,'receipt',$3,$4,$5::jsonb,$6::jsonb,$7::jsonb,'[]'::jsonb,'',$8)",
+  [crypto.randomUUID(),t.id,t.revision,SERVICE,JSON.stringify(items),JSON.stringify({'sniper:001':{}}),JSON.stringify({method:'typed',name:'Synthetic Service',confirmed:true}),t.purpose])).rejects.toThrow(/Answer every check for Sniper 001/);
+ await f.db.exec('reset role');
 });
