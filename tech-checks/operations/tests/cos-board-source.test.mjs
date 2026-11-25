@@ -294,7 +294,7 @@ test('checking one unit asks the app, never the network, and never fakes a readi
 
 test('each camera links its own page through the forwarded port, and the card has a VCC button', () => {
   // James, 25 Nov: "a VCC button also and a link to each cameras interface directly."
-  assert.match(app, /sys\.push\(lk\("VCC","https:\/\/global\.star4live\.com\/userWeb\/device\/device-management"\)\)/);
+  assert.match(app, /sys\.push\(lk\("VCC","https:\/\/www\.vigilantcontrolcenter\.com\/login"\)\)/);
   assert.match(app, /href:"http:\/\/"\+ip\+":"\+c\.p/);
   assert.match(app, /href:"https:\/\/"\+ip\+":"\+\(c\.p\+43\)/);
   // Only the standard forwarded ports are linked; anything else gets no link rather than a guess.
