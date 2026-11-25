@@ -75,7 +75,9 @@ test('on a desk the board is one screen, with one map that keeps the drawing\'s 
 
 test('the TV board is the board itself drawn large, switched on and off, with no count of its own', () => {
   // One tally, drawn two ways: the TV takes the views and the counts the board has just worked out.
-  assert.match(app, /for\(const v of vs\) c\[v\.status\]\+\+;\n  if\(TV\.on\)\{ drawTv\(vs, c\); return; \}/);
+  // The board's tiles count what its family chips are showing; the TV has no chips and counts every unit.
+  assert.match(app, /for\(const v of \(TV\.on \? vs : vs\.filter\(inFamily\)\)\) c\[v\.status\]\+\+;\n  if\(TV\.on\)\{ drawTv\(vs, c\); return; \}/);
+  assert.match(app, /const inFamily = \(v:any\) => S\.fam === "all" \|\| v\.fam === S\.fam;/);
   assert.match(app, /const tile=\(key,cls\)=>h\("div",\{class:"tile "\+cls\+\(c\[key\]\?"":" zero"\)\},h\("span",\{class:"num",text:c\[key\]\}\),h\("span",\{class:"lab",text:LABEL\[key\]\}\)\);/);
   // It lists what needs someone: down first, then camera issues. Never a unit in the shop, never an unknown one as down.
   assert.match(app, /TV\.rows=\[\.\.\.vs\.filter\(v=>v\.status==="down"\)\.sort\(byName\), \.\.\.vs\.filter\(v=>v\.status==="issues"\)\.sort\(byName\)\];/);

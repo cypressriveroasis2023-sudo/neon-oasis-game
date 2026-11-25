@@ -194,7 +194,12 @@ function render(){
   $("asofSub").replaceChildren(...sub.map(t=>h("span",{class:"warnline",text:t})));
 
   const vs = allViews(); const c = {down:0,issues:0,up:0,unknown:0,shop:0,shopOnline:0,notin:0,excl:0};
-  for(const v of vs) c[v.status]++;
+  /* Count what the family chips are showing. The tiles used to count every unit
+     while the list under them obeyed the chips, so with Avigilon picked the tile
+     could read "2 online in shop" above a list that said nothing matches. A tile
+     and the list it sits over must never disagree. The TV board has no chips. */
+  const inFamily = (v:any) => S.fam === "all" || v.fam === S.fam;
+  for(const v of (TV.on ? vs : vs.filter(inFamily))) c[v.status]++;
   if(TV.on){ drawTv(vs, c); return; }
   /* One count. mHelp is the official list: a unit is in the field, at the site mHelp gives, until mHelp shows it back in the shop or it is moved by hand here. */
   if(S.mh ? S.filter==="excl" : S.filter==="notin") S.filter="field";
