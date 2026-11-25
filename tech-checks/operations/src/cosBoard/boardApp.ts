@@ -20,6 +20,7 @@ const ROUTER_CSS = `
 .rtr .rbtn{display:flex;flex-direction:column;gap:2px;padding:12px 14px;margin:0 0 12px;border-radius:10px;background:#0e7a3c;color:#fff;text-decoration:none;border:1px solid #13a352}
 .rtr .rbtn b{font-size:16px}.rtr .rbtn span{font-size:12px;opacity:.85}
 .rtr .rbtn:hover,.rtr .rbtn:focus-visible{background:#11904a;outline:2px solid #fff;outline-offset:2px}
+.rtr .rbtn.off{background:#2a2d33;border-color:#555;color:#ddd}.rtr .rbtn.off:hover,.rtr .rbtn.off:focus-visible{background:#33373e}
 .rtr .bars{display:inline-flex;align-items:flex-end;gap:2px;height:14px;vertical-align:middle}
 .rtr .bars i{display:block;width:4px;background:rgba(255,255,255,.18);border-radius:1px}
 .rtr .bars i:nth-child(1){height:20%}.rtr .bars i:nth-child(2){height:40%}.rtr .bars i:nth-child(3){height:60%}.rtr .bars i:nth-child(4){height:80%}.rtr .bars i:nth-child(5){height:100%}
@@ -365,7 +366,17 @@ function powerChip(p){ if(!p) return null;
     live && p.f && p.f.s!=="idle" ? h("small",{class:"fl-"+p.f.s,text:p.f.s==="charging" ? "↑" : "↓"}) : null,
     p.w!==null && live ? h("small",{text:"☀ "+p.w+" W"}) : null,
     live && p.tn && (p.tn.v==="low"||p.tn.v==="tight") ? h("small",{class:"night-"+p.tn.v,text:"🌙"}) : null); }
-function routerRead(u){ return { on: u.rs==="on" || (u.rs!=="of" && u.rr==="on"), off: u.rs==="of" || (u.rs!=="on" && u.rr==="of") }; }
+/* The fresh InHand reading for a unit from the 30-minute pull, as "on", "of" or "" (none, or too old to trust). */
+function inhandNow(u){
+  const r = S.rd && u ? (S.rd.get(unitKeyOf(u.k)) || null) : null;
+  if(!r || !r.at || Date.now()-Date.parse(r.at) >= ROUTER_DETAIL_FRESH_MS) return {st:"", r};
+  return {st: r.status==="online" ? "on" : r.status==="offline" ? "of" : "", r};
+}
+/* What the router readings say, all sources together. COS's own check first, then the InHand pull, then InHand on record. */
+function routerRead(u){
+  const ih = inhandNow(u).st, rr = ih || u.rr;
+  return { on: u.rs==="on" || (u.rs!=="of" && rr==="on"), off: u.rs==="of" || (u.rs!=="on" && rr==="of") };
+}
 const WORD = { ok:"OK", warn:"Check", bad:"Problem", unk:"Unknown" }, RW = { on:"Online", of:"Offline", un:"Unknown" };
 /* Read the signs we have and say what is most likely wrong. A router reading is a hint only, never proof the cameras work. */
 function diagnose(v){
@@ -375,8 +386,12 @@ function diagnose(v){
   else cam = (u.s==="r" ? "Recon cloud" : "Star4Live")+": "+u.on+" of "+u.n+" online"+(u.off ? ", "+u.off+" offline" : "")+(v.unk ? ", "+v.unk+" no reading" : "");
   ck.push({k:"Cameras", s: fs==="up"?"ok":fs==="issues"?"warn":fs==="down"?"bad":"unk", t:cam});
   if(u.rs) ck.push({k:"Router, COS check", s: u.rs==="on"?"ok":u.rs==="of"?"bad":"unk", t:(RW[u.rs]||u.rs)+(u.rt ? " · "+when(u.rt) : "")});
-  if(u.rr) ck.push({k:"Router, InHand says", s: u.rr==="on"?"ok":u.rr==="of"?"bad":"unk", t:(RW[u.rr]||u.rr)+(u.ro ? " · "+when(u.ro) : " · no time given")});
-  if(!u.rs && !u.rr) ck.push({k:"Router", s:"unk", t: S.meta && S.meta.rl===false ? "Router readings have not loaded yet" : "No router on record for this unit"});
+  /* James (25 Nov): the card said "Router readings have not loaded yet" right above a Router box that had the reading.
+     The 30-minute InHand pull is the newest InHand reading, so it wins here and the two always agree. */
+  const ih = inhandNow(u);
+  if(ih.st) ck.push({k:"Router, InHand says", s: ih.st==="on"?"ok":"bad", t:(ih.st==="on"?"Online":"Offline")+" · "+when(secOf(ih.r.at))+(ih.st==="of" ? " · the router itself is not reaching InHand" : "")});
+  else if(u.rr) ck.push({k:"Router, InHand says", s: u.rr==="on"?"ok":u.rr==="of"?"bad":"unk", t:(RW[u.rr]||u.rr)+(u.ro ? " · "+when(u.ro) : " · no time given")});
+  if(!u.rs && !u.rr && !ih.st) ck.push({k:"Router", s:"unk", t: ih.r ? "No InHand reading in the last 75 minutes" : S.rd ? "No router on record for this unit" : S.meta && S.meta.rl===false ? "Router readings have not loaded yet" : "No router on record for this unit"});
   if(u.pw && u.pw.tn && (u.pw.tn.v==="low"||u.pw.tn.v==="tight")) ck.push({k:"Tonight, Victron", s:u.pw.tn.v==="low" ? "bad" : "warn", t:u.pw.tn.h});
   if(u.pw && u.pw.hf) ck.push({k:"Victron history", s:"warn", t:u.pw.hf.join(" · ")});
   if(u.pw && u.pw.sk && u.pw.sk.w) ck.push({k:"Weather, Victron", s:"warn", t:u.pw.sk.w});
@@ -441,8 +456,11 @@ function routerBox(v){
   const kids=[h("h3",{text:"Router"}),
     h("div",{class:"rtop"},h("span",{class:"cst "+st,text:stText}),
       h("span",{class:"note",text: r.at ? (fresh ? "InHand read "+when(secOf(r.at)) : "No InHand reading since "+when(secOf(r.at))) : "No InHand reading yet"}))];
-  if(r.ip && IPV4.test(r.ip)) kids.push(h("a",{class:"rbtn",href:"http://"+r.ip+":"+(r.port||8080),target:"_blank",rel:"noopener noreferrer"},
-    h("b",{text:"Open router (:"+(r.port||8080)+")"}),h("span",{text:"Opens the router's own page in a new tab"})));
+  /* Green only when the router is connected. An offline router's page will not open, and a green button next to a red
+     Offline read as "online" (James, 25 Nov, Sniper 168). */
+  if(r.ip && IPV4.test(r.ip)) kids.push(h("a",{class:"rbtn"+(st==="ok"?"":" off"),href:"http://"+r.ip+":"+(r.port||8080),target:"_blank",rel:"noopener noreferrer"},
+    h("b",{text:"Open router (:"+(r.port||8080)+")"}),h("span",{text: st==="ok" ? "Opens the router's own page in a new tab" : st==="bad" ? "The router is offline, so its page will not open until it is back. Last known address." : "No fresh InHand reading, so the page may not open."})));
+  if(st==="bad") kids.push(h("p",{class:"note warn",text:"The router is not reaching InHand"+(r.at ? " (InHand read "+when(secOf(r.at))+")" : "")+". With the router down, the cameras behind it cannot be reached either. Check power first, then the SIM and antenna."}));
   else kids.push(h("p",{class:"note",text:"No public IP for this router yet, so there is no router page to open."}));
   const kv=[];
   const word = signalWord(r.sig);
@@ -450,7 +468,7 @@ function routerBox(v){
     const lv = typeof r.sig.level==="number" ? Math.max(0,Math.min(5,Math.round(r.sig.level))) : (word==="Good"?4:word==="Fair"?3:word==="Poor"?1:0);
     const bars=h("span",{class:"bars "+(word||"").toLowerCase(),"aria-label":(word||"Signal")+", "+lv+" of 5 bars"},...[1,2,3,4,5].map(i=>h("i",{class:i<=lv?"on":""})));
     const parts=[word, r.sig.radio, r.sig.band ? "band "+r.sig.band : "", typeof r.sig.rsrp==="number" ? r.sig.rsrp+" dBm" : ""].filter(Boolean).join(" · ");
-    kv.push(["Signal", h("span",null,bars," ",parts||"No reading")]);
+    kv.push([st==="ok" ? "Signal" : "Last signal", h("span",null,bars," ",parts||"No reading")]);
   }
   if(r.carrier) kv.push(["Carrier", r.carrier]);
   kv.push(["Router", [r.model, r.serial].filter(Boolean).join(" · ")]);
@@ -478,7 +496,7 @@ async function loadRouters(){
     const res = await hooks.loadRouters();
     if(!res || res.ok!==true || !res.data) return;
     S.rd = new Map(res.data.routers.map(r=>[unitKeyOf(r.unit), r]));
-    if(S.openId) drawPanel();
+    if(S.meta) render(); else if(S.openId) drawPanel();
   }catch(_){ /* the card simply has no router box */ }
 }
 /* The cameras COS has as off right now, by name, with when each was last online. The camera list first; the unit's own list as a fallback. */
