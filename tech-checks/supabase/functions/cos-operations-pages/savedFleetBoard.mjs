@@ -476,7 +476,8 @@ function canonicalCameraUnit(value) {
   return result;
 }
 function parseCanonicalCameraUnit(value) {
-  const match = /^(SNIPER\s*[24]|RECON\s*(?:2|II))(?=\s|[-#])\s*[-#]?\s*(\d{1,6}(?:\.\d+)?)$/i.exec(value.trim()) || /^(HELIOS|RANGER|SOLAR\s*SPOTTER|SPOTTER|SS\s*HYBRID|SNIPER|CAM\s*V|RECON|RII|RI)\s*[-#]?\s*(\d{1,6}(?:\.\d+)?)$/i.exec(value.trim());
+  const trimmed = value.trim();
+  const match = /^(SNIPER\s*[24]|RECON\s*(?:2|II))(?=\s|[-#])\s*[-#]?\s*(\d{1,6}(?:\.\d+)?)$/i.exec(trimmed) || /^(HELIOS|RANGER|SOLAR\s*SPOTTER|SPOTTER|SS\s*HYBRID|SNIPER|CAM\s*V|RECON|RII|RI)\s*[-#]?\s*(\d{1,6}(?:\.\d+)?)$/i.exec(trimmed) || /^(RECON\s*(?:2|II))(?=\s|[-#])\s*[-#]?\s*(\d{1,6}(?:\.\d+)?)(?:\s+(?:[-\u2013\u2014]\s*)?\S.*)$/i.exec(trimmed) || /^(RECON|RII|RI)\s*[-#]?\s*(\d{1,6}(?:\.\d+)?)(?:\s+(?:[-\u2013\u2014]\s*)?\S.*)$/i.exec(trimmed);
   if (!match) return null;
   let family = plain(match[1]).replace(/\s/g, "");
   family = { RI: "RECON", RII: "RECON2", RECONII: "RECON2" }[family] || family;
