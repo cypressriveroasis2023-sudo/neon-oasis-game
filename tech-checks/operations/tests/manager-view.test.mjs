@@ -53,7 +53,7 @@ test('the host hands the manager view only what it draws, in a fixed shape', asy
     ? {data: {service_techs: [boardRow(), {name: 'No id is dropped'}, boardRow({user_id: '00000000-0000-4000-8000-00000000a009', name: 'Test Service'})], it_techs: [{name: 'Jordan Fixture'}, {name: 'Test IT'}]}, error: null}
     : {data: {transfers}, error: null}});
   const {snapshot} = await answer({kind: 'read'});
-  assert.deepEqual(calls.map(call => call.name), ['owner_tech_command_board_v2', 'techcheck_transfer_context_v1', 'techcheck_handoff_gaps_v1']);
+  assert.deepEqual(calls.map(call => call.name), ['owner_tech_command_board_v2', 'techcheck_transfer_context_v1', 'techcheck_handoff_gaps_v1', 'sim_drawer_v1']);
   assert.deepEqual(snapshot.gaps, {enforced: true, noHandoff: [], loaded: [], late: []});
   assert.match(calls[0].args.p_date, /^\d{4}-\d{2}-\d{2}$/);
   assert.match(snapshot.day, /^\d{4}-\d{2}-\d{2}$/);
@@ -125,7 +125,7 @@ test('a truck save is the truck editor call with an exact, checked shape, and no
   assert.equal(refused.state.refreshed, 0);
   // Every database call in the manager part is one of these three.
   const block = hostSource.slice(hostSource.indexOf('// ---- Manager view'), hostSource.indexOf("window.addEventListener('message', async event => {"));
-  assert.deepEqual([...block.matchAll(/\.rpc\('([a-z0-9_]+)'/g)].map(match => match[1]), ['owner_tech_command_board_v2', 'techcheck_transfer_context_v1', 'techcheck_handoff_gaps_v1', 'owner_save_service_truck_inventory_batch_v1']);
+  assert.deepEqual([...block.matchAll(/\.rpc\('([a-z0-9_]+)'/g)].map(match => match[1]), ['owner_tech_command_board_v2', 'techcheck_transfer_context_v1', 'techcheck_handoff_gaps_v1', 'sim_drawer_v1', 'sim_drawer_add_v1', 'sim_drawer_mark_v1', 'owner_save_service_truck_inventory_batch_v1']);
   assert.doesNotMatch(block, /\.from\('(?!techcheck-transfer-evidence'\))|\.(?:insert|update|delete|upsert|upload|remove)\(|fetch\(|localStorage|innerHTML/);
 });
 
@@ -220,4 +220,29 @@ test('the handoff check is read only, in a fixed shape, and a failed read leaves
   const {snapshot: still} = await failing.answer({kind: 'read'});
   assert.equal(still.gaps, null);
   assert.deepEqual(still.techs, []);
+});
+
+test('the SIM drawer is read in a fixed shape, and adding or marking a card is the drawer call and nothing else', async () => {
+  const drawer = {require_listed: false, secret: 'x',
+    cards: [{sim: '89012600000000000001', carrier: 'Simetry', status: 'in_drawer', location: null, note: 'box A', added_by: 'Owner Fixture', added_at: '2026-11-25T15:00:00Z', updated_by: 'Owner Fixture', updated_at: '2026-11-25T15:00:00Z'},
+      {sim: '89012600000000000002', carrier: 'Vendera', status: 'in_unit', location: 'Sniper 332 → Riley Fixture', note: null, updated_by: 'Jordan Fixture', updated_at: '2026-11-25T16:00:00Z'},
+      {sim: 'bad number!', status: 'in_drawer'}],
+    not_in_drawer: [{sim: '89012600000000000077', detail: 'Handed over in Sniper 332 to Riley Fixture', by: 'Jordan Fixture', at: '2026-11-25T16:00:00Z'}]};
+  const {answer, calls, plain} = host({rpc: name => name === 'owner_tech_command_board_v2' ? {data: {service_techs: []}, error: null}
+    : name === 'sim_drawer_v1' ? {data: drawer, error: null}
+    : name === 'sim_drawer_add_v1' ? {data: {added: ['89012600000000000003'], already_listed: ['89012600000000000001'], not_a_sim_number: ['12']}, error: null}
+    : name === 'sim_drawer_mark_v1' ? {data: {}, error: null} : {data: null, error: {message: 'held'}}});
+  const {snapshot} = await answer({kind: 'read'});
+  assert.deepEqual(plain(snapshot.sims), {
+    cards: [{sim: '89012600000000000001', carrier: 'Simetry', status: 'in_drawer', location: '', note: 'box A', by: 'Owner Fixture', at: '2026-11-25T15:00:00.000Z'},
+      {sim: '89012600000000000002', carrier: 'Vendera', status: 'in_unit', location: 'Sniper 332 → Riley Fixture', note: '', by: 'Jordan Fixture', at: '2026-11-25T16:00:00.000Z'}],
+    notListed: [{sim: '89012600000000000077', detail: 'Handed over in Sniper 332 to Riley Fixture', by: 'Jordan Fixture', at: '2026-11-25T16:00:00.000Z'}],
+  });
+  assert.deepEqual(plain(await answer({kind: 'simAdd', numbers: ['89012600000000000003', '89012600000000000001', '12'], carrier: 'Simetry', note: ''})),
+    {added: ['89012600000000000003'], already: ['89012600000000000001'], bad: ['12']});
+  assert.deepEqual(plain(calls.at(-1)), {name: 'sim_drawer_add_v1', args: {p_numbers: ['89012600000000000003', '89012600000000000001', '12'], p_carrier: 'Simetry', p_note: null}});
+  assert.deepEqual(plain(await answer({kind: 'simMark', sim: '89012600000000000002', status: 'bad', note: 'Will not register'})), {});
+  assert.deepEqual(plain(calls.at(-1)), {name: 'sim_drawer_mark_v1', args: {p_number: '89012600000000000002', p_status: 'bad', p_note: 'Will not register'}});
+  assert.deepEqual(plain(await answer({kind: 'simMark', sim: '89012600000000000002', status: 'on_truck'})), {error: 'invalid'});
+  assert.deepEqual(plain(await answer({kind: 'simAdd', numbers: []})), {error: 'invalid'});
 });
