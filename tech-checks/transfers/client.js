@@ -33,8 +33,24 @@ export function transferClient(context) {
 }
 let storePromise;
 function database(){if(!storePromise)storePromise=new Promise((resolve,reject)=>{const r=indexedDB.open('techcheck-transfer-drafts-v1',1);r.onupgradeneeded=()=>r.result.createObjectStore('drafts');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(new Error('Device storage is unavailable. Enable storage before starting a handoff.'));});return storePromise;}
+// Safari in private mode (and the iPhone test browser) refuses to keep Blob
+// photos in on-device storage. Keep them as plain bytes and turn them back into
+// photos when the draft is read. Drafts saved earlier with real Blobs still open.
+async function draftBytes(value){
+ if(value instanceof Blob)return {__cosBlob:1,type:value.type,bytes:await value.arrayBuffer()};
+ if(Array.isArray(value))return Promise.all(value.map(draftBytes));
+ if(value&&typeof value==='object'&&Object.getPrototypeOf(value)===Object.prototype){const out={};for(const [k,v] of Object.entries(value))out[k]=await draftBytes(v);return out;}
+ return value;
+}
+function draftBlobs(value){
+ if(value&&typeof value==='object'&&value.__cosBlob===1&&value.bytes instanceof ArrayBuffer)return new Blob([value.bytes],{type:value.type||'image/jpeg'});
+ if(Array.isArray(value))return value.map(draftBlobs);
+ if(value&&typeof value==='object'&&Object.getPrototypeOf(value)===Object.prototype){const out={};for(const [k,v] of Object.entries(value))out[k]=draftBlobs(v);return out;}
+ return value;
+}
 export async function deviceDraft(key,value,remove=false){
- const db=await database();return new Promise((resolve,reject)=>{const tx=db.transaction('drafts',value===undefined&&!remove?'readonly':'readwrite'),store=tx.objectStore('drafts');const r=remove?store.delete(key):value===undefined?store.get(key):store.put(value,key);tx.oncomplete=()=>resolve(r.result);tx.onerror=()=>reject(new Error('The transfer draft could not be preserved on this device.'));tx.onabort=tx.onerror;});
+ const stored=value===undefined||remove?value:await draftBytes(value);
+ const db=await database();return new Promise((resolve,reject)=>{const tx=db.transaction('drafts',value===undefined&&!remove?'readonly':'readwrite'),store=tx.objectStore('drafts');const r=remove?store.delete(key):value===undefined?store.get(key):store.put(stored,key);tx.oncomplete=()=>resolve(value===undefined&&!remove?draftBlobs(r.result):r.result);tx.onerror=()=>reject(new Error('The transfer draft could not be preserved on this device.'));tx.onabort=tx.onerror;});
 }
 // Read a photo into something a canvas can draw. createImageBitmap reads the file
 // directly; the <img> path is the fallback. Safari can reject image.decode() with
