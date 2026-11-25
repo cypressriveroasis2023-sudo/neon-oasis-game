@@ -494,9 +494,8 @@ const ipShort = ip => { ip=String(ip||""); return IPV4.test(ip) ? "ending ."+ip.
 function openBox(v){
   const u=v.u, m = S.mh && S.rec ? S.rec.match[v.id] : (v.mhOnly ? {rec:v.rec} : null), sys=[], own=[];
   const lk=(label,url)=>h("a",{class:"lk",href:url,target:"_blank",rel:"noopener noreferrer"},label);
-  /* James, 25 Nov: keep the Star4Live button, and a VCC button too. VCC (Vigilant Control Center) is the Star4Live
-     device list, so both open the same signed-in page. */
-  if(u.s==="v"){ sys.push(lk("VCC","https://global.star4live.com/userWeb/device/device-management")); sys.push(lk("Star4Live","https://global.star4live.com/userWeb/device/device-management")); }
+  /* James, 25 Nov: keep the Star4Live button, and a VCC button (Vigilant Control Center, the address he gave). */
+  if(u.s==="v"){ sys.push(lk("VCC","https://www.vigilantcontrolcenter.com/login")); sys.push(lk("Star4Live","https://global.star4live.com/userWeb/device/device-management")); }
   if(u.rs || u.rr || u.ri) sys.push(lk("InHand routers","https://iot.inhandnetworks.com/device/list"));
   if(v.type==="Helios" || /^Helios/.test(v.type)) sys.push(lk("Victron VRM","https://vrm.victronenergy.com/"));
   sys.push(lk("Watchful","https://v2.watchful.co.nz/alerts"));
