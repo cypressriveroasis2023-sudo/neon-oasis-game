@@ -37,7 +37,17 @@ import {createHash} from 'node:crypto';
 // polled window is unchanged, and tests/recon-event-window.test.mjs holds both
 // boundaries exactly, including that a wider window never turns Unknown into
 // online and never softens a fresh confirmed miss.
-<<<<<<< HEAD
+// Reviewed 2026-11-25 at James's instruction: the maps draw a dark basemap
+// instead of inverting a light one. Every map drew OpenStreetMap's light tiles
+// and darkened them in CSS with grayscale(1) invert(1) ... contrast(.75);
+// greyscaling discards the colour that separates a motorway from a side street
+// from water before the re-tint, so the street network and the labels washed
+// out and the map read as empty at every zoom. fieldMapBasemap.ts now points at
+// CARTO dark_all, which is drawn dark at source, and the three
+// .leaflet-tile-pane filters are gone. fleetAppearance.css carries one of those
+// three and its pin moves with it; the change is the removal of that one filter
+// rule and nothing else in the file. No unit is presented or counted
+// differently.
 // Reviewed 2026-11-25 at James's instruction: a Recon may carry its site in its
 // name. canonicalCameraUnit was fully anchored on purpose -- "never
 // device/site-name substring matching" -- but Reconeyez names a detector after
@@ -56,19 +66,6 @@ import {createHash} from 'node:crypto';
 // existing guard at the call site reports 'ambiguous' rather than choosing, so
 // a collision is never silently resolved. fieldCameraHealth.ts's pin moves with
 // that change and tests/recon-name-with-site.test.mjs holds all four properties.
-=======
-// Reviewed 2026-11-25 at James's instruction: the maps draw a dark basemap
-// instead of inverting a light one. Every map drew OpenStreetMap's light tiles
-// and darkened them in CSS with grayscale(1) invert(1) ... contrast(.75);
-// greyscaling discards the colour that separates a motorway from a side street
-// from water before the re-tint, so the street network and the labels washed
-// out and the map read as empty at every zoom. fieldMapBasemap.ts now points at
-// CARTO dark_all, which is drawn dark at source, and the three
-// .leaflet-tile-pane filters are gone. fleetAppearance.css carries one of those
-// three and its pin moves with it; the change is the removal of that one filter
-// rule and nothing else in the file. No unit is presented or counted
-// differently.
->>>>>>> origin/main
 const expected={
   "FleetDashboard.tsx": "8d711a97853b5f646d892f5552a792656623a9f8",
   "FleetUnitHealth.tsx": "3ba1f2507241a63d839424bc1db28b6d584659c1",
