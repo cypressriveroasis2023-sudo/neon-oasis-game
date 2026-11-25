@@ -309,6 +309,8 @@ function managerGaps(data) {
     loaded:rows(data.loaded_without_handoff, 100).map(row => ({ tech:managerText(row.service_tech, 80) || 'Service tech', unit:unit(row),
       by:managerText(row.by, 80) || 'Unknown', reason:managerText(row.reason, 200), at:managerTime(row.at),
       kind:['owner_override','owner_edit_no_reason','system','log_mode'].includes(row.kind) ? row.kind : 'other' })).filter(row => row.unit),
+    returns:rows(data.returns_not_checked_in, 100).map(row => ({ unit:managerText(row.unit, 90), from:managerText(row.from, 80) || 'Service',
+      state:managerText(row.state, 40) || 'waiting_it', hours:typeof row.hours_waiting === 'number' && Number.isFinite(row.hours_waiting) ? Math.max(0, Math.min(99999, row.hours_waiting)) : null })).filter(row => row.unit),
     late:rows(data.handoffs_not_finished, 100).map(row => ({ units:(Array.isArray(row.units) ? row.units : []).slice(0, 20).map(item => managerText(item, 90)).filter(Boolean),
       from:managerText(row.from, 80) || 'IT', to:managerText(row.to, 80) || 'Service', state:managerText(row.state, 40) || 'unknown',
       hours:typeof row.hours_waiting === 'number' && Number.isFinite(row.hours_waiting) ? Math.max(0, Math.min(99999, row.hours_waiting)) : null })),

@@ -54,7 +54,7 @@ test('the host hands the manager view only what it draws, in a fixed shape', asy
     : {data: {transfers}, error: null}});
   const {snapshot} = await answer({kind: 'read'});
   assert.deepEqual(calls.map(call => call.name), ['owner_tech_command_board_v2', 'techcheck_transfer_context_v1', 'techcheck_handoff_gaps_v1', 'sim_drawer_v1']);
-  assert.deepEqual(snapshot.gaps, {enforced: true, noHandoff: [], loaded: [], late: []});
+  assert.deepEqual(snapshot.gaps, {enforced: true, noHandoff: [], loaded: [], late: [], returns: []});
   assert.match(calls[0].args.p_date, /^\d{4}-\d{2}-\d{2}$/);
   assert.match(snapshot.day, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(snapshot.techs.length, 2);
@@ -204,7 +204,8 @@ test('the handoff check is read only, in a fixed shape, and a failed read leaves
   const gaps = {mode: 'enforce', secret: 'x',
     on_truck_without_handoff: [{service_tech: 'Riley Fixture', equipment_type: 'Sniper', unit_tag: '102', loaded_by: 'Riley Fixture', loaded_at: '2026-11-25T08:00:00Z', in_equipment_list: false, service_tech_id: 'private-id'}],
     loaded_without_handoff: [{service_tech: 'Riley Fixture', equipment_type: 'Ranger', unit_tag: '008', by: 'Owner Fixture', role: 'owner', reason: 'Swapped on site', kind: 'owner_override', at: '2026-11-25T09:00:00Z', actor_id: 'private-id'}],
-    handoffs_not_finished: [{transfer_id: 'private-id', state: 'awaiting_service', from: 'Jordan Fixture', to: 'Riley Fixture', hours_waiting: 5.4, units: ['Spotter 268']}]};
+    handoffs_not_finished: [{transfer_id: 'private-id', state: 'awaiting_service', from: 'Jordan Fixture', to: 'Riley Fixture', hours_waiting: 5.4, units: ['Spotter 268']}],
+    returns_not_checked_in: [{unit: 'Ranger 011', from: 'Abel Fixture', state: 'identity_review', sent_at: '2026-11-24T09:00:00Z', hours_waiting: 30.2, return_id: 'private-id'}, {from: 'no unit is dropped'}]};
   const {answer, calls} = host({rpc: name => name === 'owner_tech_command_board_v2' ? {data: {service_techs: []}, error: null}
     : name === 'techcheck_handoff_gaps_v1' ? {data: gaps, error: null} : {data: null, error: {message: 'held'}}});
   const {snapshot} = await answer({kind: 'read'});
@@ -214,6 +215,7 @@ test('the handoff check is read only, in a fixed shape, and a failed read leaves
     noHandoff: [{tech: 'Riley Fixture', unit: 'Sniper 102', by: 'Riley Fixture', at: '2026-11-25T08:00:00.000Z', listed: false}],
     loaded: [{tech: 'Riley Fixture', unit: 'Ranger 008', by: 'Owner Fixture', reason: 'Swapped on site', at: '2026-11-25T09:00:00.000Z', kind: 'owner_override'}],
     late: [{units: ['Spotter 268'], from: 'Jordan Fixture', to: 'Riley Fixture', state: 'awaiting_service', hours: 5.4}],
+    returns: [{unit: 'Ranger 011', from: 'Abel Fixture', state: 'identity_review', hours: 30.2}],
   });
   assert.doesNotMatch(JSON.stringify(snapshot.gaps), /private-id|secret/);
   const failing = host({rpc: name => name === 'owner_tech_command_board_v2' ? {data: {service_techs: []}, error: null} : {data: null, error: {message: 'Not authorized'}}});

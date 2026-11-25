@@ -59,6 +59,11 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-25** — Tech Check returns: `app_private.techcheck_ticketfree_photos_v1`
+  now needs at least one photo (Service send and IT check-in), and
+  `techcheck_handoff_gaps_v1` adds `returns_not_checked_in` (Manager tab). Old
+  definitions in `app_private.techcheck_returns_evidence_backup_v1`. Record in
+  `tech-checks/docs/db-changes/20261125_techcheck_returns_evidence.md`.
 - **2026-11-25** — Linked 31 InHand routers to COS units by exact name
   (James approved the list) with `cos_router_link_v1`: 31 `ADD_ROUTER_LINK` rows,
   safe after_state; watchdog `ok` after. 37 left unlinked on purpose. Record in

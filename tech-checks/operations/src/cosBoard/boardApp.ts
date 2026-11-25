@@ -1201,7 +1201,7 @@ function mgGaps(d){
   const title=h("h3",{text:"Handoff check"});
   const g=d.gaps;
   if(!g) return h("div",{class:"box"},title,h("p",{class:"note",text:"The handoff check could not be read just now."}));
-  const total=g.noHandoff.length+g.loaded.length+g.late.length;
+  const total=g.noHandoff.length+g.loaded.length+g.late.length+(g.returns||[]).length;
   const row=(cls, main, sub)=>h("div",{class:"prow "+cls},h("div",{class:"pmain"},h("span",{class:"name",text:main}),h("span",{class:"sub",text:sub})));
   const part=(head, rows)=>rows.length ? h("div",null,h("p",null,h("b",{text:head})),...rows) : null;
   return h("div",{class:"box",id:"mgGapBox"},title,
@@ -1212,6 +1212,8 @@ function mgGaps(d){
       (MGGAPKIND[x.kind]||MGGAPKIND.other)+" · "+x.by+(x.at ? " · "+mgWhen(x.at) : "")+(x.reason ? " · "+x.reason : "")))),
     part("Handoffs not finished after 4 hours", g.late.map(x=>row("s-issues", (x.units.join(", ")||"Equipment"),
       x.from+" to "+x.to+" · "+(MGSTATE[x.state]||[x.state.replace(/_/g," ")])[0]+(x.hours!==null ? " · waiting "+Math.round(x.hours)+" h" : "")))),
+    part("Returns not checked in by IT after 4 hours", (g.returns||[]).map(x=>row("s-issues", x.unit,
+      "Sent back by "+x.from+" · "+(x.state==="identity_review" ? "Unit ID review" : "Waiting for IT")+(x.hours!==null ? " · waiting "+Math.round(x.hours)+" h" : "")))),
     h("p",{class:"note",text:(g.enforced ? "A new unit can only go on a Service truck after IT hands it over in Tech Check and Service signs for it." : "The handoff block is switched off. Units are let through and listed here.")+" Units on the trucks on 25 Nov 2026 were counted as handed over."}));
 }
 /* SIM drawer: every SIM card on hand, and where each one went. */
