@@ -59,6 +59,10 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-25** — Linked `SOLARSPOTTER 253` to mHelp A# 2226712 in
+  `app_private.cos_mhelp_unit_link` (`decided_by='hand'`, approved by James). No
+  audit row; watchdog `ok`. Record in
+  `tech-checks/docs/db-changes/20261125_mhelp_link_ss253.md`.
 - **2026-11-25** — Tech Check: `submit_techcheck_transfer_v2` also refuses a
   note that says something is still needed unless confirmed (`_note_ready`), and
   `techcheck_transfer_differences_v2` compares SIM lists cleaned. The held
