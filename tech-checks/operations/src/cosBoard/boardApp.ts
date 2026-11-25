@@ -934,7 +934,10 @@ function drawMap(vs){
   sizeMap(); buildBase();
   if(!M.fitted && pts.length && M.w){ fitPts(pts,36,60); M.fitted=true; }
   const hand=pts.filter(q=>q.p.kind==="hand").length;
-  $("mapNote").textContent = pts.length+" field units on the map"+(hand ? ", "+hand+" from an address typed by hand" : "")+". A full colour means every unit at that spot is in that state. A ring is a mix, and its red number is how many are down. Tap a pin to open it. Pins mark the site address from mHelp unless someone typed an address in COS. Shop units are not on the map."+(M.failed ? " The background map didn't load, but the pins still work." : "");
+  // The board's tiles count every field unit; the map can only draw the ones
+  // with a pin. Saying "193 of 198" here ties the two screens together, so the
+  // gap reads as units without a pin rather than as the two screens disagreeing.
+  $("mapNote").textContent = pts.length+" of "+field.length+" field units on the map"+(hand ? ", "+hand+" from an address typed by hand" : "")+". A full colour means every unit at that spot is in that state. A ring is a mix, and its red number is how many are down. Tap a pin to open it. Pins mark the site address from mHelp unless someone typed an address in COS. Shop units are not on the map."+(M.failed ? " The background map didn't load, but the pins still work." : "");
   $("mapList").replaceChildren(...(none.length ? [h("div",{class:"count",text:none.length+" field unit"+(none.length===1?"":"s")+" with no pin yet."}), ...none.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true})).map(rowEl)] : []));
   drawMsg(); drawSel(); paint();
 }
