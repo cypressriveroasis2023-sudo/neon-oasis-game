@@ -59,6 +59,13 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-25** — Linked four more field camera units to their mHelp A#
+  in `app_private.cos_mhelp_unit_link` (`decided_by='hand'`, approved by James):
+  SOLARSPOTTER 285, SOLARSPOTTER 254, SS HYBRID 298 and
+  `RII022 - CityZen_1317HawthorneSt`. Field links now 193 of 200. No
+  `camera_inventory_audit` row written, so no new action value and the sweep is
+  unaffected; watchdog `ok` afterwards. Record in
+  `tech-checks/docs/db-changes/20261125_mhelp_link_four_field_units.md`.
 - **2026-11-25** — `operations/dist` republished with the unit-card Troubleshoot
   box (#503), Check it now (#497) and its fixes (#508): Check it now reads the
   verify answer (green only when online), uses the unit's own A# (never a fuzzy
