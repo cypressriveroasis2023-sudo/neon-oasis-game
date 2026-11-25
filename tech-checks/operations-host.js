@@ -289,6 +289,21 @@ function managerExchange(row, paths) {
     from:managerText(row.it_name, 80) || 'IT', to:managerText(row.service_name, 80) || 'Service',
     state:managerText(row.state, 40) || 'unknown', at:managerTime(row.updated_at) || managerTime(row.created_at), events };
 }
+function managerGaps(data) {
+  const rows = (value, max) => Array.isArray(value) ? value.slice(0, max).filter(row => row && typeof row === 'object') : [];
+  const unit = row => [managerText(row.equipment_type, 40), managerText(row.unit_tag, 40)].filter(Boolean).join(' ');
+  return {
+    enforced:data.mode !== 'log',
+    noHandoff:rows(data.on_truck_without_handoff, 100).map(row => ({ tech:managerText(row.service_tech, 80) || 'Service tech', unit:unit(row),
+      by:managerText(row.loaded_by, 80), at:managerTime(row.loaded_at), listed:row.in_equipment_list !== false })).filter(row => row.unit),
+    loaded:rows(data.loaded_without_handoff, 100).map(row => ({ tech:managerText(row.service_tech, 80) || 'Service tech', unit:unit(row),
+      by:managerText(row.by, 80) || 'Unknown', reason:managerText(row.reason, 200), at:managerTime(row.at),
+      kind:['owner_override','owner_edit_no_reason','system','log_mode'].includes(row.kind) ? row.kind : 'other' })).filter(row => row.unit),
+    late:rows(data.handoffs_not_finished, 100).map(row => ({ units:(Array.isArray(row.units) ? row.units : []).slice(0, 20).map(item => managerText(item, 90)).filter(Boolean),
+      from:managerText(row.from, 80) || 'IT', to:managerText(row.to, 80) || 'Service', state:managerText(row.state, 40) || 'unknown',
+      hours:typeof row.hours_waiting === 'number' && Number.isFinite(row.hours_waiting) ? Math.max(0, Math.min(99999, row.hours_waiting)) : null })),
+  };
+}
 async function managerRead() {
   const db = context().db;
   const day = new Intl.DateTimeFormat('en-CA', { timeZone:'America/Chicago' }).format(new Date());
@@ -301,7 +316,13 @@ async function managerRead() {
     if (!handoffs?.error && Array.isArray(handoffs?.data?.transfers)) exchanges = handoffs.data.transfers.slice(0, 100).map(row => managerExchange(row, paths)).filter(Boolean);
   } catch {}
   managerPhotoPaths = paths;
-  return { day, at:new Date().toISOString(),
+  // Units that went on a truck without a signed handoff, and handoffs left unsigned. Read only.
+  let gaps = null;
+  try {
+    const read = await db.rpc('techcheck_handoff_gaps_v1', { p_since:new Date(Date.now() - 7 * 864e5).toISOString() });
+    if (!read?.error && read?.data && typeof read.data === 'object') gaps = managerGaps(read.data);
+  } catch {}
+  return { day, at:new Date().toISOString(), gaps,
     techs:board.data.service_techs.slice(0, 100).map(managerTech).filter(Boolean),
     it:(Array.isArray(board.data.it_techs) ? board.data.it_techs : []).slice(0, 100).map(row => managerText(row?.name, 80)).filter(Boolean).map(name => ({ name, test:managerTest(name) })),
     exchanges };

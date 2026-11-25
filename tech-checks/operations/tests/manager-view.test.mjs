@@ -53,7 +53,8 @@ test('the host hands the manager view only what it draws, in a fixed shape', asy
     ? {data: {service_techs: [boardRow(), {name: 'No id is dropped'}, boardRow({user_id: '00000000-0000-4000-8000-00000000a009', name: 'Test Service'})], it_techs: [{name: 'Jordan Fixture'}, {name: 'Test IT'}]}, error: null}
     : {data: {transfers}, error: null}});
   const {snapshot} = await answer({kind: 'read'});
-  assert.deepEqual(calls.map(call => call.name), ['owner_tech_command_board_v2', 'techcheck_transfer_context_v1']);
+  assert.deepEqual(calls.map(call => call.name), ['owner_tech_command_board_v2', 'techcheck_transfer_context_v1', 'techcheck_handoff_gaps_v1']);
+  assert.deepEqual(snapshot.gaps, {enforced: true, noHandoff: [], loaded: [], late: []});
   assert.match(calls[0].args.p_date, /^\d{4}-\d{2}-\d{2}$/);
   assert.match(snapshot.day, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(snapshot.techs.length, 2);
@@ -124,7 +125,7 @@ test('a truck save is the truck editor call with an exact, checked shape, and no
   assert.equal(refused.state.refreshed, 0);
   // Every database call in the manager part is one of these three.
   const block = hostSource.slice(hostSource.indexOf('// ---- Manager view'), hostSource.indexOf("window.addEventListener('message', async event => {"));
-  assert.deepEqual([...block.matchAll(/\.rpc\('([a-z0-9_]+)'/g)].map(match => match[1]), ['owner_tech_command_board_v2', 'techcheck_transfer_context_v1', 'owner_save_service_truck_inventory_batch_v1']);
+  assert.deepEqual([...block.matchAll(/\.rpc\('([a-z0-9_]+)'/g)].map(match => match[1]), ['owner_tech_command_board_v2', 'techcheck_transfer_context_v1', 'techcheck_handoff_gaps_v1', 'owner_save_service_truck_inventory_batch_v1']);
   assert.doesNotMatch(block, /\.from\('(?!techcheck-transfer-evidence'\))|\.(?:insert|update|delete|upsert|upload|remove)\(|fetch\(|localStorage|innerHTML/);
 });
 
@@ -197,4 +198,26 @@ test('the door only wraps the Tech Check page, and the manager view is drawn by 
   const manager = app.slice(app.indexOf('/* ---------- manager view ----------'), app.indexOf('/* ---------- wide screens ----------'));
   assert.ok(manager.length > 5000);
   assert.doesNotMatch(manager, /fetch\(|localStorage|innerHTML|document\.|window\./);
+});
+
+test('the handoff check is read only, in a fixed shape, and a failed read leaves the rest of the view', async () => {
+  const gaps = {mode: 'enforce', secret: 'x',
+    on_truck_without_handoff: [{service_tech: 'Riley Fixture', equipment_type: 'Sniper', unit_tag: '102', loaded_by: 'Riley Fixture', loaded_at: '2026-11-25T08:00:00Z', in_equipment_list: false, service_tech_id: 'private-id'}],
+    loaded_without_handoff: [{service_tech: 'Riley Fixture', equipment_type: 'Ranger', unit_tag: '008', by: 'Owner Fixture', role: 'owner', reason: 'Swapped on site', kind: 'owner_override', at: '2026-11-25T09:00:00Z', actor_id: 'private-id'}],
+    handoffs_not_finished: [{transfer_id: 'private-id', state: 'awaiting_service', from: 'Jordan Fixture', to: 'Riley Fixture', hours_waiting: 5.4, units: ['Spotter 268']}]};
+  const {answer, calls} = host({rpc: name => name === 'owner_tech_command_board_v2' ? {data: {service_techs: []}, error: null}
+    : name === 'techcheck_handoff_gaps_v1' ? {data: gaps, error: null} : {data: null, error: {message: 'held'}}});
+  const {snapshot} = await answer({kind: 'read'});
+  assert.match(calls[2].args.p_since, /^\d{4}-\d{2}-\d{2}T/);
+  assert.deepEqual(snapshot.gaps, {
+    enforced: true,
+    noHandoff: [{tech: 'Riley Fixture', unit: 'Sniper 102', by: 'Riley Fixture', at: '2026-11-25T08:00:00.000Z', listed: false}],
+    loaded: [{tech: 'Riley Fixture', unit: 'Ranger 008', by: 'Owner Fixture', reason: 'Swapped on site', at: '2026-11-25T09:00:00.000Z', kind: 'owner_override'}],
+    late: [{units: ['Spotter 268'], from: 'Jordan Fixture', to: 'Riley Fixture', state: 'awaiting_service', hours: 5.4}],
+  });
+  assert.doesNotMatch(JSON.stringify(snapshot.gaps), /private-id|secret/);
+  const failing = host({rpc: name => name === 'owner_tech_command_board_v2' ? {data: {service_techs: []}, error: null} : {data: null, error: {message: 'Not authorized'}}});
+  const {snapshot: still} = await failing.answer({kind: 'read'});
+  assert.equal(still.gaps, null);
+  assert.deepEqual(still.techs, []);
 });
