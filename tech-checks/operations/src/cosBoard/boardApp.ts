@@ -377,7 +377,7 @@ function diagnose(v){
   let cause;
   if(v.status==="notin") cause="This has a camera record but is not in mHelp, so it is not counted.";
   else if(v.place==="shop") cause = (fs==="up"||fs==="issues") ? "Online, but filed under shop. If it is really on a site, the placement is what needs fixing." : "In the shop. Nothing to troubleshoot unless it should be on a site.";
-  else if(fs==="down" && u.pw && u.pw.q==="low") cause = "Victron shows the battery at "+u.pw.b+"%"+(u.pw.w!==null ? " with "+u.pw.w+" W of solar coming in" : "")+". The unit is most likely out of power. Check the panels and the charge controller before anything else."
+  else if(fs==="down" && lowBattery(u.pw)) cause = "Victron shows the battery at "+u.pw.b+"%"+(u.pw.w!==null ? " with "+u.pw.w+" W of solar coming in" : "")+". The unit is most likely out of power. Check the panels and the charge controller before anything else."
   else if(fs==="down") cause = r.off ? "The whole unit looks dark. Cameras and router are both not answering. Think site power, SIM or signal first."
     : r.on ? "The router answers, but nothing behind it is reporting. Think power to the cameras or recorder, the switch, or cabling."
     : "Cameras are not reporting and there is no router reading to narrow it down. Start with site power.";
@@ -406,10 +406,13 @@ function offCams(v){
   if(list && list.length) return list.filter(c=>c.st===0).map(c=>({name:c.name, since:c.lo||0}));
   return v.u.bad ? v.u.bad.split(";").map(x=>x.trim()).filter(Boolean).map(name=>({name, since:v.u.lo||0})) : [];
 }
+/* Out of power means the battery reading itself is low (under 20%), from a current reading. A Victron alarm on a full battery
+   (Felix found 95% flagged) is shown as an alarm on the card, but it is not a reason to tell a tech the unit ran out of power. */
+function lowBattery(pw){ return !!(pw && pw.q!=="off" && pw.q!=="stale" && pw.q!=="none" && typeof pw.b==="number" && pw.b<20); }
 function troubleFacts(v){
   const u=v.u, r=routerRead(u), pw=u.pw, live = pw && pw.q!=="off" && pw.q!=="stale" && pw.q!=="none";
   return { status:v.fs, place:v.place, offCams:v.fs==="issues" ? offCams(v) : [], routerOn:r.on, routerOff:r.off,
-    power: live ? {low:pw.q==="low", battery:pw.b} : null,
+    power: live ? {low:lowBattery(pw), battery:pw.b} : null,
     canCheck: !!(hooks && typeof hooks.onCheckUnit==="function" && checkPid(v)),
     routerPage: !!(u.ri && IPV4.test(u.ri) && /^\d+$/.test(u.rp)),
     camPages: !!(v.ip && IPV4.test(v.ip) && (u.s==="a" || u.s==="v")) };
@@ -567,7 +570,7 @@ function drawPanel(){
     else {
       cb.append(h("div",{class:"fix"},h("button",{class:"fixbtn",type:"button",disabled:S.busy,
         onclick:()=>checkNow(v)}, c && c.state==="run" ? "Checking…" : "Check this unit now")));
-      if(c && c.state!=="run") cb.append(h("p",{class:"note s-"+(c.state==="fail"?"down":"up"),text:c.said}));
+      if(c && c.state!=="run") cb.append(h("p",{class:"note"+(c.state==="fail" ? " s-down" : c.tone==="up" ? " s-up" : c.tone==="down" ? " s-down" : ""),text:c.said}));
       cb.append(h("p",{class:"note",text:"This asks the cameras at this unit right now instead of waiting for the next reading. It changes nothing in mHelp, Star4Live or InHand."}));
     }
     body.splice(body.indexOf(tbx),0,cb);
@@ -808,15 +811,19 @@ async function save(v, ch){
    standing at a unit does not wait for the next sweep. A check that does not run says so: a stale reading is
    never redrawn as if it were current, and nothing is written to mHelp, Star4Live or InHand. */
 function checkPid(v){
+  /* The unit's own A# first. An mHelp match counts only when it is exact: a fuzzy name match can belong to another unit,
+     and checking it would report that unit's cameras on this card. */
+  if(v.u.pid) return v.u.pid;
   const mm = S.mh ? (S.rec && S.rec.match[v.id]) : undefined;
-  return (mm && mm.rec && mm.rec.id) || v.u.pid || "";
+  return (mm && !mm.fuzzy && mm.rec && mm.rec.id) || "";
 }
 async function checkNow(v){
   if(S.busy || v.mhOnly || !hooks || typeof hooks.onCheckUnit!=="function") return;
   S.busy=true; S.chk={unit:v.id, state:"run", said:""}; drawPanel();
   try{
-    const said = await hooks.onCheckUnit(v.k, checkPid(v));
-    S.chk={unit:v.id, state:"done", said: said || "Checked just now."};
+    const got = await hooks.onCheckUnit(v.k, checkPid(v));
+    const said = got && typeof got==="object" ? got.said : got, tone = got && typeof got==="object" ? got.tone : "info";
+    S.chk={unit:v.id, state:"done", tone: tone==="up"||tone==="down" ? tone : "info", said: said || "The check finished, but COS was not told what it found. Tap Refresh."};
   }catch(err){
     S.chk={unit:v.id, state:"fail", said: (err && err.message) || "COS could not run the check."};
   }
