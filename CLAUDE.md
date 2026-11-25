@@ -18,6 +18,7 @@ work. A change here is not local, however small it looks.
 | `cron.job` (Tech Check) | 15 jobs on interleaved minutes. Pick a free minute; don't reuse another job's slot. |
 | Edge functions under `tech-checks/supabase/functions/` | Several are loaded from **pinned GitHub commits**, so the deployed code is not what's on `main`. Check the entrypoint before assuming. |
 | `tech-checks/operations/dist` | Committed to the repo and published by GitHub Pages on push to `main`. |
+| `tech-checks/supabase/migrations/` | Pinned by the `verify` workflow to an authorized file list. Adding a file here fails CI on every PR. Put change records in `tech-checks/docs/db-changes/` instead. |
 
 Two Supabase projects, easy to confuse:
 
@@ -51,13 +52,19 @@ new action value needs adding to the allow-list.
 - Merge with an explicit SHA: `gh api -X PUT .../pulls/N/merge -f merge_method=merge -f sha=<full sha>`
 - Rebuild before committing `dist`: `rm -rf dist/assets`, `git checkout -- dist`, `npm run build`, then `node .github/scripts/verify-cos-build-artifact.mjs` (expect exit 0)
 - `app_private` is not exposed to PostgREST. Reach it through a security-definer function in `public`.
-- Record live database changes as a file in `tech-checks/supabase/migrations/`, with a rollback line, even when applied by hand.
+- Record live database changes as a file in `tech-checks/docs/db-changes/`, with a rollback line, even when applied by hand. **Do not add files to `tech-checks/supabase/migrations/`**: the `verify` workflow pins that folder to an authorized list of files and fails closed on any other, so a new file there blocks every PR until the owner extends the pin.
 - Don't commit another session's unrelated work-in-progress; stage only your own files.
 
 ## Log of changes to shared ground
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-24** — Refreshed `equipment_master` from mHelp: 762 → 1148 rows
+  (386 added, 118 placements updated, 223 held for review). Fixed
+  `cos_equipment_master_refresh` to supply `source_page` and to prove its
+  insert during a dry run. Checked afterwards: 0 duplicate sweep keys, and the
+  next sweep published 34 of 44 as before. Record in
+  `tech-checks/docs/db-changes/`.
 - **2026-11-24** — Added `ADD_ROUTER_LINK` to the allow-list in
   `cos_tracker_endpoint_claims_v1` (migration
   `20261124_cos_tracker_endpoint_claims_allow_add_router_link.sql`). Three such
