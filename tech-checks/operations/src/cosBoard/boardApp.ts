@@ -417,13 +417,24 @@ function troubleFacts(v){
     routerPage: !!(u.ri && IPV4.test(u.ri) && /^\d+$/.test(u.rp)),
     camPages: !!(v.ip && IPV4.test(v.ip) && (u.s==="a" || u.s==="v")) };
 }
+/* The bar of tools under the diagnosis: Troubleshoot and Check this unit now, big and in color. Null when the card has neither. */
+function toolsBar(v, tb){
+  const pid = !v.mhOnly && hooks && typeof hooks.onCheckUnit==="function" ? checkPid(v) : "";
+  if(!tb && !pid) return null;
+  const c = S.chk && S.chk.unit===v.id ? S.chk : null;
+  const jump = id => { const el=$("panel").querySelector("#"+id); if(el) el.scrollIntoView({behavior:"smooth", block:"start"}); };
+  return h("div",{class:"tools"},
+    tb ? h("button",{class:"tool t-tr",type:"button",onclick:()=>jump("trBox")},h("b",{text:"Troubleshoot"}),h("span",{text:"Step by step, from what COS knows"})) : null,
+    pid ? h("button",{class:"tool t-ck",type:"button",disabled:S.busy,onclick:()=>{ checkNow(v); jump("chkBox"); }},
+      h("b",{text: c && c.state==="run" ? "Checking…" : "Check this unit now"}),h("span",{text:"Ask the cameras right now"})) : null);
+}
 /* Troubleshoot: what COS knows first, then one question at a time. Returns null where there is nothing to troubleshoot. */
 function troubleBox(v){
   if(v.mhOnly || v.u.s==="r") return null;
   const f=troubleFacts(v), tr = S.tr && S.tr.unit===v.id ? S.tr : (S.tr={unit:v.id, ans:{}});
   const walk=troubleWalk(f, tr.ans); if(!walk.at) return null;
   const known=troubleKnown(f, when, s=>ago(s));
-  const box=h("div",{class:"box trb"},h("h3",{text:"Troubleshoot"}));
+  const box=h("div",{class:"box trb",id:"trBox"},h("h3",{text:"Troubleshoot"}));
   if(known.length) box.append(h("ul",{class:"trknown"},known.map(k=>h("li",{text:k}))),h("p",{class:"note",text:"COS already knows this, so you don't have to look it up."}));
   if(walk.trail.length) box.append(h("ol",{class:"trtrail"},walk.trail.map((t,i)=>h("li",null,
     h("button",{class:"trback",type:"button",onclick:()=>{ const keep={}; walk.trail.slice(0,i).forEach(x=>keep[x.id]=tr.ans[x.id]); tr.ans=keep; drawPanel(); }},
@@ -526,7 +537,8 @@ function drawPanel(){
 
   const tb = troubleBox(v), ob = openBox(v);
   const tbx = tb || h("div",{class:"box"},h("h3",{text:"What to do"}),h("ol",{class:"steps"},steps(v).map(s=>h("li",{text:s}))));
-  const body=[ resBox(resFor(v.name, v.k, mm&&mm.rec.label)), diagBox(v), camsBox(v),
+  const dg = diagBox(v);
+  const body=[ resBox(resFor(v.name, v.k, mm&&mm.rec.label)), dg, camsBox(v),
     tbx,
     ob, locBox(v), logBox(v),
     h("div",{class:"box"},h("h3",{text:"Details"}),dl, v.why?h("p",{class:"note",text:v.why}):null) ];
@@ -565,7 +577,7 @@ function drawPanel(){
      Drawn only where the app can run a check and there is an A# to check against. */
   if(!v.mhOnly && hooks && typeof hooks.onCheckUnit==="function"){
     const c = S.chk && S.chk.unit===v.id ? S.chk : null, pid = checkPid(v);
-    const cb=h("div",{class:"box"},h("h3",{text:"Check it now"}));
+    const cb=h("div",{class:"box chkb",id:"chkBox"},h("h3",{text:"Check it now"}));
     if(!pid) cb.append(h("p",{class:"note",text:"This unit has no A# in COS yet, so there is nothing to check it against. Give it an A# in mHelp first."}));
     else {
       cb.append(h("div",{class:"fix"},h("button",{class:"fixbtn",type:"button",disabled:S.busy,
@@ -575,6 +587,10 @@ function drawPanel(){
     }
     body.splice(body.indexOf(tbx),0,cb);
   }
+  /* James: "i would have missed it cause it blends in." The tools sit in one bright bar right under the diagnosis,
+     so nobody has to scroll or search for them. Each one jumps to its box or runs straight away. */
+  const tools = toolsBar(v, tb);
+  if(tools) body.splice(body.indexOf(dg)+1,0,tools);
   body.push(histBox(v));
 
   P.className="panel s-"+v.status;

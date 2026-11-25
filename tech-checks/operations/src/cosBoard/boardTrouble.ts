@@ -137,7 +137,18 @@ export function troubleNote(unit: string, known: string[], walk: TroubleWalk, st
 
 /* Troubleshoot's own look, in the board's colors. Answers are big enough to hit with a thumb. */
 export const TROUBLE_CSS = `
-.box.trb{border-color:#3a557f}
+.box.trb{border:2px solid var(--warn);background:linear-gradient(180deg,rgba(251,191,36,.10),rgba(251,191,36,0) 120px),var(--s1)}
+.box.trb>h3,.box.chkb>h3{font-size:15px;letter-spacing:.02em;color:var(--warn)}
+.box.chkb{border:2px solid var(--shop);background:linear-gradient(180deg,rgba(96,165,250,.10),rgba(96,165,250,0) 120px),var(--s1)}
+.box.chkb>h3{color:var(--shop)}
+.tools{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:0 0 12px}
+.tool{display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;border:0;border-radius:14px;padding:14px 16px;min-height:64px;cursor:pointer;font-family:var(--body)}
+.tool b{font-family:var(--display);font-weight:800;font-size:18px;line-height:1.15}
+.tool span{font-size:13px;font-weight:600;opacity:.85}
+.tool.t-tr{background:var(--warn);color:#1a1300}
+.tool.t-ck{background:var(--shop);color:#04111f}
+.tool:disabled{opacity:.6;cursor:default}
+.tool:focus-visible{outline:3px solid var(--tx);outline-offset:2px}
 .trknown{list-style:none;margin:0 0 6px;padding:0;display:flex;flex-direction:column;gap:4px}
 .trknown li{background:var(--s2);border:1px solid var(--line2);border-radius:10px;padding:7px 11px;font-size:15px;font-weight:600}
 .trtrail{list-style:none;margin:8px 0 10px;padding:0;display:flex;flex-direction:column;gap:6px}

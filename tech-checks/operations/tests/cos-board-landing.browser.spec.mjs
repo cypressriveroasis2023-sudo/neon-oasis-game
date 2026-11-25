@@ -860,9 +860,12 @@ test('a unit with cameras off names them and walks a tech through it without lea
   expect(card).not.toContain('listed below');
   const heads = await inBoard(host, root => [...root.querySelectorAll('#panel .box > h3')].map(head => head.textContent));
   expect(heads.indexOf('Troubleshoot')).toBeGreaterThan(heads.indexOf('Diagnosis'));
+  // James: the tools must not blend in. A bright bar right under the diagnosis names them and jumps to them.
+  expect(await inBoard(host, root => [...root.querySelectorAll('#panel .tools .tool b')].map(b => b.textContent))).toContain('Troubleshoot');
+  expect(await inBoard(host, root => root.querySelector('#panel .tools')?.previousElementSibling?.querySelector('h3')?.textContent)).toBe('Diagnosis');
   expect(heads.indexOf('Troubleshoot')).toBeLessThan(heads.indexOf('Fix the record'));
   const answer = label => inBoard(host, (root, wanted) => { const b = [...root.querySelectorAll('#panel .trbtn')].find(x => x.textContent === wanted); b?.click(); return Boolean(b); }, label);
-  if (process.env.SHOT) { await inBoard(host, root => root.querySelector('#panel .box').scrollIntoView()); await page.screenshot({path: process.env.SHOT.replace('.png', '-top.png')}); }
+  if (process.env.SHOT) { await inBoard(host, root => root.querySelector('#panel .tools').scrollIntoView({block: 'center'})); await page.screenshot({path: process.env.SHOT.replace('.png', '-top.png')}); }
   expect(await answer('No, or not sure')).toBe(true);
   if (process.env.SHOT) { await inBoard(host, root => root.querySelector('#panel .trb').scrollIntoView()); await page.screenshot({path: process.env.SHOT.replace('.png', '-step.png')}); }
   // Every step points somewhere in COS, never to Star4Live.
