@@ -522,8 +522,9 @@ function drawPanel(){
   const dl=h("dl",{class:"kv"}); for(const [a,b] of kv) dl.append(h("dt",{text:a}),h("dd",{text:b}));
 
   const tb = troubleBox(v), ob = openBox(v);
+  const tbx = tb || h("div",{class:"box"},h("h3",{text:"What to do"}),h("ol",{class:"steps"},steps(v).map(s=>h("li",{text:s}))));
   const body=[ resBox(resFor(v.name, v.k, mm&&mm.rec.label)), diagBox(v), camsBox(v),
-    tb || h("div",{class:"box"},h("h3",{text:"What to do"}),h("ol",{class:"steps"},steps(v).map(s=>h("li",{text:s})))),
+    tbx,
     ob, locBox(v), logBox(v),
     h("div",{class:"box"},h("h3",{text:"Details"}),dl, v.why?h("p",{class:"note",text:v.why}):null) ];
   if(v.type==="Helios") body.push(powerBox(v));
@@ -556,8 +557,9 @@ function drawPanel(){
   /* Fixing the record comes after troubleshooting and the unit's own pages: most problems are not the record. */
   body.splice(body.indexOf(ob)+1,0,fx);
 
-  /* Checking comes before fixing: find out what is true now, then change it.
-     Drawn only where the app can actually run a check, and only where there is an A# to check against. */
+  /* Checking sits right before Troubleshoot, which uses it. James chose (25 Nov) to put troubleshooting ahead of
+     record fixes: the red record buttons under the diagnosis looked like the answer to a camera fault and are not.
+     Drawn only where the app can run a check and there is an A# to check against. */
   if(!v.mhOnly && hooks && typeof hooks.onCheckUnit==="function"){
     const c = S.chk && S.chk.unit===v.id ? S.chk : null, pid = checkPid(v);
     const cb=h("div",{class:"box"},h("h3",{text:"Check it now"}));
@@ -568,7 +570,7 @@ function drawPanel(){
       if(c && c.state!=="run") cb.append(h("p",{class:"note s-"+(c.state==="fail"?"down":"up"),text:c.said}));
       cb.append(h("p",{class:"note",text:"This asks the cameras at this unit right now instead of waiting for the next reading. It changes nothing in mHelp, Star4Live or InHand."}));
     }
-    body.splice(3,0,cb);
+    body.splice(body.indexOf(tbx),0,cb);
   }
   body.push(histBox(v));
 

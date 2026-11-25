@@ -274,6 +274,8 @@ test('checking one unit asks the app, never the network, and never fakes a readi
 
   // Checking must not run while a hand fix is in flight, and must not run twice at once.
   assert.match(app, /if\(S\.busy \|\| v\.mhOnly \|\| !hooks \|\| typeof hooks\.onCheckUnit!=="function"\) return;/);
+  // Checking sits right before Troubleshoot, which tells the tech to use it; fixing the record comes later on the card.
+  assert.match(app, /body\.splice\(body\.indexOf\(tbx\),0,cb\);/);
 });
 
 test('the app checks one unit with the same verify the rest of COS uses, then re-reads the board', () => {
