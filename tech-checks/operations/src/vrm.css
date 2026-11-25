@@ -142,3 +142,31 @@ html[data-theme='light'] .vrm-fleet-summary li,html[data-theme='light'] .vrm-wor
 .vrm-history-facts .bad b{color:#ff6b78}.vrm-history-facts .warn b{color:#f5b942}
 .vrm-history-flag{margin:10px 0 0;font-size:12.5px;color:#f5d27a}
 .vrm-attention .vrm-attn-overnight span{color:#ff8a93}.vrm-attention .vrm-attn-solar span{color:#f5b942}
+/* Tonight forecast */
+.vrm-tonight{margin:0 0 14px;padding:12px;border-radius:10px;border:1px solid var(--vt-line,#253447);border-left:4px solid #7b8ba0;background:#111c2a}
+.vrm-tonight h4{margin:0 0 6px}
+.vrm-tonight-ok,.vrm-tonight-charging{border-left-color:#3ddc84}.vrm-tonight-tight{border-left-color:#f5b942;background:#1d170a}.vrm-tonight-low{border-left-color:#ff4d5e;background:#1f0b10}
+.vrm-tonight-headline{margin:0;font-size:16px;font-weight:700;color:#fff;line-height:1.35}
+.vrm-tonight-low .vrm-tonight-headline{color:#ff8a93}.vrm-tonight-tight .vrm-tonight-headline{color:#f5d27a}.vrm-tonight-ok .vrm-tonight-headline,.vrm-tonight-charging .vrm-tonight-headline{color:#9ff0c0}
+.vrm-tonight-basis{margin:4px 0 0;font-size:12.5px;color:#a3b3ca}
+.vrm-tonight-todo{margin:10px 0 4px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e6edf7}
+.vrm-tonight ol{margin:0;padding-left:20px;display:grid;gap:5px;font-size:13px;color:#e6edf7;line-height:1.4}
+.vrm-tile-night{font-size:10.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.vrm-night-low{color:#ff6b78}.vrm-night-tight{color:#f5b942}
+.vrm-attention .vrm-attn-tonight span{color:#ff8a93;font-weight:700}.vrm-attention .vrm-attn-tight span{color:#f5b942}
+/* How to read this page */
+.vrm-guide{margin:10px 0 4px;border:1px solid var(--vt-line,#253447);border-radius:10px;background:var(--vt-panel,#0d1622)}
+.vrm-guide summary{cursor:pointer;padding:11px 12px;font-size:13px;font-weight:700;color:#e6edf7;list-style:none}
+.vrm-guide summary::before{content:'?';display:inline-grid;place-items:center;width:18px;height:18px;margin-right:8px;border-radius:50%;background:#e0283a;color:#fff;font-size:11px}
+.vrm-guide[open] summary{border-bottom:1px solid var(--vt-line,#253447)}
+.vrm-guide-body{padding:4px 12px 12px;font-size:13px;color:#c8d4e3;line-height:1.45}
+.vrm-guide-body h5{margin:14px 0 6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#ff8a93}
+.vrm-guide-body p{margin:0 0 6px}.vrm-guide-body ul{list-style:none;margin:0;padding:0;display:grid;gap:5px}
+.vrm-guide-keys i{display:inline-block;width:10px;height:10px;margin-right:8px;border-radius:50%;vertical-align:-1px}
+.g-good{background:#3ddc84}.g-fair{background:#f5b942}.g-low{background:#ff4d5e}.g-stale{background:#7b8ba0}.g-off{background:transparent;border:1px dashed #7b8ba0}
+.vrm-guide-symbols b{color:#fff;font-weight:700}.vrm-guide-symbols b.g-in{color:#3ddc84}.vrm-guide-symbols b.g-out{color:#f5b942}
+.vrm-guide-alerts li{display:grid;gap:2px;padding:8px 10px;border:1px solid var(--vt-line,#253447);border-radius:8px;background:#111c2a}
+.vrm-guide-alerts b{color:#fff}.vrm-guide-alerts em{font-style:normal;color:#9ff0c0}.vrm-guide-alerts em::before{content:'→ '}
+.vrm-guide-ok li::before{content:'✓ ';color:#3ddc84}.vrm-guide-escalate li::before{content:'! ';color:#ff6b78;font-weight:800}
+.vrm-tonight ol{list-style:decimal outside}.vrm-tonight ol li{display:list-item;padding-left:2px}.vrm-tonight ol li::marker{color:#ff8a93;font-weight:700}
+
+.vrm-attention .vrm-attn-notfull span{color:#f5b942;font-weight:650}.vrm-attention .vrm-attn-load span{color:#f5b942;font-weight:650}

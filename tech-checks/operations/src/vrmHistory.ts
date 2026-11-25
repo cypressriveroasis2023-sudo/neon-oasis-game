@@ -76,11 +76,50 @@ export function solarVsYesterday(points: HistoryPoint[], now: number): {today: n
   return {today: Math.round(today), yesterday: Math.round(yesterday), share: today / yesterday};
 }
 
-export type HistoryFlag = {kind: 'overnight' | 'solar'; line: string};
+/* ---------- Early warnings: didn't fill up, using more power than usual ---------- */
+export const FULL_PERCENT = 95;          // a healthy day gets the battery to at least this
+export const LOAD_RATIO = 1.5;           // "more than usual" = 1.5x its normal night draw ...
+export const LOAD_EXTRA_W = 10;          // ... and at least 10 W more
+
+/**
+ * The most recent daytime (7 AM - 5 PM) that has finished, and the highest battery % reached in it.
+ * Needs 8+ readings spread over 6+ hours, so a unit that was off most of the day is not judged.
+ */
+export function dayPeak(points: HistoryPoint[], now: number): {peak: number; label: 'today' | 'yesterday'} | null {
+  const d = new Date(now), h = d.getHours();
+  if (h >= 7 && h < 17) return null;                       // judge only after the sun is done
+  const off = h >= 17 ? 0 : -1, from = at(d, off, 7), to = at(d, off, 17);
+  const day = points.filter(p => p[1] !== null && p[0] >= from && p[0] <= to);
+  if (day.length < 8 || day[day.length - 1][0] - day[0][0] < 6 * 3600) return null;
+  return {peak: Math.round(Math.max(...day.map(p => p[1] as number))), label: off === 0 ? 'today' : 'yesterday'};
+}
+
+const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+/** Power the unit pulls from its battery when there is no sun (W, positive), from one reading. */
+const nightDraw = (p: HistoryPoint): number | null => p[3] !== null && p[3] < 0 && (p[2] ?? 0) < 5 ? -p[3] : null;
+
+/**
+ * Night power use over the last 2 hours against this unit's own normal (median of its earlier no-sun readings,
+ * 6 hours to 7 days old). Needs 4+ recent and 12+ normal readings.
+ */
+export function nightLoad(points: HistoryPoint[], now: number): {recent: number; normal: number; high: boolean} | null {
+  const nowS = now / 1000;
+  const recent = points.filter(p => p[0] >= nowS - 2 * 3600 && p[0] <= nowS + 300).map(nightDraw).filter((w): w is number => w !== null);
+  const before = points.filter(p => p[0] < nowS - 6 * 3600 && p[0] >= nowS - 7 * 86400).map(nightDraw).filter((w): w is number => w !== null);
+  if (recent.length < 4 || before.length < 12) return null;
+  const r = Math.round(recent.reduce((a, b) => a + b, 0) / recent.length), n = Math.round(median(before));
+  return {recent: r, normal: n, high: n > 0 && r >= n * LOAD_RATIO && r - n >= LOAD_EXTRA_W};
+}
+
+export type HistoryFlag = {kind: 'overnight' | 'notfull' | 'load' | 'solar'; line: string};
 export function historyFlags(points: HistoryPoint[], now: number): HistoryFlag[] {
   const flags: HistoryFlag[] = [];
   const night = overnightLow(points, now);
   if (night && night.low < OVERNIGHT_LOW_PERCENT) flags.push({kind: 'overnight', line: 'Dropped to ' + night.low + '% overnight'});
+  const day = dayPeak(points, now);
+  if (day && day.peak < FULL_PERCENT) flags.push({kind: 'notfull', line: "Didn't fill up " + day.label + ' · best was ' + day.peak + '%'});
+  const load = nightLoad(points, now);
+  if (load?.high) flags.push({kind: 'load', line: 'Using more power than usual · ' + load.recent + ' W vs normal ' + load.normal + ' W'});
   const sun = solarVsYesterday(points, now);
   if (sun && sun.share < SOLAR_LOW_SHARE) flags.push({kind: 'solar', line: 'Solar ' + Math.round(sun.share * 100) + '% of yesterday (weather, dirt or shade)'});
   return flags;
@@ -90,4 +129,79 @@ export function historyFlags(points: HistoryPoint[], now: number): HistoryFlag[]
 export function last24h(points: HistoryPoint[], now: number): HistoryPoint[] {
   const from = now / 1000 - 24 * 3600;
   return points.filter(p => p[0] >= from);
+}
+
+/* ---------- Tonight: will this Helios make it to sunrise? ---------- */
+export const NIGHT_FLOOR_PERCENT = 20;   // "will run low" means reaching this before morning
+export const NIGHT_TIGHT_PERCENT = 30;   // under this at 7 AM is "tight"
+export type TonightVerdict = 'ok' | 'tight' | 'low' | 'charging';
+export type Tonight = {
+  verdict: TonightVerdict;
+  battery: number;          // battery % now (newest point)
+  ratePerHour: number;      // % per hour over the last 2 hours (negative = draining)
+  atMorning: number;        // estimated % at 7 AM (0..100)
+  floorAt: number | null;   // epoch s when it reaches 20%, if before 7 AM
+  morning: number;          // epoch s of the 7 AM being forecast
+};
+
+const nextSeven = (now: number) => { const d = new Date(now); const t = new Date(d); t.setHours(7, 0, 0, 0); if (d.getHours() >= 7) t.setDate(t.getDate() + 1); return t.getTime() / 1000; };
+
+/** True from 5 PM to 7 AM local, when the sun can no longer refill the battery and a forecast means something. */
+export function isNightForecastTime(now: number): boolean { const h = new Date(now).getHours(); return h >= 17 || h < 7; }
+
+/**
+ * Straight-line forecast from the last 2 hours of battery readings (needs 4+ readings over 45+ minutes,
+ * the newest no older than 45 minutes). Only from 5 PM to 7 AM. Returns null when there is not enough to go on.
+ */
+export function tonightForecast(points: HistoryPoint[], now: number): Tonight | null {
+  if (!isNightForecastTime(now)) return null;
+  const nowS = now / 1000;
+  const recent = points.filter(p => p[1] !== null && p[0] >= nowS - 2 * 3600 && p[0] <= nowS + 300);
+  if (recent.length < 4) return null;
+  const first = recent[0], last = recent[recent.length - 1];
+  if (last[0] - first[0] < 45 * 60 || nowS - last[0] > 45 * 60) return null;
+  // Least-squares slope in % per hour.
+  const xs = recent.map(p => (p[0] - first[0]) / 3600), ys = recent.map(p => p[1] as number);
+  const mx = xs.reduce((a, b) => a + b, 0) / xs.length, my = ys.reduce((a, b) => a + b, 0) / ys.length;
+  const den = xs.reduce((a, x) => a + (x - mx) ** 2, 0);
+  const rate = den ? xs.reduce((a, x, i) => a + (x - mx) * (ys[i] - my), 0) / den : 0;
+  const battery = last[1] as number, morning = nextSeven(now);
+  const hours = Math.max(0, (morning - last[0]) / 3600);
+  const atMorning = Math.max(0, Math.min(100, battery + rate * hours));
+  if (rate >= -0.2) return {verdict: 'charging', battery: Math.round(battery), ratePerHour: Math.round(rate * 10) / 10, atMorning: Math.round(atMorning), floorAt: null, morning};
+  const toFloor = battery > NIGHT_FLOOR_PERCENT ? (battery - NIGHT_FLOOR_PERCENT) / -rate : 0;
+  const floorAt = last[0] + toFloor * 3600;
+  const verdict: TonightVerdict = floorAt < morning ? 'low' : atMorning < NIGHT_TIGHT_PERCENT ? 'tight' : 'ok';
+  return {verdict, battery: Math.round(battery), ratePerHour: Math.round(rate * 10) / 10, atMorning: Math.round(atMorning), floorAt: floorAt < morning ? Math.round(floorAt) : null, morning};
+}
+
+const clock = (s: number) => new Date(s * 1000).toLocaleTimeString(undefined, {hour: 'numeric', minute: '2-digit'});
+
+/** One plain sentence a tech can act on. */
+export function tonightHeadline(t: Tonight): string {
+  if (t.verdict === 'charging') return 'Holding steady — not losing charge right now.';
+  if (t.verdict === 'ok') return 'Should make it to morning — about ' + t.atMorning + '% at 7 AM.';
+  if (t.verdict === 'tight') return 'Tight — about ' + t.atMorning + '% at 7 AM. Check again before bed.';
+  return t.floorAt !== null && t.battery <= NIGHT_FLOOR_PERCENT ? 'Already at ' + t.battery + '% and still dropping.' : 'Will run low — reaches 20% around ' + clock(t.floorAt as number) + '.';
+}
+
+/** The why, in one short line. */
+export function tonightBasis(t: Tonight): string {
+  const rate = Math.abs(t.ratePerHour);
+  return 'Battery ' + t.battery + '% now, ' + (t.ratePerHour < 0 ? 'losing about ' + rate + '% an hour' : t.ratePerHour > 0 ? 'gaining about ' + rate + '% an hour' : 'flat') + ' over the last 2 hours.';
+}
+
+/** What a tech should do about it, short and in order. Empty when nothing needs doing. */
+export function tonightSteps(t: Tonight): string[] {
+  if (t.verdict === 'charging' || t.verdict === 'ok') return [];
+  if (t.verdict === 'tight') return [
+    'Look again before end of shift — the estimate updates every 15 minutes.',
+    'If it keeps dropping faster, treat it as "Will run low".',
+  ];
+  return [
+    'Check its cameras now on the COS Board. If they go down overnight, low power is the likely cause.',
+    'Look at today\'s solar on the chart. Little or no solar means dirty or shaded panels, or a charger problem.',
+    'Check the load. A heater, extra camera or bad device can drain the battery fast.',
+    'If it cannot make it, plan a battery swap or site visit the way you normally would, and note it on the IT sheet.',
+  ];
 }

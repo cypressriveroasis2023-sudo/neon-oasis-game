@@ -88,6 +88,7 @@ const hostPage = fixture => readFileSync(resolve(repo, 'tech-checks/index.html')
       if(!fixture.manager)return{data:null,error:{message:'Owner/Admin access required.'}};
       if(name==='owner_tech_command_board_v2')return{data:JSON.parse(JSON.stringify(fixture.manager.board)),error:null};
       if(name==='techcheck_transfer_context_v1')return fixture.manager.context?{data:JSON.parse(JSON.stringify(fixture.manager.context)),error:null}:{data:null,error:{message:'Named handoffs are held for release review.'}};
+      if(name==='techcheck_handoff_gaps_v1')return fixture.manager.gaps?{data:JSON.parse(JSON.stringify(fixture.manager.gaps)),error:null}:{data:null,error:{message:'held'}};
       if(name==='owner_save_service_truck_inventory_batch_v1'){
         if(fixture.saveError)return{data:null,error:{message:fixture.saveError}};
         // The stand-in keeps the same rule as the database: every unit slot is cleared first, a blank SIM is left alone.
