@@ -151,3 +151,39 @@ test('the daily list shows trucks without handoffs, loads without handoffs and u
   await db.query("select set_config('test.actor','',false)");
   assert.ok((await db.query('select public.techcheck_handoff_gaps_v1() r')).rows[0].r.checked_at);
 });
+
+test('returns: a return needs at least one photo, and returns IT has not checked in after 4 hours show on the owner list', async () => {
+  // Live photo check and returns table, reduced to what the change touches.
+  await db.exec(`
+    create table app_private.techcheck_ticketfree_returns_v1(id uuid primary key, service_tech_name text, family text, unit_tag text,
+      used_family text, used_tag text, state text, submitted_at timestamptz);
+    create function app_private.techcheck_ticketfree_photos_v1(p_id uuid, p_paths text[]) returns void language plpgsql security definer set search_path='' as $function$
+declare path text;
+begin
+ if p_paths is null or cardinality(p_paths)>8 then raise exception 'Use no more than eight photos.';end if;
+ foreach path in array p_paths loop
+  if path is null or path !~ '[.]jpg$' then raise exception 'Save each photo under this signed-in return before submitting.';end if;
+ end loop;
+end$function$;
+    insert into app_private.techcheck_ticketfree_returns_v1 values
+      ('00000000-0000-4000-8000-000000000201','Josh Mireles','Sniper','420',null,null,'waiting_it',now()-interval '6 hours'),
+      ('00000000-0000-4000-8000-000000000202','Abel Cervantes',null,null,'Ranger','011','identity_review',now()-interval '30 hours'),
+      ('00000000-0000-4000-8000-000000000203','Josh Mireles','Spotter','111',null,null,'waiting_it',now()-interval '1 hour'),
+      ('00000000-0000-4000-8000-000000000204','Josh Mireles','Spotter','112',null,null,'checked_in',now()-interval '9 hours');`);
+  await db.exec('select app_private.techcheck_ticketfree_photos_v1(gen_random_uuid(), array[]::text[])'); // before: none allowed
+  const sql = await readFile(new URL('../../database-maintenance/techcheck-returns-evidence-v1.sql', import.meta.url), 'utf8');
+  await db.exec(sql);
+  await db.exec(sql); // running it twice changes nothing
+  await assert.rejects(db.exec('select app_private.techcheck_ticketfree_photos_v1(gen_random_uuid(), array[]::text[])'), /Take at least one photo of the equipment/);
+  await assert.rejects(db.exec('select app_private.techcheck_ticketfree_photos_v1(gen_random_uuid(), null)'), /no more than eight/);
+  await db.exec("select app_private.techcheck_ticketfree_photos_v1(gen_random_uuid(), array['a.jpg'])");
+  await assert.rejects(db.exec("select app_private.techcheck_ticketfree_photos_v1(gen_random_uuid(), array['a.png'])"), /Save each photo/);
+  const [{r}] = await as(owner, 'select public.techcheck_handoff_gaps_v1() r');
+  assert.deepEqual(r.returns_not_checked_in.map(x => [x.unit, x.from, x.state]),
+    [['Ranger 011', 'Abel Cervantes', 'identity_review'], ['Sniper 420', 'Josh Mireles', 'waiting_it']]);
+  assert.ok(r.returns_not_checked_in[0].hours_waiting >= 29);
+  assert.ok(Array.isArray(r.handoffs_not_finished)); // the rest of the list is unchanged
+  await assert.rejects(as(josh, 'select public.techcheck_handoff_gaps_v1() r'), /Not authorized/);
+  const saved = (await db.query('select fn from app_private.techcheck_returns_evidence_backup_v1 order by fn')).rows.map(x => x.fn);
+  assert.deepEqual(saved, ['techcheck_handoff_gaps_v1', 'techcheck_ticketfree_photos_v1']);
+});

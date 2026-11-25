@@ -27,7 +27,7 @@ async function mount(page,status){
     const url=route.request().url();
     if(url===origin+'/camera-observed-timestamp-fixture')return route.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}iframe{width:100%;height:100vh;border:0}</style><iframe src="/#fleet-dashboard"></iframe><script>addEventListener('message',event=>{if(event.origin===location.origin&&event.data.type==='COS_OPERATIONS_TOKEN_REQUEST')event.source.postMessage({type:'COS_OPERATIONS_TOKEN_RESPONSE',requestId:event.data.requestId,role:'owner',accessToken:'synthetic-observation-time-only'},location.origin)})</script>`});
     if(url.startsWith(origin+'/'))return route.continue();
-    if(/^https:\/\/(?:[abc]\.)?tile\.openstreetmap\.org\//.test(url))return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#dce5df"/></svg>'});
+    if(/^https:\/\/(?:(?:[abc]\.)?tile\.openstreetmap\.org|[abcd]\.basemaps\.cartocdn\.com)\//.test(url))return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#dce5df"/></svg>'});
     if(url.includes('/functions/v1/cos-unit-camera-status'))return route.fulfill({status:200,contentType:'application/json',body:'{"units":[]}'});
     if(!url.endsWith('/functions/v1/cos-operations-pages')){state.blockedExternal.push(url);return route.abort('blockedbyclient');}
     const headers={'access-control-allow-origin':origin,'access-control-allow-methods':'POST,OPTIONS','access-control-allow-headers':'authorization,content-type'};

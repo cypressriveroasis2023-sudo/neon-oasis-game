@@ -34,6 +34,8 @@ on:
           - rollback-to-v18-entry
           - a-links-v19
           - rollback-to-v19-entry
+          - vcc-moves-v20
+          - rollback-to-v20-entry
       confirm:
         description: 'Type the patch name again to confirm. Deploying changes production immediately.'
         required: true
@@ -91,14 +93,20 @@ jobs:
       - name: Pin the A# links rollback file
         if: inputs.patch == 'rollback-to-v19-entry'
         run: printf '%s  %s\n' 'e9e011bfc614f80d29eeeeb848f88880689e84d622929ed7b7110b608d02227e' '.github/function-patches/cos-unit-camera-status/rollback-to-v19-entry.json' | sha256sum -c -
+      - name: Pin the Moved in VCC patch file
+        if: inputs.patch == 'vcc-moves-v20'
+        run: printf '%s  %s\n' 'd9775a92830aff5406ef5306a9d81744172ae825ce3a183c9ab1c459d8e59d17' '.github/function-patches/cos-unit-camera-status/vcc-moves-v20.json' | sha256sum -c -
+      - name: Pin the Moved in VCC rollback file
+        if: inputs.patch == 'rollback-to-v20-entry'
+        run: printf '%s  %s\n' '11df4e96b174a977e2aad611a9e96b4ffd85e07bc7669a25077e930a251a47d8' '.github/function-patches/cos-unit-camera-status/rollback-to-v20-entry.json' | sha256sum -c -
       - name: Pin the read-only live archive preflight
-        run: printf '%s  %s\n' '3491d7f3fa7ea86910fe8378411461a95edc92d273dff52b7ef5251203ef156a' '.github/scripts/preflight-live-function-pins.mjs' | sha256sum -c -
+        run: printf '%s  %s\n' 'cb634d16da255c900ab1e9193cbca3977e97516774a01dbbe2c821b61a78fb16' '.github/scripts/preflight-live-function-pins.mjs' | sha256sum -c -
       - name: Choose the recorded patch path
         id: recorded
         run: |
           name="${{ inputs.patch }}"
           case "$name" in
-            camera-routes-only-v16|rollback-to-v16-entry|troubleshoot-route-v17|rollback-to-v17-entry|camera-ports-v18|rollback-to-v18-entry|a-links-v19|rollback-to-v19-entry)
+            camera-routes-only-v16|rollback-to-v16-entry|troubleshoot-route-v17|rollback-to-v17-entry|camera-ports-v18|rollback-to-v18-entry|a-links-v19|rollback-to-v19-entry|vcc-moves-v20|rollback-to-v20-entry)
               echo "file=.github/function-patches/cos-unit-camera-status/${name}.json" >> "$GITHUB_OUTPUT"
               ;;
             *)

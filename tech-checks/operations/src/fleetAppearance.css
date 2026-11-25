@@ -153,7 +153,7 @@
 #root#root .cos-fleet-map-toolbar > div:last-child { flex-wrap: nowrap; }
 #root#root .cos-fleet-map-canvas { height: 500px; min-height: 330px; background: #17202a; }
 /* Only raster tiles are toned down. Markers, locations, controls and attribution are untouched. */
-#root#root .cos-fleet-map-canvas .leaflet-tile-pane { filter: grayscale(.7) invert(.9) hue-rotate(180deg) brightness(.75) contrast(.9); }
+/* Tiles are dark at source (CARTO dark_all); a filter here erases street detail. */
 #root#root .cos-fleet-map-canvas .leaflet-control-zoom a { width: 44px; height: 44px; line-height: 44px; }
 
 /* Compact address pins. The SVG tip matches Leaflet's [22,38] icon anchor;

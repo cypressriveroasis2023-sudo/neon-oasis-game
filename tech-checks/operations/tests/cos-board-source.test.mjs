@@ -34,8 +34,11 @@ test('the board is isolated from the rest of COS and sends nothing itself', () =
   // Exactly four sends, each named here on purpose: the hand fix, checking one unit on demand, sending a
   // Troubleshoot result to IT (James, 25 Nov: it goes on the next IT sheet instead of being copied by hand; it
   // schedules nothing and changes no unit), and linking an A# by hand (James, 25 Nov: "build a# button"; Tech Check
-  // checks the person and the A#). The count stays exact so a fifth has to be argued for here.
-  assert.equal(landing.split('api.post(').length - 1, 4);
+  // checks the person and the A#), and applying one Moved in VCC item (James, 25 Nov: "build move in VCC"; Tech Check
+  // works the list out again and refuses anything no longer listed). The count stays exact so a sixth has to be argued for here.
+  assert.equal(landing.split('api.post(').length - 1, 5);
+  assert.equal(landing.split("api.post('/api/unit-camera-status/vcc-move', {key})").length - 1, 1);
+  assert.match(app, /await hooks\.onVccMove\(it\.key\)/);
   assert.equal(landing.split("api.post('/api/unit-camera-status/link-a', {unitKey, productId})").length - 1, 1);
   assert.match(app, /await hooks\.onLinkA\(v\.k, pid\)/);
   assert.equal(landing.split("api.post('/api/unit-camera-status/troubleshoot', report)").length - 1, 1);
