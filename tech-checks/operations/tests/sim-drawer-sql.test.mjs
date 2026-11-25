@@ -102,3 +102,37 @@ test('a broken drawer never stops a handoff from saving', async () => {
   assert.equal((await db.query("select count(*)::int n from app_private.techcheck_transfer_events where id='00000000-0000-4000-8000-000000000303'")).rows[0].n, 1);
   await db.exec('alter table app_private.sim_drawer_moved rename to sim_drawer');
 });
+
+// Step 4 of the handoff plan: with the switch on, a handoff only takes SIMs that are in the drawer.
+test('SIMs must come from the drawer: off by default, then unlisted or busy SIMs are refused with the next step', async () => {
+  await db.exec(await readFile(new URL('../../database-maintenance/techcheck-sim-drawer-required-v1.sql', import.meta.url), 'utf8'));
+  await db.exec(await readFile(new URL('../../database-maintenance/techcheck-sim-drawer-required-v1.sql', import.meta.url), 'utf8'));
+  await db.exec('grant execute on all functions in schema public to authenticated');
+  const t2 = '00000000-0000-4000-8000-000000000202';
+  await db.query(`insert into app_private.techcheck_transfers values ($1,'Abel Cervantes')`, [t2]);
+  const send = (sims, id, tr = transfer) => db.query(`insert into app_private.techcheck_transfer_events(id,transfer_id,actor_id,actor_name,kind,snapshot) values($1,$2,$3,'Teddy Hopper','checkout',$4::jsonb)`,
+    [id, tr, teddy, JSON.stringify({actual: [{family: 'Ranger', unit_tag: '007', sims}]})]);
+  // Off: an unlisted SIM is still only recorded.
+  await send(['89012600000000000555'], '00000000-0000-4000-8000-000000000401');
+  await assert.rejects(as(teddy, 'select public.sim_drawer_require_v1(true) r'), /Not authorized/);
+  const [{r}] = await as(owner, 'select public.sim_drawer_require_v1(true) r');
+  assert.deepEqual(r, {require_listed: true});
+  assert.equal((await drawer(owner)).require_listed, true);
+  await assert.rejects(send(['8901 2600 0000 0000 666'], '00000000-0000-4000-8000-000000000402'),
+    /SIM 8901260000000000666 in Ranger 007 is not in the SIM drawer, so this handoff was not saved\. NEXT STEP: check the number/);
+  // A card already handed out in another handoff is not free.
+  await as(owner, "select public.sim_drawer_add_v1(array['89012600000000000888','89012600000000000999'],'Simetry') r");
+  await send(['89012600000000000888', 'NA'], '00000000-0000-4000-8000-000000000403');
+  assert.equal((await card('89012600000000000888')).status, 'in_unit');
+  await assert.rejects(send(['89012600000000000888'], '00000000-0000-4000-8000-000000000404', t2),
+    /SIM 89012600000000000888 in Ranger 007 is not free: the SIM drawer shows it as already in a unit \(Ranger 007 → Josh Mireles\)/);
+  // The same handoff again, and a free card, go through.
+  await send(['89012600000000000888'], '00000000-0000-4000-8000-000000000405');
+  await send(['89012600000000000999'], '00000000-0000-4000-8000-000000000406', t2);
+  assert.equal((await card('89012600000000000999')).location, 'Ranger 007 → Abel Cervantes');
+  await as(owner, 'select public.sim_drawer_require_v1(false) r');
+  await send(['89012600000000000777'], '00000000-0000-4000-8000-000000000407');
+  const log = (await db.query("select detail, actor_name from app_private.sim_drawer_history where sim_number='SETTING' order by id")).rows;
+  assert.deepEqual(log.map(x => x.detail), ['SIMs must come from the drawer: on', 'SIMs must come from the drawer: off']);
+  assert.equal(log[0].actor_name, 'James Martin');
+});
