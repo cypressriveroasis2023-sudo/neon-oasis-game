@@ -1,0 +1,47 @@
+{
+  "slug": "cos-unit-camera-status",
+  "projectRef": "tughscoxralhofrckvxy",
+  "sourceDir": "tech-checks/docs/cos-unit-camera-status-v18-entry",
+  "sourceCommit": "95e3e5a4f81f0f823e7e646a01a8235da7c5f425",
+  "deployedFileNames": {
+    "index.ts": "cos-unit-camera-status/index.ts",
+    "deno.json": "cos-unit-camera-status/deno.json"
+  },
+  "entrypointPath": "cos-unit-camera-status/index.ts",
+  "importMapPath": "cos-unit-camera-status/deno.json",
+  "verifyJwt": false,
+  "description": "Each Star4Live camera in /api/unit-camera-status carries its forwarded web port (1400/1500/1600/1700/1900), from its local address 192.168.10.14-17/19 by the company port standard, so the unit card can link each camera's own page. Only the port number is sent, never the local address. Two exact edits to live v18: the camera query also reads source_metadata->>localIp, and the camera list adds port when the local address fits the standard. Nothing else changes.",
+  "authorization": "James, 2026-11-25: 'a link to each cameras interface directly.' Running the deploy still needs his explicit go for that run.",
+  "releaseStatus": "PREPARED",
+  "sourceRecord": "tech-checks/docs/cos-unit-camera-status-v18-entry/index.ts",
+  "requireLiveBeforeDeploy": {
+    "status": "ACTIVE",
+    "version": 18,
+    "ezbr_sha256": "3c521a58ea0bdac730e0753eb6b8d295305dc63aac723e6a4c2909a1626362b5"
+  },
+  "edits": [
+    {
+      "file": "index.ts",
+      "needle": "legacyAll(\"camera_devices?select=id,device_name,unit_key,organization,vigilant_status,activation_state,source_last_seen_at,public_ip,star_organization_id:source_metadata->>organizationId&source=eq.vigilant_control_center&order=id.asc\"",
+      "replacement": "legacyAll(\"camera_devices?select=id,device_name,unit_key,organization,vigilant_status,activation_state,source_last_seen_at,public_ip,star_organization_id:source_metadata->>organizationId,local_ip:source_metadata->>localIp&source=eq.vigilant_control_center&order=id.asc\"",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "cameraList: named.map((c) => ({ name: c.name, status: c.status, atSite: cameraPlacement(c.row) === \"FIELD\" })),",
+      "replacement": "cameraList: named.map((c) => ({ name: c.name, status: c.status, atSite: cameraPlacement(c.row) === \"FIELD\", ...((m) => m ? { port: Number(m[1]) * 100 } : {})(/^192\\.168\\.10\\.(1[4-79])$/.exec(text18(c.row.local_ip))) })),",
+      "occurrences": 1
+    }
+  ],
+  "expectedBefore": {
+    "index.ts": "ee7e57864dabadab6fd0b03500bc8793afcdb84f5ff65be2fbbab0e59782d7e8",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "expectedAfter": {
+    "index.ts": "a718c407bdacd735cce4f00aedfab32e8557b886b25ee653a9c32defa3c2c4e7",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "dryRun": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/camera-ports-v18.json --dry-run",
+  "deploy": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/camera-ports-v18.json --deploy",
+  "rollback": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/rollback-to-v18-entry.json --deploy"
+}

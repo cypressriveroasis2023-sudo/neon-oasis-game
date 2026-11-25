@@ -20,6 +20,8 @@ export type StarCameraRow = {
   activation_state?: string | null;
   source_last_seen_at?: string | null;
   public_ip?: string | null;
+  /** The camera's local address, read only to work out its forwarded web port. Never sent on. */
+  local_ip?: string | null;
   star_organization_id?: string | null;
 };
 
@@ -31,7 +33,11 @@ export type UnitCamera = {
 };
 /** Every camera Star4Live reports for a unit, with where it sits and whether a
  * person has said it is no longer on the unit (a swap). */
-export type UnitCameraEntry = UnitCamera & { atSite: boolean; removed?: boolean };
+/** port: the router's forwarded web port for this camera (1400/1500/1600/1700/1900), from its local address by the
+ * company port standard. Only the port is sent, never the local address. Absent when the address is off-standard. */
+export type UnitCameraEntry = UnitCamera & { atSite: boolean; removed?: boolean; port?: number };
+const CAMERA_LOCAL = /^192\.168\.10\.(1[4-79])$/;
+export const cameraWebPort = (localIp: unknown): number | null => { const m = CAMERA_LOCAL.exec(typeof localIp === 'string' ? localIp.trim() : ''); return m ? Number(m[1]) * 100 : null; };
 
 export type UnitCameraStatus = {
   unit: string;
@@ -211,7 +217,7 @@ export function projectUnitCameraStatus(rows: StarCameraRow[] | null | undefined
       cameras: atSite.length, online, offline, unknown,
       down: atSite.filter(c => c.status !== 'online').map(c => ({ name: c.name, status: c.status })),
       ...(awayFromSite.length ? { awayFromSite: awayFromSite.map(c => ({ name: c.name, status: c.status })) } : {}),
-      cameraList: named.map(c => ({ name: c.name, status: c.status, atSite: cameraPlacement(c.row) === 'FIELD' })),
+      cameraList: named.map(c => { const port = cameraWebPort(c.row.local_ip); return { name: c.name, status: c.status, atSite: cameraPlacement(c.row) === 'FIELD', ...(port ? {port} : {}) }; }),
       onlineInShop: placement === 'SHOP' && online > 0,
       publicIp: text(members.find(row => text(row.public_ip))?.public_ip) || null,
       observedAt: observed.length ? observed[observed.length - 1] : null,
