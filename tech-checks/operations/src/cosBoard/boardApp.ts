@@ -413,10 +413,32 @@ function lowBattery(pw){ return !!(pw && pw.q!=="off" && pw.q!=="stale" && pw.q!
 function troubleFacts(v){
   const u=v.u, r=routerRead(u), pw=u.pw, live = pw && pw.q!=="off" && pw.q!=="stale" && pw.q!=="none";
   return { status:v.fs, place:v.place, offCams:v.fs==="issues" ? offCams(v) : [], routerOn:r.on, routerOff:r.off,
-    power: live ? {low:lowBattery(pw), battery:pw.b} : null,
+    power: live ? {low:lowBattery(pw), battery:pw.b, nightLow: typeof pw.nl==="number" ? pw.nl : null} : null,
     canCheck: !!(hooks && typeof hooks.onCheckUnit==="function" && checkPid(v)),
     routerPage: !!(u.ri && IPV4.test(u.ri) && /^\d+$/.test(u.rp)),
     camPages: !!(v.ip && IPV4.test(v.ip) && (u.s==="a" || u.s==="v")) };
+}
+/* Send to IT: the result goes onto the next daily IT sheet, Manager help YES flagged, instead of being copied by hand.
+   Sent once per result; a new answer makes a new result. Drawn only where the app can send. */
+function sendBox(v, at, note, tr){
+  if(!hooks || typeof hooks.onSendTrouble!=="function") return null;
+  const key = JSON.stringify(tr.ans), st = tr.sent && tr.sent.key===key ? tr.sent : null;
+  if(st && st.state==="done") return h("p",{class:"note s-up trsent",text:"Sent to IT"+(st.by ? " by "+st.by : "")+" · "+st.at+". It goes on the next IT sheet"+(at.managerHelp ? ", flagged for the manager." : ".")});
+  const go = async () => {
+    if(tr.sent && tr.sent.state==="run") return;
+    tr.sent = {key, state:"run", id: (tr.sent && tr.sent.key===key && tr.sent.id) || crypto.randomUUID()};
+    drawPanel();
+    try{
+      const got = await hooks.onSendTrouble({requestId: tr.sent.id, unitKey: v.k, unitName: v.name, result: at.title, next: at.next || "", managerHelp: !!at.managerHelp, note});
+      tr.sent = {key, state:"done", id: tr.sent.id, by: got && got.by || "", at: got && got.at ? when(Math.round(Date.parse(got.at)/1000)) : "just now"};
+    }catch(err){
+      tr.sent = {key, state:"fail", id: tr.sent.id, said: (err && err.message) || "COS could not send it. Copy the note instead."};
+    }
+    drawPanel();
+  };
+  return h("div",null,
+    h("button",{class:"trbtn go trsend",type:"button",disabled: !!(st && st.state==="run"),onclick:go}, st && st.state==="run" ? "Sending…" : "Send to IT"),
+    st && st.state==="fail" ? h("p",{class:"note s-down",text:st.said}) : null);
 }
 /* The bar of tools under the diagnosis: Troubleshoot and Check this unit now, big and in color. Null when the card has neither. */
 function toolsBar(v, tb){
@@ -437,7 +459,8 @@ function troubleBox(v){
   const known=troubleKnown(f, when, s=>ago(s));
   const box=h("div",{class:"box trb",id:"trBox"},h("h3",{text:"Troubleshoot"}));
   if(known.length) box.append(h("ul",{class:"trknown"},known.map(k=>h("li",{text:k}))),h("p",{class:"note",text:"COS already knows this, so you don't have to look it up."}));
-  if(walk.trail.length) box.append(h("ol",{class:"trtrail"},walk.trail.map((t,i)=>h("li",null,
+  if(walk.trail.length) box.append(h("ol",{class:"trtrail"},walk.trail.map((t,i)=>t.auto ? h("li",null,
+    h("div",{class:"trback trauto"},h("span",{text:t.question}),h("b",{text:t.answer}))) : h("li",null,
     h("button",{class:"trback",type:"button",onclick:()=>{ const keep={}; walk.trail.slice(0,i).forEach(x=>keep[x.id]=tr.ans[x.id]); tr.ans=keep; drawPanel(); }},
       h("span",{text:t.question}),h("b",{text:t.answer}))))));
   const at=walk.at;
@@ -450,6 +473,7 @@ function troubleBox(v){
     box.append(h("div",{class:"trres t-"+at.tone},h("p",{class:"trq",text:at.title}),h("ul",null,at.todo.map(t=>h("li",{text:t}))),
         h("p",{class:"trhelp",text:"Manager help: "+(at.managerHelp ? "YES — write what is needed; the manager arranges any visit." : "No")})),
       h("pre",{class:"trnote",text:note}),
+      sendBox(v, at, note, tr),
       h("div",{class:"tropts two"},
         h("button",{class:"trbtn go",type:"button",onclick:()=>{ try{ navigator.clipboard.writeText(note).then(()=>toast("Note copied."),()=>toast("Couldn't copy in this view.")); }catch(_){ toast("Couldn't copy in this view."); } }},"Copy note"),
         h("button",{class:"trbtn",type:"button",onclick:()=>{ tr.ans={}; drawPanel(); }},"Start over")));
@@ -464,6 +488,7 @@ const ipShort = ip => { ip=String(ip||""); return IPV4.test(ip) ? "ending ."+ip.
 function openBox(v){
   const u=v.u, m = S.mh && S.rec ? S.rec.match[v.id] : (v.mhOnly ? {rec:v.rec} : null), sys=[], own=[];
   const lk=(label,url)=>h("a",{class:"lk",href:url,target:"_blank",rel:"noopener noreferrer"},label);
+  /* James, 25 Nov: keep the Star4Live button on the card. */
   if(u.s==="v") sys.push(lk("Star4Live","https://global.star4live.com/userWeb/device/device-management"));
   if(u.rs || u.rr || u.ri) sys.push(lk("InHand routers","https://iot.inhandnetworks.com/device/list"));
   if(v.type==="Helios" || /^Helios/.test(v.type)) sys.push(lk("Victron VRM","https://vrm.victronenergy.com/"));

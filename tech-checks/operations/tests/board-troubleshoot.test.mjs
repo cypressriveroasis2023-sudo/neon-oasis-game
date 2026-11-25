@@ -63,3 +63,21 @@ test('whole unit down: router off goes to the SIM, router on goes to pinging the
 test('an answer that no longer fits stops the walk at that step', () => {
   assert.equal(at(base, {night: 'maybe'}).id, 'night');
 });
+
+test('COS answers the night question from last night’s Victron low when it is clear', () => {
+  const withNight = low => ({...base, power: {low: false, battery: 80, nightLow: low}});
+  // Clear drop overnight: COS answers yes and goes straight to power.
+  const drop = troubleWalk(withNight(12), {});
+  assert.equal(drop.at.title, 'Power, not the camera');
+  assert.equal(drop.trail[0].auto, true);
+  assert.match(drop.trail[0].answer, /last night’s low was 12%/);
+  // Held up fine overnight: COS answers no and asks the next question.
+  const fine = troubleWalk(withNight(65), {});
+  assert.equal(fine.at.id, 'check');
+  assert.match(fine.trail[0].answer, /^No — Victron/);
+  // In between, or no Victron: the tech is asked.
+  assert.equal(troubleWalk(withNight(30), {}).at.id, 'night');
+  assert.equal(troubleWalk(base, {}).at.id, 'night');
+  // A tech's own answer is never overridden.
+  assert.equal(troubleWalk(withNight(12), {night: 'no'}).at.id, 'check');
+});

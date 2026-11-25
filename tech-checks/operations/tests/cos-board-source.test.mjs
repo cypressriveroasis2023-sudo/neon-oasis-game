@@ -30,9 +30,12 @@ test('the board is isolated from the rest of COS and sends nothing itself', () =
   assert.doesNotMatch(app, /unit-camera-status|\bapi\.(?:get|post)\(|from '\.\.?\/api'/);
   const landing = read('../src/CosBoardLanding.tsx');
   assert.equal(landing.split("api.post('/api/unit-camera-status/edit', handFixRequest(unit, step, crypto.randomUUID()))").length - 1, 1);
-  // Exactly two sends, both named here on purpose: the hand fix, and checking one unit on demand. The count stays
-  // exact so a third has to be argued for in this test rather than appearing quietly.
-  assert.equal(landing.split('api.post(').length - 1, 2);
+  // Exactly three sends, each named here on purpose: the hand fix, checking one unit on demand, and sending a
+  // Troubleshoot result to IT (James, 25 Nov: it goes on the next IT sheet instead of being copied by hand; it
+  // schedules nothing and changes no unit). The count stays exact so a fourth has to be argued for here.
+  assert.equal(landing.split('api.post(').length - 1, 3);
+  assert.equal(landing.split("api.post('/api/unit-camera-status/troubleshoot', report)").length - 1, 1);
+  assert.match(app, /await hooks\.onSendTrouble\(\{requestId: tr\.sent\.id/);
   assert.equal(landing.split("api.post('/api/product-connections/verify', {productIds: [productId]})").length - 1, 1);
   // The work log and the board's own tech check form would need that store, so they are off.
   assert.match(app, /function logBox\(\)\{ return null; \}/);
@@ -287,12 +290,17 @@ test('checking one unit asks the app, never the network, and never fakes a readi
   assert.match(app, /mm && !mm\.fuzzy && mm\.rec && mm\.rec\.id/);
 });
 
+test('the card keeps its Star4Live button', () => {
+  // James, 25 Nov: "keep star4live button." Troubleshoot never sends a tech there; the button stays for when they choose to.
+  assert.match(app, /if\(u\.s==="v"\) sys\.push\(lk\("Star4Live","https:\/\/global\.star4live\.com\/userWeb\/device\/device-management"\)\);/);
+});
+
 test('a full battery with a Victron alarm is not called out of power', () => {
   // Felix: 95% was flagged as a power problem, because a level-2 Victron alarm turns the shared tone "low".
   // On the board, out of power means the battery reading itself is under 20%, from a current reading.
   assert.match(app, /function lowBattery\(pw\)\{ return !!\(pw && pw\.q!=="off" && pw\.q!=="stale" && pw\.q!=="none" && typeof pw\.b==="number" && pw\.b<20\); \}/);
   assert.match(app, /fs==="down" && lowBattery\(u\.pw\)/);
-  assert.match(app, /power: live \? \{low:lowBattery\(pw\), battery:pw\.b\} : null/);
+  assert.match(app, /power: live \? \{low:lowBattery\(pw\), battery:pw\.b, nightLow:/);
   assert.doesNotMatch(app, /u\.pw\.q==="low"\) cause/);
 });
 

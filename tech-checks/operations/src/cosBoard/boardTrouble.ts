@@ -12,7 +12,7 @@ export type TroubleFacts = {
   offCams: {name: string; since: number}[];   // cameras COS has as offline, with last online (unix seconds, 0 = unknown)
   routerOn: boolean;
   routerOff: boolean;
-  power: {low: boolean; battery: number | null} | null;   // Victron, only when current
+  power: {low: boolean; battery: number | null; nightLow?: number | null} | null;   // Victron, only when current; nightLow = last night's lowest %
   canCheck: boolean;                    // the card has Check it now
   routerPage: boolean;                  // the card links the router's own page
   camPages: boolean;                    // the card links the unit's own camera pages
@@ -86,6 +86,18 @@ const RESULTS: Record<string, Result> = {
   dead: {title: 'No power at the unit, or the router failed', tone: 'bad', todo: ['On site: power at the unit, breaker and fuses, router lights, antenna cables.'], next: 'Site visit: power and router', managerHelp: true},
 };
 
+/* Questions COS can answer from its own data, so the tech is not asked. Last night's lowest Victron battery answers the
+ * night question when it is clear either way: under 20% is a night power drop, 40% or more is not. In between, ask. */
+const NIGHT_LOW = 20, NIGHT_OK = 40;
+function autoAnswer(f: TroubleFacts, id: string): {key: string; said: string} | null {
+  if (id !== 'night') return null;
+  const low = f.power?.nightLow;
+  if (typeof low !== 'number') return null;
+  if (low < NIGHT_LOW) return {key: 'yes', said: 'Yes — Victron: last night’s low was ' + low + '%'};
+  if (low >= NIGHT_OK) return {key: 'no', said: 'No — Victron: last night’s low was ' + low + '%'};
+  return null;
+}
+
 /** Where a unit's troubleshooting starts, or null when there is nothing to troubleshoot. */
 export function troubleStart(f: TroubleFacts): string | null {
   if (f.place !== 'field') return null;
@@ -104,7 +116,7 @@ export function troubleKnown(f: TroubleFacts, when: (sec: number) => string, ago
   return out;
 }
 
-export type TroubleWalk = {trail: {id: string; question: string; answer: string}[]; at: TroubleStep | TroubleResult | null};
+export type TroubleWalk = {trail: {id: string; question: string; answer: string; auto?: boolean}[]; at: TroubleStep | TroubleResult | null};
 
 /** Walk the answers given so far and return the trail plus the next step or the result. Unknown answers stop the walk there. */
 export function troubleWalk(f: TroubleFacts, answers: TroubleAnswers): TroubleWalk {
@@ -115,6 +127,14 @@ export function troubleWalk(f: TroubleFacts, answers: TroubleAnswers): TroubleWa
   while (guard++ < 20) {
     if (at.startsWith('r:')) return {trail, at: {kind: 'result', ...RESULTS[at.slice(2)]}};
     const node = N[at];
+    // A tech's own answer wins; otherwise COS answers what its data settles.
+    const auto = answers[at] === undefined ? autoAnswer(f, at) : null;
+    if (auto) {
+      const hop = node.options.find(o => o[0] === auto.key)!;
+      trail.push({id: at, question: node.question, answer: auto.said, auto: true});
+      at = hop[2];
+      continue;
+    }
     const picked = node.options.find(o => o[0] === answers[at]);
     if (!picked) return {trail, at: {kind: 'step', id: at, question: node.question, how: node.how, who: node.who || REMOTE, options: node.options.map(([key, label]) => ({key, label}))}};
     trail.push({id: at, question: node.question, answer: picked[1]});
@@ -154,6 +174,7 @@ export const TROUBLE_CSS = `
 .trtrail{list-style:none;margin:8px 0 10px;padding:0;display:flex;flex-direction:column;gap:6px}
 .trback{display:block;width:100%;text-align:left;background:transparent;border:0;border-left:3px solid var(--line2);padding:3px 0 3px 10px;font-size:14px;color:var(--tx2)}
 .trback b{display:block;color:var(--tx);font-weight:650}
+.trauto{border-left-color:var(--up)}.trauto b::before{content:'COS answered · ';color:var(--up);font-weight:700}
 .trwho{display:inline-block;background:var(--s2);border:1px solid var(--line2);border-radius:999px;padding:2px 10px;font-size:12.5px;font-weight:650;color:var(--tx2);margin:6px 0 6px}
 .trq{font-family:var(--display);font-weight:800;font-size:20px;line-height:1.25;margin:0 0 8px!important;color:var(--tx)}
 .trhow{background:var(--s2);border-radius:12px;padding:10px 12px 10px 32px!important;margin:0 0 10px!important;font-size:15px}
@@ -164,6 +185,8 @@ export const TROUBLE_CSS = `
 .trres{border-left:5px solid var(--warn);padding:2px 0 2px 12px;margin:6px 0 10px}
 .trres.t-good{border-left-color:var(--up)}.trres.t-bad{border-left-color:var(--down)}.trres.t-info{border-left-color:var(--shop)}
 .trres ul{margin:0 0 8px;padding-left:20px}.trres li{margin:3px 0}
+.trsend{width:100%;text-align:center;margin:10px 0 0;min-height:54px;font-size:17px}
+.trsent{margin-top:10px!important;font-weight:650}
 .trhelp{font-weight:700;background:var(--s2);border-radius:10px;padding:8px 11px}
 .trnote{white-space:pre-wrap;font-size:13px;line-height:1.45;background:var(--bg2);border:1px solid var(--line2);border-radius:10px;padding:10px 12px;margin:0;color:var(--tx2);overflow-wrap:anywhere}
 `;
