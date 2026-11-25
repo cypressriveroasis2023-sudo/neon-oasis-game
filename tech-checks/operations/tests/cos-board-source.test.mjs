@@ -276,6 +276,24 @@ test('checking one unit asks the app, never the network, and never fakes a readi
   assert.match(app, /if\(S\.busy \|\| v\.mhOnly \|\| !hooks \|\| typeof hooks\.onCheckUnit!=="function"\) return;/);
   // Checking sits right before Troubleshoot, which tells the tech to use it; fixing the record comes later on the card.
   assert.match(app, /body\.splice\(body\.indexOf\(tbx\),0,cb\);/);
+
+  // Felix: the green "Checked just now" showed when no check had run. Green only when the check came back online;
+  // a check with no answer says so instead of a success line.
+  assert.doesNotMatch(app, /Checked just now/);
+  assert.match(app, /c\.tone==="up" \? " s-up"/);
+  assert.doesNotMatch(app, /s-"\+\(c\.state==="fail"\?"down":"up"\)/);
+  // Felix: it could check the wrong unit. The unit's own A# comes first, and a fuzzy mHelp name match is never used.
+  assert.match(app, /if\(v\.u\.pid\) return v\.u\.pid;/);
+  assert.match(app, /mm && !mm\.fuzzy && mm\.rec && mm\.rec\.id/);
+});
+
+test('a full battery with a Victron alarm is not called out of power', () => {
+  // Felix: 95% was flagged as a power problem, because a level-2 Victron alarm turns the shared tone "low".
+  // On the board, out of power means the battery reading itself is under 20%, from a current reading.
+  assert.match(app, /function lowBattery\(pw\)\{ return !!\(pw && pw\.q!=="off" && pw\.q!=="stale" && pw\.q!=="none" && typeof pw\.b==="number" && pw\.b<20\); \}/);
+  assert.match(app, /fs==="down" && lowBattery\(u\.pw\)/);
+  assert.match(app, /power: live \? \{low:lowBattery\(pw\), battery:pw\.b\} : null/);
+  assert.doesNotMatch(app, /u\.pw\.q==="low"\) cause/);
 });
 
 test('the app checks one unit with the same verify the rest of COS uses, then re-reads the board', () => {
@@ -288,6 +306,11 @@ test('the app checks one unit with the same verify the rest of COS uses, then re
   // A save in flight and a board that moved on are both refused rather than guessed at.
   assert.match(landing, /A save is still in progress/);
   assert.match(landing, /started !== generation\.current/);
+
+  // What the check found is read with the same contract Verify now uses; an unknown answer is not a check.
+  assert.match(landing, /readSingleVerification\(\(await api\.post\('\/api\/product-connections\/verify'/);
+  assert.match(landing, /item\.status === 'unknown'\) throw new Error\('The check did not reach the cameras'/);
+  assert.doesNotMatch(landing, /Checked just now/);
 });
 
 test('the camera-systems count is shown but marked, never passed off as the official one', () => {

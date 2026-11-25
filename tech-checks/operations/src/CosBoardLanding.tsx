@@ -1,5 +1,6 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
 import {api, openLegacy} from './api';
+import {readSingleVerification} from './fleetVerificationRun';
 import {cameraFeedCensus, cameraFeedClock, recorderLinksFromHealth} from './sharedFleetCounts';
 import {STAR_UNIT_STATUS_CONTRACT, type UnitCameraStatus} from '../shared/starUnitStatus';
 import type {CameraRow} from './cameraEvidence';
@@ -179,12 +180,18 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
         if (writing.current) throw new Error('A save is still in progress. Try again once it finishes.');
         if (!productId) throw new Error('This unit has no A# in COS, so there is nothing to check it against.');
         const started = generation.current;
-        await api.post('/api/product-connections/verify', {productIds: [productId]});
+        // Say what the check found, not that it ran. An answer COS cannot confirm, or one where the cameras were not
+        // reached, is not a check: the card keeps the old reading and says so.
+        const item = readSingleVerification((await api.post('/api/product-connections/verify', {productIds: [productId]})).data, productId);
+        if (item.status === 'unknown') throw new Error('The check did not reach the cameras' + (item.reason ? ': ' + item.reason : '.') + ' Still showing the last reading.');
+        const at = item.checkedAt ? new Date(item.checkedAt).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'}) : '';
+        const found = (item.status === 'online' ? 'Online' : 'Offline') + (at ? ' at ' + at : '') + (item.reason ? ' · ' + item.reason : '');
+        const tone = item.status === 'online' ? 'up' as const : 'down' as const;
         const result = checked((await api.get('/api/unit-camera-status')).data);
-        // The board moved on while the check ran. Saying it was checked would be true; showing this reading would not.
-        if (started !== generation.current) return 'Checked. The board had already moved on, so tap Refresh to see it.';
+        // The board moved on while the check ran. The answer is still true; this reading may not be.
+        if (started !== generation.current) return {said: found + '. The board had already moved on, so tap Refresh to see it.', tone};
         take.current(result);
-        return 'Checked just now.';
+        return {said: found + '.', tone};
       },
       // Tech checks are their own screen in COS.
       // An IT sign-in keeps its tech checks in the Tech Check app around this frame, so the tab opens them there.
