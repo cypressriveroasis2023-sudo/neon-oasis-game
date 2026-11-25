@@ -30,6 +30,8 @@ export default function VrmTechGuide() {
         <li><b className='g-in'>↑ 203 W in</b> — battery charging.</li>
         <li><b className='g-out'>↓ 37 W out</b> — battery draining.</li>
         <li><b>🌙 20% by 3:40 AM</b> — will run low tonight (shown from 5 PM to 7 AM).</li>
+        <li><b>🌙 Low 72%</b> — lowest battery last night (5 PM–7 AM). Green 50%+, yellow 20–49%, red under 20%.</li>
+        <li><b>🔌 Plugged in</b> — stayed full all night on outside power. Nothing to do.</li>
         <li><b>FIELD / SHOP</b> — where mHelp says the unit is.</li>
       </ul>
       <h5>2. Needs attention</h5>

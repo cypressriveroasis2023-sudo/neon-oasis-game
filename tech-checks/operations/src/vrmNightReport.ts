@@ -55,7 +55,7 @@ export function nightReport(units: readonly {installationId: number; name: strin
   const silent = rows.length - live.length;
   const bottom: string[] = [];
   if (!live.length) bottom.push('No Helios saved readings for this night yet.');
-  else if (attention.length) bottom.push(attention.length + (attention.length === 1 ? ' unit needs' : ' units need') + ' a look: ' + attention.map(r => r.name).join(', ') + '.');
+  else if (attention.length) bottom.push(attention.length + (attention.length === 1 ? ' unit needs' : ' units need') + ' a look' + (attention.length <= 3 ? ': ' + attention.map(r => r.name).join(', ') : ' (see Needs attention)') + '.');
   else bottom.push(w.done ? 'Every reporting Helios made it through the night.' : 'Every reporting Helios is fine so far tonight.');
   const ends = onBattery.map(r => r.end).filter((n): n is number => n !== null);
   if (ends.length) bottom.push((w.done ? 'Battery at 7 AM: ' : 'Battery now: ') + range(ends, '%') + ' for the units on battery.');
