@@ -8,6 +8,8 @@ import { readDashboardPower, shortDate, unitTileSummary } from './vrmReadOnlyMod
 import { heliosPlacement, placementLabel, victronNeedsAttention } from './victronAttention';
 import { dayPeak, historyFlags, isNightForecastTime, nightLoad, last24h, overnightLow, readVrmHistory, solarVsYesterday, tonightBasis, tonightForecast, tonightHeadline, tonightSteps, type HistoryPoint, type Tonight } from './vrmHistory';
 import VrmTechGuide from './VrmTechGuide';
+import VrmNightReport from './VrmNightReport';
+import { nightReport } from './vrmNightReport';
 import VrmHistoryChart from './VrmHistoryChart';
 
 type FleetSync = ReturnType<typeof readVrmFleetConfig>['sync'];
@@ -177,6 +179,7 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
       <h3>{attention.length ? 'Needs attention · Field units' : 'No Field power issues'}</h3>
       {attention.length > 0 && <ul>{attention.map(item => <li key={item.installationId}><button type='button' className={'vrm-attn-'+item.kind} onClick={() => select(item.installationId)}><strong>{item.name}</strong><span>{item.line}</span></button></li>)}</ul>}
     </section>}
+    {units.length > 0 && history && <VrmNightReport report={nightReport(units, history, now, name => heliosPlacement(name, inventory) === 'shop')} now={now} place={name => { const p = heliosPlacement(name, inventory); return p === 'unknown' ? '' : placementLabel(p); }} onOpen={select}/>}
     {units.length > 0 && <VrmTechGuide/>}
     {!loaded && loading && <p role='status'>Loading your Victron installations…</p>}
     {loaded && units.length === 0 && <div className='vrm-awaiting' role='status'><h3>No installations in the saved fleet</h3><p>{canDiscover ? 'Refresh the fleet to check the connected Victron account.' : 'No saved installations are available. Ask an Owner to check the fleet sync.'} No installation IDs or dashboards are assumed.</p></div>}
