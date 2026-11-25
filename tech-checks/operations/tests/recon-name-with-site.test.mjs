@@ -52,6 +52,9 @@ test('names that are not units stay not units', () => {
   // unit, and in particular a sentence that merely mentions a unit must not.
   for (const name of [
     'Stolen from RII-022 on 04/10/2026',   // mentions RII-022; must not become it
+    'RII-007-junk',                        // a glued-on suffix is not a site
+    'RII005-Newmark',                      // same: no space before the dash
+    'RII022-',                             // trailing separator, no site
     'Shop Equipment',
     'AI BOX',
     'Boob Camera 1',

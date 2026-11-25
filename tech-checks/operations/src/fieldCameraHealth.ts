@@ -55,10 +55,11 @@ function parseCanonicalCameraUnit(value:string):string|null {
     // Recon read "No site on record" and sat at Unknown. The two patterns above
     // are untouched, so every name that parsed before parses the same way; these
     // two only add names that used to parse to nothing. The suffix is required
-    // here, the family list is just Recon, and the site must follow a separator,
-    // so a Spotter or Sniper site name still can never be read as a unit number.
-    || /^(RECON\s*(?:2|II))(?=\s|[-#])\s*[-#]?\s*(\d{1,6}(?:\.\d+)?)(?:\s*[-\u2013\u2014]\s*\S.*|\s+\S.*)$/i.exec(trimmed)
-    || /^(RECON|RII|RI)\s*[-#]?\s*(\d{1,6}(?:\.\d+)?)(?:\s*[-\u2013\u2014]\s*\S.*|\s+\S.*)$/i.exec(trimmed);
+    // here, the family list is just Recon, and the site must begin with whitespace,
+    // so a Spotter or Sniper site name still can never be read as a unit number and
+    // a glued-on suffix is not a site: "RII-007-junk" is still nothing.
+    || /^(RECON\s*(?:2|II))(?=\s|[-#])\s*[-#]?\s*(\d{1,6}(?:\.\d+)?)(?:\s+(?:[-\u2013\u2014]\s*)?\S.*)$/i.exec(trimmed)
+    || /^(RECON|RII|RI)\s*[-#]?\s*(\d{1,6}(?:\.\d+)?)(?:\s+(?:[-\u2013\u2014]\s*)?\S.*)$/i.exec(trimmed);
   if(!match)return null;
   let family=plain(match[1]).replace(/\s/g,'');
   family=({RI:'RECON',RII:'RECON2',RECONII:'RECON2'} as Record<string,string>)[family]||family;

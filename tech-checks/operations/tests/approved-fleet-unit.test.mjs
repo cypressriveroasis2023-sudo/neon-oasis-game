@@ -45,7 +45,9 @@ import {createHash} from 'node:crypto';
 // read "No site on record" at Unknown. Two patterns are ADDED after the two
 // anchored ones, which are unchanged, so every name that parsed before parses
 // identically; the new ones accept the Recon families only, and only with a
-// separator and a site after the number. Checked against all 472 unit keys in
+// space and a site after the number -- a glued-on suffix is not a site, so
+// "RII-007-junk" is still nothing, which tests/recon-battery.test.mjs already
+// required. Checked against all 472 unit keys in
 // camera_devices: 36 Recon records gain an identity and the other 16 unparsed
 // keys stay unparsed, including "Stolen from RII-022 on 04/10/2026", the test
 // rigs, "Sniper Alibi 243", "SPOTTER NVR 305" and "SS023.1". Where a duplicate
@@ -60,7 +62,7 @@ const expected={
   "FleetBatterySummary.tsx": "278f67abefcc6846876e2ced0862eec9cf1733dd",
   "LastKnownCameraStatus.tsx": "40b4218e51b13c8e15d5f5e7ad81be410df4663d",
   "fleetDashboardModel.ts": "d98e1e1700ef34888a40b5caa0a9c9bdb3359d41",
-  "fieldCameraHealth.ts": "d9104f61006a5f76c478de8e2cddb84c7fcda323",
+  "fieldCameraHealth.ts": "a7e9a7757a5d86c9ecbfb6370e796abe331fca34",
   "cameraEvidence.ts": "3eabba249ac6c8f4384eefd044a6d154e7904172",
   "api.ts": "b00323c7dc29b5e8cfb05851dcf65bf53c9108a7",
   "useCameraHealth.ts": "62382e9352b2c17cdafa144a784bc2f64fa04d51",
