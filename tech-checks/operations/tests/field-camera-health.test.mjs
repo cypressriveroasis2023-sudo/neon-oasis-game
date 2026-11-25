@@ -9,7 +9,14 @@ const project=(rows=[row],units=[unit],value=unit)=>fieldCameraHealth(value,unit
 test('anchored family identifiers normalize padding without fuzzy matching',()=>{
  for(const label of ['SOLARSPOTTER 051','Solar Spotter51'])assert.equal(canonicalCameraUnit(label),'SOLARSPOTTER|51');
  assert.equal(canonicalCameraUnit('Spotter 051'),'SPOTTER|51');assert.equal(canonicalCameraUnit('Recon II 051'),'RECON2|51');assert.equal(canonicalCameraUnit('RII-051'),'RECON2|51');assert.equal(canonicalCameraUnit('RI051'),'RECON|51');assert.notEqual(canonicalCameraUnit('SNIPER 2 005'),canonicalCameraUnit('SNIPER 005'));
- for(const label of ['RII051 - Job Name','Spotter 051HD','051','Camera for Solar Spotter 051','Solar Spotter 000','Spotter 51 / 52'])assert.equal(canonicalCameraUnit(label),null);assert.equal(project().state,'online');
+ // 'RII051 - Job Name' used to be in the list below. It was moved here on
+ // 2026-11-25 at James's instruction: Reconeyez names every detector after its
+ // site, so that shape is not a fuzzy match to reject but the only shape a real
+ // Recon key has. See the review note in approved-fleet-unit.test.mjs. The rest
+ // of this list is unchanged, and a Recon still needs whitespace before its
+ // site, so 'RII051-Job Name' is still nothing.
+ assert.equal(canonicalCameraUnit('RII051 - Job Name'),'RECON2|51');
+ for(const label of ['RII051-Job Name','Spotter 051 - Job Name','Spotter 051HD','051','Camera for Solar Spotter 051','Solar Spotter 000','Spotter 51 / 52'])assert.equal(canonicalCameraUnit(label),null);assert.equal(project().state,'online');
 });
 test('duplicate fields, resource IDs, conflicting models and unit aliases fail closed',()=>{
  for(const units of [[unit,{...unit,id:'different'}],[unit,{...unit,unitNumber:'Ranger 52'}]])assert.equal(project([row],units).state,'unknown');

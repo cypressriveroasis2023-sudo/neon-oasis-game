@@ -45,8 +45,21 @@ export function canonicalCameraUnit(value:string):string|null {
 }
 function parseCanonicalCameraUnit(value:string):string|null {
   // A variant discriminator must end before the asset tag: Sniper 201 is not Sniper 2 01.
-  const match=/^(SNIPER\s*[24]|RECON\s*(?:2|II))(?=\s|[-#])\s*[-#]?\s*(\d{1,6}(?:\.\d+)?)$/i.exec(value.trim())
-    || /^(HELIOS|RANGER|SOLAR\s*SPOTTER|SPOTTER|SS\s*HYBRID|SNIPER|CAM\s*V|RECON|RII|RI)\s*[-#]?\s*(\d{1,6}(?:\.\d+)?)$/i.exec(value.trim());
+  const trimmed=value.trim();
+  const match=/^(SNIPER\s*[24]|RECON\s*(?:2|II))(?=\s|[-#])\s*[-#]?\s*(\d{1,6}(?:\.\d+)?)$/i.exec(trimmed)
+    || /^(HELIOS|RANGER|SOLAR\s*SPOTTER|SPOTTER|SS\s*HYBRID|SNIPER|CAM\s*V|RECON|RII|RI)\s*[-#]?\s*(\d{1,6}(?:\.\d+)?)$/i.exec(trimmed)
+    // Recon families only, and only with a site on the end. Reconeyez names a
+    // detector after where it stands -- "RII005 - Newmark/Gembler",
+    // "RII-024 GVP Rise Loop 410" -- so a Recon key almost never ends at its
+    // number, and all 38 of them failed the two anchored forms above: every
+    // Recon read "No site on record" and sat at Unknown. The two patterns above
+    // are untouched, so every name that parsed before parses the same way; these
+    // two only add names that used to parse to nothing. The suffix is required
+    // here, the family list is just Recon, and the site must begin with whitespace,
+    // so a Spotter or Sniper site name still can never be read as a unit number and
+    // a glued-on suffix is not a site: "RII-007-junk" is still nothing.
+    || /^(RECON\s*(?:2|II))(?=\s|[-#])\s*[-#]?\s*(\d{1,6}(?:\.\d+)?)(?:\s+(?:[-\u2013\u2014]\s*)?\S.*)$/i.exec(trimmed)
+    || /^(RECON|RII|RI)\s*[-#]?\s*(\d{1,6}(?:\.\d+)?)(?:\s+(?:[-\u2013\u2014]\s*)?\S.*)$/i.exec(trimmed);
   if(!match)return null;
   let family=plain(match[1]).replace(/\s/g,'');
   family=({RI:'RECON',RII:'RECON2',RECONII:'RECON2'} as Record<string,string>)[family]||family;
