@@ -10,7 +10,8 @@ const units = ['HELIOS 001', 'HELIOS 002', 'HELIOS 003', 'HELIOS 004', 'HELIOS 0
 test('the night is the last finished 5 PM to 7 AM, or tonight so far', () => {
   assert.deepEqual(nightWindow(local(25, 8)), {from: s(local(24, 17)), to: s(local(25, 7)), done: true});
   assert.equal(nightWindow(local(25, 2)).done, false);
-  assert.equal(nightWindow(local(25, 18)).from, s(local(25, 17)));
+  assert.equal(nightWindow(local(25, 18)).from, s(local(24, 17)));   // early evening still shows last night
+  assert.equal(nightWindow(local(25, 20)).from, s(local(25, 17)));
 });
 
 test('report: statuses, the numbers on top, and plain bottom lines', () => {

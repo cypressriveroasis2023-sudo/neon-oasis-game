@@ -15,10 +15,10 @@ export type NightReport = {
 
 const at = (base: Date, dayOffset: number, hour: number) => { const d = new Date(base); d.setDate(d.getDate() + dayOffset); d.setHours(hour, 0, 0, 0); return d.getTime() / 1000; };
 
-/** The night being reported: the last finished 5 PM - 7 AM, or tonight so far after 5 PM / before 7 AM. */
+/** The night being reported: the last finished 5 PM - 7 AM until 7 PM, then tonight so far (once it has 2 hours of readings). */
 export function nightWindow(now: number): {from: number; to: number; done: boolean} {
   const d = new Date(now), h = d.getHours();
-  if (h >= 17) return {from: at(d, 0, 17), to: at(d, 1, 7), done: false};
+  if (h >= 19) return {from: at(d, 0, 17), to: at(d, 1, 7), done: false};
   if (h < 7) return {from: at(d, -1, 17), to: at(d, 0, 7), done: false};
   return {from: at(d, -1, 17), to: at(d, 0, 7), done: true};
 }
