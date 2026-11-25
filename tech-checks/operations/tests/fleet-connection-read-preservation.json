@@ -6,7 +6,7 @@
     {
       "path": "api.ts",
       "baselineBlob": "b00323c7dc29b5e8cfb05851dcf65bf53c9108a7",
-      "candidateBlob": "a3ff3f5d12316fd687616a2b9b72eec5ee51c353",
+      "candidateBlob": "65464bba0536d7412bb115d257d58eaf5b231191",
       "replacements": [
         {
           "from": "const fleetSnapshots=new Map<string,{value:FleetSnapshot;at:number}>();\ntype FleetReads={health:Promise<FleetSnapshot['health']>;fieldMap:Promise<FleetSnapshot['fieldMap']>;connectionMap:Promise<FleetSnapshot['fieldMap']>;paired:Promise<FleetSnapshot>};\nconst pendingFleetSnapshots=new Map<string,FleetReads>();\n",
@@ -62,6 +62,12 @@
           "from": "    if (authenticationDenied) invalidatePrivateData('authentication-denied');",
           "to": "    if (authenticationDenied) invalidatePrivateData('authentication-denied', path);",
           "count": 1
+        },
+        {
+          "from": "const unitCameraStatusPaths = ['/api/unit-camera-status', '/api/unit-camera-status/edit'];",
+          "to": "const unitCameraStatusPaths = ['/api/unit-camera-status', '/api/unit-camera-status/edit', '/api/unit-camera-status/troubleshoot'];",
+          "count": 1,
+          "note": "085dbb1 Board: Send to IT from Troubleshoot -- adds the troubleshoot path to the list that routes to cos-unit-camera-status"
         }
       ]
     },
