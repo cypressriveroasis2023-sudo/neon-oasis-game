@@ -110,3 +110,25 @@ test('anyone who is not Owner or IT never sees the Link router list', async ({pa
   await expect(frame.getByRole('region', {name: 'InHand routers not linked to a unit'})).toHaveCount(0);
   await expect(frame.getByText('Owner or IT only.')).toHaveCount(0);
 });
+
+test('an offline router reads Offline everywhere on the card, and its button is grey, not green', async ({page}, info) => {
+  test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');
+  const {app} = await mountFleet(page, false, {cameraStatus: report});
+  const host = app.locator('.cos-board-host');
+  await expect.poll(() => inBoard(host, root => root.querySelectorAll('.tile').length)).toBe(4);
+  await detailsServer(page, {routers: [{unit: 'SPOTTER 002', serial: 'RF3022412359403', model: 'InHand IR300', status: 'offline', at: fresh,
+    ip: '203.0.113.42', ipFrom: 'inhand', port: 8080, sig: {level: 4, radio: '4G', band: '66', rsrp: -81}, carrier: 'AT&T'}], unmatched: [], units: []});
+  await page.route('**/functions/v1/cos-unit-camera-status', route => route.request().method() === 'OPTIONS'
+    ? route.fulfill({status: 204, headers: {'access-control-allow-origin': '*', 'access-control-allow-headers': '*'}})
+    : route.fulfill({status: 200, headers: {'access-control-allow-origin': '*'}, json: report}));
+  await inBoard(host, root => root.getElementById('refresh').click());
+  await refreshed(host);
+  await openUnit(host, 'Spotter 002');
+  await expect.poll(() => inBoard(host, root => root.getElementById('rtrBox')?.querySelector('.cst')?.textContent || '')).toBe('Offline');
+  const card = await inBoard(host, root => ({panel: root.getElementById('panel').textContent, off: root.querySelector('#rtrBox a.rbtn')?.classList.contains('off')}));
+  expect(card.off).toBe(true);
+  expect(card.panel).toMatch(/Router, InHand says.{0,20}Offline · /);
+  expect(card.panel).not.toContain('Router readings have not loaded yet');
+  expect(card.panel).toContain('The router is offline, so its page will not open');
+  expect(card.panel).toContain('Last signal');
+});
