@@ -26,7 +26,13 @@ export class PullError extends Error {
 }
 
 export type Token = { access_token: string; expires_in?: number; refresh_token?: string | null };
-export type Reading = { serial: string; online: 0 | 1 };
+/** Extra router facts for the unit card. Never SIM numbers (ICCID, IMSI, IMEI) or phone numbers. */
+export type ReadingDetails = {
+  name?: string; model?: string; pub?: string; carrier?: string; fw?: string; seen?: string;
+  sig?: { level?: number; radio?: string; band?: string; rsrp?: number; rsrq?: number; sinr?: number; ts?: string };
+  gps?: { lat: number; lng: number; t?: string };
+};
+export type Reading = { serial: string; online: 0 | 1; d?: ReadingDetails };
 
 export type PullDeps = {
   fetch: typeof fetch;
@@ -134,13 +140,50 @@ function deviceArray(body: any): any[] | null {
   return null;
 }
 
+const CARRIERS: Record<string, string> = { '310-260': 'T-Mobile', '310-410': 'AT&T', '310-280': 'AT&T', '310-150': 'AT&T', '311-480': 'Verizon', '310-012': 'Verizon' };
+const short = (v: unknown, max: number) => typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined;
+const num = (v: unknown, lo: number, hi: number) => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi ? v : undefined;
+const iso = (v: unknown) => typeof v === 'string' && /^\d{4}-\d\d-\d\dT/.test(v) && Number.isFinite(Date.parse(v)) ? v : undefined;
+
+/** Only the fields the card shows, each checked. Everything else InHand sends is dropped here. */
+export function detailsOf(device: any): ReadingDetails {
+  const d: ReadingDetails = {};
+  const name = short(device?.name, 80); if (name) d.name = name;
+  const model = short(device?.model, 24); if (model) d.model = model;
+  if (typeof device?.pubIp === 'string' && /^\d{1,3}(\.\d{1,3}){3}$/.test(device.pubIp) && device.pubIp.split('.').every((p: string) => Number(p) <= 255)) d.pub = device.pubIp;
+  const info = device?.info && typeof device.info === 'object' ? device.info : {};
+  const mcc = num(info.mcc, 0, 999), mnc = num(info.mnc, 0, 999);
+  if (mcc !== undefined && mnc !== undefined) {
+    const key = String(mcc).padStart(3, '0') + '-' + String(mnc).padStart(3, '0');
+    d.carrier = CARRIERS[key] || 'Carrier ' + key;
+  }
+  const fw = short(info.swVersion, 24); if (fw) d.fw = fw;
+  const seen = iso(device?.logtime); if (seen) d.seen = seen;
+  const s = device?.signalStrength;
+  if (s && typeof s === 'object') {
+    const sig: NonNullable<ReadingDetails['sig']> = {};
+    const level = num(s.level, 0, 5); if (level !== undefined) sig.level = Math.round(level);
+    const radio = short(s.radio, 8); if (radio) sig.radio = radio;
+    const band = s.band === undefined || s.band === null ? undefined : short(String(s.band), 8); if (band) sig.band = band;
+    for (const k of ['rsrp', 'rsrq', 'sinr'] as const) { const v = num(s[k], -200, 100); if (v !== undefined) sig[k] = v; }
+    const ts = iso(s.ts); if (ts) sig.ts = ts;
+    if (Object.keys(sig).length) d.sig = sig;
+  }
+  const loc = device?.location;
+  if (loc && typeof loc === 'object') {
+    const lat = num(loc.latitude, -90, 90), lng = num(loc.longitude, -180, 180);
+    if (lat !== undefined && lng !== undefined && !(lat === 0 && lng === 0)) d.gps = { lat, lng, ...(iso(loc.time) ? { t: iso(loc.time) } : {}) };
+  }
+  return d;
+}
+
 export function readingOf(device: any): Reading | null {
   const serial = typeof device?.serialNumber === 'string' ? device.serialNumber.trim().toUpperCase() : '';
   if (!/^[A-Z0-9-]{6,40}$/.test(serial)) return null;
   const online = device?.online;
-  if (online === 1 || online === true) return { serial, online: 1 };
-  if (online === 0 || online === false) return { serial, online: 0 };
-  return null;
+  const flag = online === 1 || online === true ? 1 : online === 0 || online === false ? 0 : null;
+  if (flag === null) return null;
+  return { serial, online: flag, d: detailsOf(device) };
 }
 
 /** Every page of /api/devices. Throws 'devices_unauthorized' on 401/403 so the caller can sign in again once. */
