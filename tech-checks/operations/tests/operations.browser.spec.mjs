@@ -53,7 +53,7 @@ async function fixturePage(page,{locationWritesEnabled=true,jobs=null}={}) {
   await page.route(origin + '/harness', route => route.fulfill({ status: 200, contentType: 'text/html', body: harness }));
   await page.route(url => !url.toString().startsWith(origin + '/'), async route => {
     const request = route.request(), url = request.url();
-    if (/^https:\/\/(?:(?:[abc]\.)?tile\.openstreetmap\.org|[abcd]\.basemaps\.cartocdn\.com)\//.test(url)) return route.fulfill({ status: 200, contentType: 'image/png', body: png });
+    if (/^https:\/\/[abc]\.tile\.openstreetmap\.org\//.test(url)) return route.fulfill({ status: 200, contentType: 'image/png', body: png });
     if (url !== edge) return route.abort('blockedbyclient');
     if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': origin, 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'authorization, content-type' } });
     expect(request.method()).toBe('POST');
