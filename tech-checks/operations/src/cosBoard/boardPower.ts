@@ -1,7 +1,7 @@
 import {readVrmFleetConfig} from '../../../supabase/functions/cos-operations-pages/vrm';
 import {canonicalCameraUnit} from '../fieldCameraHealth';
 import {readDashboardPower, unitTileSummary, type TileTone} from '../vrmReadOnlyModel';
-import {historyFlags, overnightLow, type HistoryPoint} from '../vrmHistory';
+import {historyFlags, overnightLow, tonightBasis, tonightForecast, tonightHeadline, tonightSteps, type HistoryPoint} from '../vrmHistory';
 
 /** One Helios unit's Victron reading as the COS Board draws it.
  * b = battery %, w = solar W, v = battery volts, t = reading time in seconds (0 = none), q = tone,
@@ -10,7 +10,9 @@ import {historyFlags, overnightLow, type HistoryPoint} from '../vrmHistory';
 export type BoardPower = {b: number | null; w: number | null; v: number | null; t: number; q: Exclude<TileTone, 'unavailable'> | 'off';
   f?: {s: 'charging' | 'draining' | 'idle'; w: number | null}; al?: {k: string; l: 1 | 2}; ls: number;
   /** From saved history, when it has been read: last night's lowest battery %, and plain-language flags. */
-  nl?: number; hf?: string[]};
+  nl?: number; hf?: string[];
+  /** Tonight's estimate (5 PM to 7 AM): verdict, one-line headline, why, and steps for a tech. */
+  tn?: {v: 'ok' | 'tight' | 'low' | 'charging'; h: string; b: string; s: string[]}};
 
 const seconds = (value?: string) => {
   const time = value ? Date.parse(value) : NaN;
@@ -51,7 +53,9 @@ export function boardPowerByUnit(fleetData: unknown, now: number, history?: Read
       ...((points => {
         if (!points?.length) return {};
         const night = overnightLow(points, now), flags = historyFlags(points, now).map(f => f.line);
-        return {...(night ? {nl: night.low} : {}), ...(flags.length ? {hf: flags} : {})};
+        const t = tile.fresh ? tonightForecast(points, now) : null;
+        return {...(night ? {nl: night.low} : {}), ...(flags.length ? {hf: flags} : {}),
+          ...(t ? {tn: {v: t.verdict, h: tonightHeadline(t), b: tonightBasis(t), s: tonightSteps(t)}} : {})};
       })(history?.get(item.installationId))),
     });
   }

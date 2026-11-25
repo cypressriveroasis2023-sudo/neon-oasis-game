@@ -59,6 +59,14 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-24** — Operations: added `cos_vrm_private.power_history` and an
+  AFTER trigger on `cos_vrm_private.installations` (Victron battery history;
+  errors are swallowed and the sync is unchanged), plus the
+  `public.cos_vrm_power_history` read (service_role only) and a new edge
+  function `cos-vrm-history`. Record in `tech-checks/docs/db-changes/`.
+- **2026-11-24** — Tech Check cron: `cos-mhelp-inventory-sync` moved from
+  `5,35` to `5,20,35,50`, so a failed mHelp read retries 15 minutes later.
+  Record in `tech-checks/docs/db-changes/`.
 - **2026-11-24** — Refreshed `equipment_master` from mHelp: 762 → 1148 rows
   (386 added, 118 placements updated, 223 held for review). Fixed
   `cos_equipment_master_refresh` to supply `source_page` and to prove its
