@@ -59,6 +59,12 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-25** — Vendor emails v2 (prepared, deploy pending James): Eyeforce account
+  add / unit swap are the full CIF form, approved IT may send them, the filled CIF goes as an
+  attachment. Tech Check `cos-vendor-requests-v2.sql` (actor `fleet`, unit cameras, cron-secret
+  read); new **Operations** function `cos-deactivation-log` writes the cancellation sheet as the
+  COS service account. No audit row. Record in
+  `tech-checks/docs/db-changes/20261125_eyeforce_cif_forms.md`.
 - **2026-11-25** — New edge function `cos-vendor-request` (Tech Check, v1) and
   `app_private.vendor_requests`: the unit card's "Email a vendor" (SIM cancel to
   Vendera/Simetry, Eyeforce add/remove/swap). Owner only; sends from James's Gmail
