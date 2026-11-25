@@ -586,9 +586,18 @@ function drawPanel(){
     fx.append(h("div",{class:"fix"},
       h("button",{class:"fixbtn alt",type:"button",disabled:S.busy,onclick:()=>{ if(v.place==="field") save(v,{place:"shop"}); else { S.form="tofield"; drawPanel(); } }}, v.place==="field"?"Move to shop":"Move to field"),
       b("Change site","site",true), b("Rename","name",true), b("Correct IP","ip",true),
+      canLinkA(v) ? b("Add A#","pid",true) : null,
       v.edited ? b("Undo hand edits","undo",true) : null));
     const F={ site:["Site name",v.site,"site"], tofield:["Which site is it on?",v.site||v.feedSite,"site"], name:["Unit name",v.name,"name"], ip:["IP address",v.ip||"","ip"] }[S.form];
-    if(S.form==="undo"){
+    if(S.form==="pid" && canLinkA(v)){
+      /* An A# linked by hand (James, 25 Nov): so a unit mHelp could not match by name can still be checked. */
+      const inp=h("input",{id:"fixInput",type:"text",inputmode:"numeric",autocomplete:"off",placeholder:"e.g. 2226712"});
+      const go=()=>linkA(v, inp.value.replace(/^\s*A#?\s*/i,"").trim());
+      fx.append(h("form",{class:"form",onsubmit:ev=>{ev.preventDefault();go();}},h("label",{for:"fixInput",text:"A# from mHelp"}),inp,
+        h("p",{class:"note",text:"Digits only, as mHelp shows it. COS checks it is on the mHelp list and not already on another unit, then saves it with your name and the time."}),
+        h("div",{class:"btns"},h("button",{class:"fixbtn",type:"submit",disabled:S.busy},"Link A#"),h("button",{class:"fixbtn alt",type:"button",onclick:()=>{S.form=null;drawPanel();}},"Cancel"))));
+      setTimeout(()=>{ try{ inp.focus(); }catch(_){} },0);
+    } else if(S.form==="undo"){
       fx.append(h("div",{class:"form"},
         h("p",{class:"note",text:"This clears what was set by hand on "+v.name+": "+((u.hx||[]).map(x=>FIELD[x.f]||x.f).join(", ")||"nothing")+". The unit goes back to what "+(u.s==="v"?"Star4Live":u.s==="a"?"the COS record":"the Recon cloud")+" reports."}),
         h("div",{class:"btns"},h("button",{class:"fixbtn",type:"button",disabled:S.busy,onclick:()=>save(v,{__reset:true})},"Clear them"),h("button",{class:"fixbtn alt",type:"button",onclick:()=>{S.form=null;drawPanel();}},"Cancel"))));
@@ -611,7 +620,7 @@ function drawPanel(){
   if(!v.mhOnly && hooks && typeof hooks.onCheckUnit==="function"){
     const c = S.chk && S.chk.unit===v.id ? S.chk : null, pid = checkPid(v);
     const cb=h("div",{class:"box chkb",id:"chkBox"},h("h3",{text:"Check it now"}));
-    if(!pid) cb.append(h("p",{class:"note",text:"This unit has no A# in COS yet, so there is nothing to check it against. Give it an A# in mHelp first."}));
+    if(!pid) cb.append(h("p",{class:"note",text:"This unit has no A# in COS yet, so there is nothing to check it against. "+(canLinkA(v) && S.can===true ? "Add it under Fix the record with Add A#." : "Give it an A# in mHelp first.")}));
     else {
       cb.append(h("div",{class:"fix"},h("button",{class:"fixbtn",type:"button",disabled:S.busy,
         onclick:()=>checkNow(v)}, c && c.state==="run" ? "Checking…" : "Check this unit now")));
@@ -859,6 +868,16 @@ async function save(v, ch){
    Refresh asks for the latest saved reading. This asks the cameras themselves, for this unit only, so a tech
    standing at a unit does not wait for the next sweep. A check that does not run says so: a stale reading is
    never redrawn as if it were current, and nothing is written to mHelp, Star4Live or InHand. */
+/* Add A#: drawn only where the unit has no A# to check against and the app can link one. */
+function canLinkA(v){ return !v.mhOnly && v.u.s!=="r" && !checkPid(v) && !!(hooks && typeof hooks.onLinkA==="function"); }
+async function linkA(v, pid){
+  if(S.can!==true || S.busy || !canLinkA(v)) return;
+  if(!/^[1-9][0-9]{0,14}$/.test(pid)){ toast("Not linked. Enter the A# from mHelp, digits only.", 8000); return; }
+  S.busy=true; drawPanel();
+  try{ const said = await hooks.onLinkA(v.k, pid); S.form=null; toast(said || ("A# "+pid+" linked."), 9000); }
+  catch(err){ toast("Not linked. "+((err && err.message) || "COS could not confirm the link."), 14000); }
+  S.busy=false; render();
+}
 function checkPid(v){
   /* The unit's own A# first. An mHelp match counts only when it is exact: a fuzzy name match can belong to another unit,
      and checking it would report that unit's cameras on this card. */

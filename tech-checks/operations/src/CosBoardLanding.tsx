@@ -215,6 +215,23 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
         take.current(result);
         return {said: found + '.', tone};
       },
+      // An A# linked by hand from the unit card (James, 25 Nov), for a unit mHelp could not match by name. Tech Check
+      // checks the person and the A#; only the server's own confirmation is called linked.
+      onLinkA: async (unitKey: string, productId: string) => {
+        if (writing.current) throw new Error('A save is still in progress. Try again once it finishes.');
+        writing.current = true;
+        try {
+          generation.current += 1;
+          const data = (await api.post('/api/unit-camera-status/link-a', {unitKey, productId})).data as {linked?: {productId?: string; label?: string; duplicate?: boolean}} | null;
+          const result = checked(data);
+          generation.current += 1;
+          if (data?.linked?.productId !== productId) throw new Error('COS could not confirm the link. Tap Refresh.');
+          take.current(result);
+          return data.linked.duplicate ? 'A# ' + productId + ' was already linked to this unit.' : 'A# ' + productId + ' linked' + (data.linked.label ? ' (' + data.linked.label + ')' : '') + '. Check this unit now can use it.';
+        } catch (failure: any) {
+          throw new Error(failure?.response?.data?.error || failure?.message || 'COS could not confirm the link.');
+        } finally { writing.current = false; }
+      },
       // Troubleshoot result sent to IT for the next daily IT sheet (James, 25 Nov). It schedules nothing and
       // changes no unit. A reply that is not the server's receipt is not called sent.
       onSendTrouble: async (report: {requestId: string; unitKey: string; unitName: string; result: string; next: string; managerHelp: boolean; note: string}) => {

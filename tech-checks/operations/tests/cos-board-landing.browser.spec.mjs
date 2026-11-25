@@ -65,6 +65,11 @@ async function editServer(page, start = units, flags = {}) {
   await page.route('**/functions/v1/cos-unit-camera-status', async route => {
     if (route.request().method() === 'OPTIONS') return route.fulfill({status: 204, headers: cors});
     const body = JSON.parse(route.request().postData() || '{}');
+    if (body.path === '/api/unit-camera-status/link-a') {
+      server.linked = [...(server.linked || []), body.body];
+      server.units = server.units.map(row => row.unit === body.body.unitKey ? {...row, productId: body.body.productId} : row);
+      return route.fulfill({status: 200, headers: cors, json: {...reportOf(server.units, flags), linked: {unit: body.body.unitKey, productId: body.body.productId, label: 'SNIPER 200', by: 'Fixture Owner', duplicate: false}}});
+    }
     if (!(body.path && body.path.endsWith('/edit'))) { server.reads += 1; return route.fulfill({status: 200, headers: cors, json: reportOf(server.units, flags)}); }
     server.sent.push(body.body);
     if (server.fail) return route.fulfill({status: server.fail.status, headers: cors, json: {error: server.fail.error}});
@@ -842,6 +847,26 @@ test('a corrected IP can be saved on any unit, and the save names the system tha
   expect(state.errors).toEqual([]);
 });
 
+
+test('a unit with no A# can be given one from the card, and Check it now then uses it', async ({page}, info) => {
+  test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');
+  // James, 25 Nov: "it says it doesnt have an a# but i cant add it manualy". Tech Check checks who and which A#.
+  const rows = [...units, unit('SNIPER 200', {state: 'RED', online: 0, offline: 1, source: 'ip_check', publicIp: '203.0.113.9',
+    cameraList: [{name: 'SNIPER 200 / Cam 1', status: 'offline', atSite: true}]})];
+  const {host, server, state} = await phoneBoard(page, rows);
+  await openUnit(host, 'Sniper 200');
+  expect(await panel(host)).toContain('Add it under Fix the record with Add A#');
+  expect(await fixButtons(host)).toContain('Add A#');
+  await pressFix(host, 'Add A#');
+  await typeAndSave(host, 'fixInput', 'A# 2226712');
+  await expect.poll(() => (server.linked || []).length).toBe(1);
+  expect(server.linked[0]).toEqual({unitKey: 'SNIPER 200', productId: '2226712'});
+  await expect.poll(() => toastText(host)).toContain('A# 2226712 linked');
+  // With an A# the card offers the check, and no longer offers Add A#.
+  await expect.poll(() => fixButtons(host)).not.toContain('Add A#');
+  expect(await inBoard(host, root => [...root.querySelectorAll('#panel .tools .tool b')].map(b => b.textContent))).toContain('Check this unit now');
+  expect(state.errors).toEqual([]);
+});
 
 test('a unit with cameras off names them and walks a tech through it without leaving COS', async ({page}, info) => {
   test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');

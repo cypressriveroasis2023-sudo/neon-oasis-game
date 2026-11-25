@@ -970,11 +970,11 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
       }
       // Camera status read and its hand edit. Kept above the GET-only section so
       // the POST edit is reachable; each path checks its own method.
-      if (path === '/api/unit-camera-status' || path === '/api/unit-camera-status/edit') {
-        const editing = path.endsWith('/edit');
+      if (path === '/api/unit-camera-status' || path === '/api/unit-camera-status/edit' || path === '/api/unit-camera-status/link-a') {
+        const editing = path.endsWith('/edit') || path.endsWith('/link-a');
         if (method !== (editing ? 'POST' : 'GET')) fail(editing ? 'Use POST to record a hand edit.' : 'Use GET for unit camera status.', 405);
         const readStatus = async () => {
-          const [cameras, integrations, handEdits, otherDevices, otherHealth] = await Promise.all([
+          const [cameras, integrations, handEdits, otherDevices, otherHealth, aLinks] = await Promise.all([
             legacyAll('camera_devices?select=id,device_name,unit_key,organization,vigilant_status,activation_state,source_last_seen_at,public_ip,star_organization_id:source_metadata->>organizationId,local_ip:source_metadata->>localIp&source=eq.vigilant_control_center&order=id.asc', context.headers),
             // A missing or unreadable sync row leaves the feed unproven, which
             // reads as Unknown rather than stopping the page.
@@ -987,6 +987,9 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
             // If they cannot be read the Star4Live units still show.
             legacyAll('camera_devices?select=id,device_name,unit_key,organization,source,activation_state,source_last_seen_at,public_ip&source=in.(2026_unit_tracker,reconeyez)&activation_state=eq.active&order=id.asc', context.headers).catch(() => null),
             legacyAll('camera_health_current?select=camera_device_id,overall_status,checked_at&order=camera_device_id.asc', context.headers).catch(() => null),
+            // A# links (mHelp product ids) by unit, so the card knows each unit's A#. Unreadable links hide nothing else.
+            readJson(LEGACY_URL + '/rest/v1/rpc/cos_mhelp_hand_link_state_v1', {method: 'POST', headers: {...context.headers, 'Content-Type': 'application/json'}, body: '{}'}, 'A# links could not be read.')
+              .then(v => v?.contract === 'COS_MHELP_HAND_LINKS_V1' && Array.isArray(v.links) ? v.links : null).catch(() => null),
           ]);
           const feeds = Array.isArray(integrations) ? integrations : [];
           const feed = feeds.find(row => row?.provider === 'vigilant') || null;
@@ -998,7 +1001,8 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
             otherRead ? projectIpCheckUnits(otherDevices, otherHealth, now) : [],
             otherRead ? projectReconUnits(otherDevices, otherHealth, reconFeed && {syncedAt: reconFeed.last_sync_at, status: reconFeed.last_sync_status, enabled: reconFeed.enabled}, now) : []);
           return {
-            ...applyHandEdits({...star, units, counts: countUnits(units)}, handEdits),
+            ...applyHandEdits({...star, units: units.map(u => u.productId ? u : (l => l ? {...u, productId: String(l.productId)} : u)((aLinks || []).find(l => typeof l?.unitKey === 'string' && l.unitKey.toUpperCase() === String(u.unit).toUpperCase() && /^[1-9][0-9]{0,14}$/.test(String(l.productId))))), counts: countUnits(units)}, handEdits),
+            aLinksRead: Array.isArray(aLinks),
             handEditsRead: Array.isArray(handEdits),
             otherSourcesRead: otherRead,
             canEdit: true,
@@ -1008,6 +1012,24 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
         if (!editing) return json(await readStatus());
         const current = await readStatus();
         if (!current.handEditsRead) fail('Saved hand edits are unavailable, so a new one cannot be recorded safely.', 503);
+        if (path === '/api/unit-camera-status/link-a') {
+          // An A# linked by hand on the unit card (James, 25 Nov). Tech Check checks the person is the Owner or
+          // approved IT, that the A# is on the mHelp list and free, and records who and when.
+          const lb = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
+          const lUnit = typeof lb.unitKey === 'string' ? lb.unitKey.trim() : '';
+          const lPid = typeof lb.productId === 'string' ? lb.productId.trim() : '';
+          if (!lUnit || lUnit.length > 120 || !/^[1-9][0-9]{0,14}$/.test(lPid)) return json({error: 'Enter the A# from mHelp, digits only. Nothing was linked.'}, 422);
+          if (!current.units.some(u => String(u.unit).toUpperCase() === lUnit.toUpperCase())) return json({error: 'COS is no longer reporting that unit. Nothing was linked.'}, 404);
+          const lRole = context.legacyOwner && context.actorId ? 'owner' : 'it';
+          const lName = (context.name || '').trim() || (lRole === 'owner' ? 'Owner' : 'IT technician');
+          let lReply, lData = {};
+          try { lReply = await requestFetch(LEGACY_URL + '/rest/v1/rpc/cos_mhelp_hand_link_v1', {method: 'POST', headers: {...context.headers, 'Content-Type': 'application/json'}, body: JSON.stringify({p_unit_key: lUnit, p_product_id: lPid, p_actor_name: lName})}); } catch { fail('The A# could not be linked. Nothing was changed.', 503); }
+          try { lData = await lReply.json(); } catch { lData = {}; }
+          if (!lReply.ok) return json({error: lData?.code === 'PT409' && typeof lData.message === 'string' ? lData.message.slice(0, 300) : lData?.code === '42501' ? 'Only the Owner or approved IT can link an A#.' : 'The A# could not be linked. Nothing was changed.'}, lReply.status === 403 || lData?.code === '42501' ? 403 : 422);
+          if (lData?.contract !== 'COS_MHELP_HAND_LINK_RESULT_V1') fail('The A# link could not be confirmed. Tap Refresh.', 503);
+          const lAfter = await readStatus();
+          return json({...lAfter, linked: {unit: lData.unitKey, productId: lData.productId, label: lData.label, by: lName, duplicate: lData.repeat === true}});
+        }
         const actorRole = context.legacyOwner && context.actorId ? 'owner' : 'it';
         let edit;
         try { edit = checkedHandEditRequest(body, current.units, () => crypto.randomUUID()); }
