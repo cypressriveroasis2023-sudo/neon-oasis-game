@@ -1,6 +1,16 @@
 /** Public, pure presentation semantics. A saved observation is not a live probe. */
 export const CAMERA_FRESH_MS = 20 * 60 * 1000;
 /**
+ * Reconeyez is not polled: it speaks when it has something to say, through its
+ * cloud, so a healthy Recon on a quiet night can go hours without an event.
+ * Judging it by the polled window calls a working unit Unknown overnight, which
+ * is what the field Recons showed. This is the window for a feed that reports by
+ * event rather than on a clock. It is not a claim that the unit is online: a
+ * missing or stale reading is still Unknown, never Offline. Only the age that
+ * counts as stale differs, and only for this feed.
+ */
+export const RECON_FRESH_MS = 6 * 60 * 60 * 1000;
+/**
  * Power is not a camera check and does not arrive like one. Victron is polled
  * every 15 minutes and its own observations are already several minutes old by
  * the time they land, so a healthy Helios normally reports 19 to 26 minutes
@@ -43,6 +53,12 @@ const normalized=(value:unknown)=>typeof value==='string'?value.trim().replace(/
 export function powerTimestamp(value:unknown,now=Date.now()):{at:string|null;fresh:boolean} {
   const stamp=cameraTimestamp(value,now);
   return stamp.at===null?stamp:{at:stamp.at,fresh:now-Date.parse(stamp.at)<=POWER_FRESH_MS};
+}
+
+/** The same reading of a timestamp, judged against the Reconeyez event window. */
+export function reconTimestamp(value:unknown,now=Date.now()):{at:string|null;fresh:boolean} {
+  const stamp=cameraTimestamp(value,now);
+  return stamp.at===null?stamp:{at:stamp.at,fresh:now-Date.parse(stamp.at)<=RECON_FRESH_MS};
 }
 
 export function cameraTimestamp(value:unknown,now=Date.now()):{at:string|null;fresh:boolean} {
