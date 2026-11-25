@@ -143,3 +143,21 @@ test('the database refuses a receipt with a blank check even if the screen is sk
   [crypto.randomUUID(),t.id,t.revision,SERVICE,JSON.stringify(items),JSON.stringify({'sniper:001':{}}),JSON.stringify({method:'typed',name:'Synthetic Service',confirmed:true}),t.purpose])).rejects.toThrow(/Answer every check for Sniper 001/);
  await f.db.exec('reset role');
 });
+
+test('IT picks a SIM from the drawer during a handoff, and that SIM leaves the drawer',async({page})=>{
+ await page.setViewportSize({width:390,height:844});f=await mountTransfers(page);
+ await f.db.query("insert into app_private.sim_drawer(sim_number,carrier) values('89852350825066019344','Smart SIM'),('89852350825066019369','Smart SIM')");
+ await page.getByRole('button',{name:'Check Out / Hand Off',exact:true}).click();await page.getByLabel('What is this equipment for?',{exact:true}).selectOption('installation');await page.getByLabel('Receiving Service technician').selectOption(SERVICE);await page.getByLabel('Select equipment').selectOption('sniper:001');await page.getByRole('button',{name:'Add unit to handoff'}).click();
+ await fillUnit(page,'001','');
+ const pick=page.getByLabel('Pick a SIM from the drawer 1',{exact:true});
+ await expect(pick.locator('option').first()).toHaveText('Pick a SIM from the drawer (2 in the drawer)');
+ await pick.selectOption('89852350825066019344');
+ await expect(page.getByLabel(/Exact SIM numbers.*1/)).toHaveValue('89852350825066019344');
+ // a SIM already picked is not offered again
+ await expect(page.getByLabel('Pick a SIM from the drawer 1',{exact:true}).locator('option')).toHaveCount(2);
+ for(const check of await page.locator('fieldset input[type=checkbox]').all())await check.check();await sign(page,'Synthetic IT');
+ await page.getByRole('button',{name:'Sign & send handoff',exact:true}).click();await expect(page.getByText('Awaiting Service verification',{exact:true})).toBeVisible();
+ const cards=(await f.db.query('select sim_number,status,location from app_private.sim_drawer order by sim_number')).rows;
+ expect(cards).toEqual([{sim_number:'89852350825066019344',status:'in_unit',location:'Sniper 001 → Synthetic Service'},{sim_number:'89852350825066019369',status:'in_drawer',location:null}]);
+ expect(f.errors).toEqual([]);
+});

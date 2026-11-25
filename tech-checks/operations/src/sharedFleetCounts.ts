@@ -81,10 +81,14 @@ export function emptyUnverifiedReasons(): Record<UnverifiedReason, number> {
   };
 }
 
-/** A missing or stale camera is Unknown. Offline requires a fresh confirmed miss. */
-export function presentedCameraState(camera: CountCamera, now = Date.now()): 'online' | 'offline' | 'unknown' {
+/** A missing or stale camera is Unknown. Offline requires a fresh confirmed miss.
+ *  freshMs is the age that counts as stale. It is the polled window for everything the clock drives, and
+ *  RECON_FRESH_MS for the Reconeyez event feed, which reports when something happens rather than on a clock.
+ *  Widening the window never turns Unknown into Online: it only stops a quiet healthy feed reading as stale. */
+export function presentedCameraState(camera: CountCamera, now = Date.now(), freshMs = CAMERA_FRESH_MS): 'online' | 'offline' | 'unknown' {
   const stamp = cameraTimestamp(camera.observedAt, now);
-  if (!stamp.fresh || now - Date.parse(stamp.at || '') > CAMERA_FRESH_MS) return 'unknown';
+  const at = stamp.at ? Date.parse(stamp.at) : NaN;
+  if (!Number.isFinite(at) || now - at > freshMs) return 'unknown';
   if (camera.state === 'online') return 'online';
   if (camera.state === 'offline') return 'offline';
   return 'unknown';

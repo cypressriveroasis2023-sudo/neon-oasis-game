@@ -10,7 +10,7 @@ test('the board carries no fleet data and reads nothing itself', () => {
   // This repository is public. Unit names, customers, addresses and IPs reach the board from the signed-in feed only.
   const files = readdirSync(new URL('../src/cosBoard/', import.meta.url), {recursive: true}).map(name => String(name).replace(/\\/g, '/')).sort();
   assert.deepEqual(files, [
-    'boardApp.ts', 'boardData.ts', 'boardEdit.ts', 'boardFonts.ts', 'boardMap.json', 'boardPower.ts', 'boardStyle.ts',
+    'boardApp.ts', 'boardData.ts', 'boardEdit.ts', 'boardFonts.ts', 'boardMap.json', 'boardPower.ts', 'boardStyle.ts', 'boardTrouble.ts',
     'fonts', 'fonts/OFL.txt', 'fonts/inter-latin-wght-normal.woff2', 'fonts/inter-tight-latin-wght-normal.woff2',
   ]);
   const map = JSON.parse(read('../src/cosBoard/boardMap.json'));
@@ -30,7 +30,10 @@ test('the board is isolated from the rest of COS and sends nothing itself', () =
   assert.doesNotMatch(app, /unit-camera-status|\bapi\.(?:get|post)\(|from '\.\.?\/api'/);
   const landing = read('../src/CosBoardLanding.tsx');
   assert.equal(landing.split("api.post('/api/unit-camera-status/edit', handFixRequest(unit, step, crypto.randomUUID()))").length - 1, 1);
-  assert.equal(landing.split('api.post(').length - 1, 1);
+  // Exactly two sends, both named here on purpose: the hand fix, and checking one unit on demand. The count stays
+  // exact so a third has to be argued for in this test rather than appearing quietly.
+  assert.equal(landing.split('api.post(').length - 1, 2);
+  assert.equal(landing.split("api.post('/api/product-connections/verify', {productIds: [productId]})").length - 1, 1);
   // The work log and the board's own tech check form would need that store, so they are off.
   assert.match(app, /function logBox\(\)\{ return null; \}/);
   assert.doesNotMatch(app, /drawTechForm|techCard|sendTech/);
@@ -52,10 +55,11 @@ test('on a desk the board is one screen, with one map that keeps the drawing\'s 
   assert.match(app, /new ResizeObserver\(\(\)=>\{ measureWide\(\);/);
   assert.match(app, /cleanups\.push\(\(\)=>seen\.disconnect\(\)\);/);
   // One map. Beside the list on a wide Board tab, otherwise on its own tab; beside the list the count tiles choose what it shows.
-  assert.match(app, /const side = W\.wide && S\.view==="board", block=\$\("mapBlock"\), home = side \? \$\("boardSide"\) : \$\("viewMap"\);/);
+  // The map now lives on the board on a phone too, so the desk case names boardSide and the phone case boardMain.
+  assert.match(app, /const block=\$\("mapBlock"\), home = side \? \$\("boardSide"\) : onBoard \? \$\("boardMain"\) : \$\("viewMap"\);/);
   assert.equal(app.split('id=\\"mapSvg\\"').length - 1, 1);
   assert.match(app, /function sideFilter\(\)\{ if\(!W\.side\) return; const f=\["down","issues","unknown","up"\]\.includes\(S\.filter\) \? S\.filter : "all";/);
-  assert.match(app, /if\(!side\) M\.f="all";/);
+  assert.match(app, /if\(!withList\) M\.f="all";/);
   // One screen: the board is as tall as the window, the tabs sit in its top bar, and each tab scrolls inside it.
   assert.match(style, /\.cosb\.wide:not\(\.tv\)\{height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden\}/);
   assert.match(style, /\.cosb\.wide>main>section\{flex:1;min-height:0;overflow-y:auto;/);
@@ -215,8 +219,8 @@ test('the board counts one way, and a hand fix comes first on the card and says 
   // What the camera systems see on their own is only the fallback, and so is its DO NOT USE exclusion.
   assert.ok(app.includes('(v.excl && !S.mh) ? "excl"'));
   assert.ok(app.includes('const feeds = !S.mh;'));
-  // Fix it sits right under the diagnosis, and the save waits for the saved reading before saying how the count moved.
-  assert.ok(app.includes('body.splice(2,0,fx);'));
+  // Fixing the record sits after troubleshooting and the unit's own pages, and the save waits for the saved reading before saying how the count moved.
+  assert.ok(app.includes('body.splice(body.indexOf(ob)+1,0,fx);'));
   assert.equal(app.includes('body.push(fx);'), false);
   assert.match(app, /S\.saved=\{was, said: said \|\| "Saved\.", unit:v\.id, ip:steps\.some\(x=>x\.field==="public_ip"\)\}; clearTimeout\(savedTimer\); savedTimer=setTimeout\(saidSaved, 1500\);/);
   // A corrected IP is kept for every unit, and the save names the system that still decides Up or Down.
@@ -228,7 +232,7 @@ test('the board counts one way, and a hand fix comes first on the card and says 
   // A Sniper with no IP saved is Unknown for good, and the card says so and sends him to the fix.
   assert.match(app, /if\(v\.status==="unknown"\) return v\.u\.s==="a" && !v\.u\.ip/);
   assert.ok(app.includes('COS has no IP address for this unit, so it cannot be checked at all. That is why it shows Unknown and not Down.'));
-  assert.ok(app.includes('Add the IP under Fix it. COS checks the address within the hour and the unit stops being Unknown.'));
+  assert.ok(app.includes('Add the IP under Fix the record. COS checks the address within the hour and the unit stops being Unknown.'));
   assert.ok(app.includes('COS has no IP address saved for this unit, so there is nothing to check.'));
   // The reading is COS's own check of the address. COS has no Avigilon feed.
   assert.equal(app.includes('Avigilon check'), false);
@@ -253,4 +257,88 @@ test('the board counts one way, and a hand fix comes first on the card and says 
   assert.ok(app.includes('A fix made by hand wins in COS and stays until someone undoes it. No new reading from mHelp or Star4Live replaces it.'));
   assert.match(app, /render\(\);\n  announce\(\);\n  saidSaved\(\);\n\}/);
   assert.ok(app.includes('" The count changed: "+moved.join(", ")+"."'));
+});
+
+test('checking one unit asks the app, never the network, and never fakes a reading', () => {
+  // The board draws; the app around it is the only thing that sends. Checking is no exception.
+  assert.match(app, /await hooks\.onCheckUnit\(v\.k, checkPid\(v\)\)/);
+  assert.doesNotMatch(app, /product-connections\/verify/);
+
+  // A button that cannot do anything is worse than no button: drawn only where the app supplies the hook.
+  assert.match(app, /typeof hooks\.onCheckUnit==="function"/);
+  // And only where there is an A# to check against, rather than silently checking nothing.
+  assert.match(app, /nothing to check it against/);
+
+  // A failed check reports the failure. It must not fall through to a success message.
+  assert.match(app, /catch\(err\)\{\s*S\.chk=\{unit:v\.id, state:"fail"/);
+
+  // Checking must not run while a hand fix is in flight, and must not run twice at once.
+  assert.match(app, /if\(S\.busy \|\| v\.mhOnly \|\| !hooks \|\| typeof hooks\.onCheckUnit!=="function"\) return;/);
+  // Checking sits right before Troubleshoot, which tells the tech to use it; fixing the record comes later on the card.
+  assert.match(app, /body\.splice\(body\.indexOf\(tbx\),0,cb\);/);
+
+  // Felix: the green "Checked just now" showed when no check had run. Green only when the check came back online;
+  // a check with no answer says so instead of a success line.
+  assert.doesNotMatch(app, /Checked just now/);
+  assert.match(app, /c\.tone==="up" \? " s-up"/);
+  assert.doesNotMatch(app, /s-"\+\(c\.state==="fail"\?"down":"up"\)/);
+  // Felix: it could check the wrong unit. The unit's own A# comes first, and a fuzzy mHelp name match is never used.
+  assert.match(app, /if\(v\.u\.pid\) return v\.u\.pid;/);
+  assert.match(app, /mm && !mm\.fuzzy && mm\.rec && mm\.rec\.id/);
+});
+
+test('a full battery with a Victron alarm is not called out of power', () => {
+  // Felix: 95% was flagged as a power problem, because a level-2 Victron alarm turns the shared tone "low".
+  // On the board, out of power means the battery reading itself is under 20%, from a current reading.
+  assert.match(app, /function lowBattery\(pw\)\{ return !!\(pw && pw\.q!=="off" && pw\.q!=="stale" && pw\.q!=="none" && typeof pw\.b==="number" && pw\.b<20\); \}/);
+  assert.match(app, /fs==="down" && lowBattery\(u\.pw\)/);
+  assert.match(app, /power: live \? \{low:lowBattery\(pw\), battery:pw\.b\} : null/);
+  assert.doesNotMatch(app, /u\.pw\.q==="low"\) cause/);
+});
+
+test('the app checks one unit with the same verify the rest of COS uses, then re-reads the board', () => {
+  const landing = read('../src/CosBoardLanding.tsx');
+  assert.match(landing, /onCheckUnit: async/);
+  // The existing endpoint, not a new path of its own.
+  assert.match(landing, /api\.post\('\/api\/product-connections\/verify', \{productIds: \[productId\]\}\)/);
+  // A check is only worth anything if the card then shows what came back.
+  assert.match(landing, /api\.get\('\/api\/unit-camera-status'\)/);
+  // A save in flight and a board that moved on are both refused rather than guessed at.
+  assert.match(landing, /A save is still in progress/);
+  assert.match(landing, /started !== generation\.current/);
+
+  // What the check found is read with the same contract Verify now uses; an unknown answer is not a check.
+  assert.match(landing, /readSingleVerification\(\(await api\.post\('\/api\/product-connections\/verify'/);
+  assert.match(landing, /item\.status === 'unknown'\) throw new Error\('The check did not reach the cameras'/);
+  assert.doesNotMatch(landing, /Checked just now/);
+});
+
+test('the camera-systems count is shown but marked, never passed off as the official one', () => {
+  // James read two different counts within a minute. The earlier one came before the mHelp list arrived and was
+  // honest, just not official. It still shows, because a board with no numbers is worse than a marked one, but
+  // the mark is on the numbers rather than in a sentence above them, which a glance skips.
+  assert.match(app, /\$\("kpi"\)\.classList\.toggle\("prov", !S\.mh\);/);
+  assert.match(app, /\$\("provNote"\)\.textContent = S\.mh \? "" : "Not the official count\./);
+  assert.match(app, /\$\("provNote"\)\.hidden = Boolean\(S\.mh\);/);
+  // The wall screen is read from across the shop, so the whole block dims there too.
+  assert.match(app, /\$\("tvKpi"\)\.classList\.toggle\("prov", !S\.mh\);/);
+  assert.match(app, /Not the official count: what the camera systems see, until mHelp has loaded\./);
+  // Dimmed and dashed, so the difference carries without reading a word of it.
+  assert.match(style, /\.kpi\.prov \.tile,\.kpi\.prov \.mini\{opacity:\.6;border-style:dashed\}/);
+  assert.match(style, /\.tvleft\.prov \.tvtiles,\.tvleft\.prov \.tvminis\{opacity:\.6\}/);
+});
+
+test('the map is on the board itself, on a phone as well as a desk', () => {
+  // James: "I wish this would show me the map and all units online and offline in the field right when I log in
+  // and go to the home page." On a desk the map already sat beside the list; on a phone it was a tab away.
+  assert.match(app, /const side = W\.wide && S\.view==="board", onBoard = !W\.wide && S\.view==="board";/);
+  // On a phone it goes under the counts and above the list, not after it.
+  assert.match(app, /if\(onBoard\) \$\("boardMain"\)\.insertBefore\(block, \$\("boardList"\)\);/);
+  // One map, moved: never a second copy drawn somewhere else.
+  assert.equal(app.split('id=\\"mapSvg\\"').length - 1, 1);
+  // The count tiles filter the map in both places, so tapping Down shows the down units on the map too.
+  assert.match(app, /const withList = side \|\| onBoard;/);
+  assert.match(app, /if\(W\.side!==withList\)\{ W\.side=withList;/);
+  // On the board the map shows only the map: its own tab keeps the filters and the list under it.
+  assert.match(style, /#mapBlock\.onboard #mapChips,#mapBlock\.onboard #mapNote,#mapBlock\.onboard #mapList\{display:none\}/);
 });

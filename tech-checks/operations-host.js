@@ -289,6 +289,16 @@ function managerExchange(row, paths) {
     from:managerText(row.it_name, 80) || 'IT', to:managerText(row.service_name, 80) || 'Service',
     state:managerText(row.state, 40) || 'unknown', at:managerTime(row.updated_at) || managerTime(row.created_at), events };
 }
+const MANAGER_SIM_STATUS = ['in_drawer','in_unit','on_truck','bad','deactivated','removed'];
+function managerSims(data) {
+  const rows = (value, max) => Array.isArray(value) ? value.slice(0, max).filter(row => row && typeof row === 'object') : [];
+  return {
+    cards:rows(data.cards, 2000).map(row => ({ sim:managerText(row.sim, 24), carrier:managerText(row.carrier, 40),
+      status:MANAGER_SIM_STATUS.includes(row.status) ? row.status : 'removed', location:managerText(row.location, 120), note:managerText(row.note, 300),
+      by:managerText(row.updated_by || row.added_by, 80), at:managerTime(row.updated_at || row.added_at) })).filter(row => /^[0-9A-Z]{8,24}$/.test(row.sim)),
+    notListed:rows(data.not_in_drawer, 100).map(row => ({ sim:managerText(row.sim, 24), detail:managerText(row.detail, 160), by:managerText(row.by, 80), at:managerTime(row.at) })).filter(row => row.sim),
+  };
+}
 function managerGaps(data) {
   const rows = (value, max) => Array.isArray(value) ? value.slice(0, max).filter(row => row && typeof row === 'object') : [];
   const unit = row => [managerText(row.equipment_type, 40), managerText(row.unit_tag, 40)].filter(Boolean).join(' ');
@@ -322,7 +332,13 @@ async function managerRead() {
     const read = await db.rpc('techcheck_handoff_gaps_v1', { p_since:new Date(Date.now() - 7 * 864e5).toISOString() });
     if (!read?.error && read?.data && typeof read.data === 'object') gaps = managerGaps(read.data);
   } catch {}
-  return { day, at:new Date().toISOString(), gaps,
+  // The SIM drawer: every card on hand and where each went. Read only here.
+  let sims = null;
+  try {
+    const read = await db.rpc('sim_drawer_v1');
+    if (!read?.error && read?.data && typeof read.data === 'object') sims = managerSims(read.data);
+  } catch {}
+  return { day, at:new Date().toISOString(), gaps, sims,
     techs:board.data.service_techs.slice(0, 100).map(managerTech).filter(Boolean),
     it:(Array.isArray(board.data.it_techs) ? board.data.it_techs : []).slice(0, 100).map(row => managerText(row?.name, 80)).filter(Boolean).map(name => ({ name, test:managerTest(name) })),
     exchanges };
@@ -345,6 +361,20 @@ async function managerAnswer(data) {
     if (typeof data.path !== 'string' || !managerPhotoPaths.has(data.path)) return { error:'invalid' };
     const signed = await context().db.storage.from('techcheck-transfer-evidence').createSignedUrl(data.path, 300);
     return !signed?.error && typeof signed?.data?.signedUrl === 'string' ? { url:signed.data.signedUrl } : { error:'unavailable' };
+  }
+  if (data.kind === 'simAdd') {
+    const numbers = Array.isArray(data.numbers) ? data.numbers.filter(n => typeof n === 'string').slice(0, 500).map(n => n.slice(0, 40)) : null;
+    if (!numbers?.length) return { error:'invalid' };
+    const saved = await context().db.rpc('sim_drawer_add_v1', { p_numbers:numbers, p_carrier:managerText(data.carrier, 40) || null, p_note:managerText(data.note, 300) || null });
+    if (saved?.error) return { error:'rejected', message:managerText(saved.error.message, 200) };
+    const list = value => Array.isArray(value) ? value.slice(0, 500).map(v => managerText(v, 24)).filter(Boolean) : [];
+    return { added:list(saved?.data?.added), already:list(saved?.data?.already_listed), bad:list(saved?.data?.not_a_sim_number) };
+  }
+  if (data.kind === 'simMark') {
+    if (typeof data.sim !== 'string' || !['in_drawer','bad','deactivated','removed'].includes(data.status)) return { error:'invalid' };
+    const saved = await context().db.rpc('sim_drawer_mark_v1', { p_number:data.sim.slice(0, 40), p_status:data.status, p_note:managerText(data.note, 300) || null });
+    if (saved?.error) return { error:'rejected', message:managerText(saved.error.message, 200) };
+    return {};
   }
   if (data.kind === 'truck') {
     const kit = managerKit(data.kit);

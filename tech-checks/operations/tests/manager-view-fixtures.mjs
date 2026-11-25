@@ -88,6 +88,9 @@ const hostPage = fixture => readFileSync(resolve(repo, 'tech-checks/index.html')
       if(!fixture.manager)return{data:null,error:{message:'Owner/Admin access required.'}};
       if(name==='owner_tech_command_board_v2')return{data:JSON.parse(JSON.stringify(fixture.manager.board)),error:null};
       if(name==='techcheck_transfer_context_v1')return fixture.manager.context?{data:JSON.parse(JSON.stringify(fixture.manager.context)),error:null}:{data:null,error:{message:'Named handoffs are held for release review.'}};
+      if(name==='sim_drawer_v1')return fixture.manager.sims?{data:JSON.parse(JSON.stringify(fixture.manager.sims)),error:null}:{data:null,error:{message:'held'}};
+      if(name==='sim_drawer_add_v1'){const added=[],already=[],bad=[];for(const raw of args.p_numbers){const n=String(raw).replace(/[^0-9A-Za-z]/g,'').toUpperCase();if(!/^[0-9A-Z]{8,24}$/.test(n)){bad.push(n);continue;}if(fixture.manager.sims.cards.some(c=>c.sim===n)){already.push(n);continue;}fixture.manager.sims.cards.unshift({sim:n,carrier:args.p_carrier,status:'in_drawer',location:null,note:args.p_note,updated_by:'Owner Fixture',updated_at:'2026-11-25T17:00:00Z'});added.push(n);}return{data:{added,already_listed:already,not_a_sim_number:bad},error:null};}
+      if(name==='sim_drawer_mark_v1'){if(args.p_status!=='in_drawer'&&!args.p_note)return{data:null,error:{message:'Write why this SIM is '+args.p_status+'.'}};const c=fixture.manager.sims.cards.find(x=>x.sim===args.p_number);c.status=args.p_status;if(args.p_status==='in_drawer')c.location=null;if(args.p_note)c.note=args.p_note;return{data:{sim:c.sim,status:c.status},error:null};}
       if(name==='techcheck_handoff_gaps_v1')return fixture.manager.gaps?{data:JSON.parse(JSON.stringify(fixture.manager.gaps)),error:null}:{data:null,error:{message:'held'}};
       if(name==='owner_save_service_truck_inventory_batch_v1'){
         if(fixture.saveError)return{data:null,error:{message:fixture.saveError}};

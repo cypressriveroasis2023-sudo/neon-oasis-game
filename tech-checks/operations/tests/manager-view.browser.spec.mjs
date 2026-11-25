@@ -221,3 +221,55 @@ test('the handoff check says all clear when nothing is missing, and says so when
   await expect.poll(() => textOf(host, 'mgGap')).toContain('The handoff check could not be read just now.');
   expect(await textOf(host, 'mgChecks')).toContain('1 of 2 trucks ready.');
 });
+
+// Small helpers for the SIM drawer box, which lives outside the truck editor.
+const typeIn = (host, selector, value) => inBoard(host, (root, [sel, text]) => {
+  const field = root.querySelector(sel); field.value = text; field.dispatchEvent(new Event('input', {bubbles: true})); return true;
+}, [selector, value]);
+const pressInRow = async (host, sim, label) => expect(await inBoard(host, (root, [wanted, name]) => {
+  const row = [...root.querySelectorAll('#mgSim .prow')].find(item => item.textContent.includes(wanted));
+  const button = row && [...row.querySelectorAll('button')].find(item => item.textContent.trim() === name && !item.disabled);
+  button?.click(); return Boolean(button);
+}, [sim, label])).toBe(true);
+const typeInRow = (host, sim, value) => inBoard(host, (root, [wanted, text]) => {
+  const row = [...root.querySelectorAll('#mgSim .prow')].find(item => item.textContent.includes(wanted));
+  const field = row.querySelector('input'); field.value = text; field.dispatchEvent(new Event('input', {bubbles: true})); return true;
+}, [sim, value]);
+
+test('the SIM drawer shows what is in the drawer and what is out, and the owner adds and marks cards', async ({page}) => {
+  const fixture = {manager: manager()};
+  fixture.manager.sims = {require_listed: false,
+    cards: [{sim: '89012600000000000001', carrier: 'Simetry', status: 'in_drawer', location: null, note: null, updated_by: 'Owner Fixture', updated_at: '2026-11-25T15:00:00Z'},
+      {sim: '89012600000000000002', carrier: 'Vendera', status: 'in_unit', location: 'Sniper 332 → Riley Fixture', note: null, updated_by: 'Jordan Fixture', updated_at: '2026-11-25T16:00:00Z'}],
+    not_in_drawer: [{sim: '89012600000000000077', detail: 'Handed over in Sniper 332 to Riley Fixture', by: 'Jordan Fixture', at: '2026-11-25T16:00:00Z'}]};
+  const {frame, host} = await mount(page, fixture);
+  await openManager(frame, host);
+  await expect.poll(() => textOf(host, 'mgSim')).toContain('1 SIM in the drawer.');
+  let text = await textOf(host, 'mgSim');
+  for (const part of ['1 out in units or on trucks · 0 bad or deactivated.', '1 SIM handed out that were not on the drawer list', '89012600000000000077', '89012600000000000001 · Simetry']) expect(text).toContain(part);
+  // what is out, and where
+  await press(host, '#mgSim', 'Out (1)');
+  expect(await textOf(host, 'mgSim')).toContain('Sniper 332 → Riley Fixture');
+  // add cards: spaces and dashes are dropped, repeats and junk are reported
+  await press(host, '#mgSim', 'In the drawer (1)');
+  await press(host, '#mgSim', 'Add SIM cards');
+  await typeIn(host, '#mgSim textarea', '8901 2600 0000 0000 003\n89012600000000000001\n12');
+  await typeIn(host, '#mgSim input[list="simCarriers"]', 'Vendera');
+  await press(host, '#mgSim', 'Add to drawer');
+  await page.waitForTimeout(1500);console.log('RPC', JSON.stringify((await page.evaluate(() => window.fixture.rpc)).filter(c=>c.name.startsWith('sim'))));
+  await expect.poll(() => textOf(host, 'mgSim')).toContain('2 SIMs in the drawer.');
+  text = await textOf(host, 'mgSim');
+  for (const part of ['1 SIM added. 1 already on the list. Not SIM numbers: 12.', '8901260000000000003 · Vendera']) expect(text).toContain(part);
+  // marking a card bad needs a reason
+  await press(host, '#mgSim', 'Close');
+  await pressInRow(host, '89012600000000000001', 'Mark bad');
+  await pressInRow(host, '89012600000000000001', 'Save');
+  await expect.poll(() => textOf(host, 'mgSim')).toContain('Write why first.');
+  await typeInRow(host, '89012600000000000001', 'Will not register');
+  await pressInRow(host, '89012600000000000001', 'Save');
+  await expect.poll(() => textOf(host, 'mgSim')).toContain('1 SIM in the drawer.');
+  await press(host, '#mgSim', 'Bad (1)');
+  expect(await textOf(host, 'mgSim')).toContain('Will not register');
+  const calls = (await page.evaluate(() => window.fixture.rpc)).map(c => c.name).filter(n => n.startsWith('sim_drawer_') && n !== 'sim_drawer_v1');
+  expect(calls).toEqual(['sim_drawer_add_v1', 'sim_drawer_mark_v1']);
+});

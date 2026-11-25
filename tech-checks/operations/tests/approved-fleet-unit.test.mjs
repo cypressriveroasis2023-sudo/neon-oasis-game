@@ -28,6 +28,15 @@ import {createHash} from 'node:crypto';
 // live InHand status and do not print a router address. Their pins move with
 // that reading. The camera window, the session guards, and the other
 // presentation pins are unchanged.
+// Reviewed 2026-11-25 at James's instruction: Reconeyez is judged by its own
+// freshness window instead of the camera one. Reconeyez reports by event
+// through its cloud rather than on a clock, so a healthy Recon sitting quiet
+// overnight read as Unknown; four of the five field Recons were in that state.
+// cameraEvidence.ts carries RECON_FRESH_MS and reconTimestamp and its pins move
+// with that change. CAMERA_FRESH_MS and cameraTimestamp are untouched, the
+// polled window is unchanged, and tests/recon-event-window.test.mjs holds both
+// boundaries exactly, including that a wider window never turns Unknown into
+// online and never softens a fresh confirmed miss.
 const expected={
   "FleetDashboard.tsx": "8d711a97853b5f646d892f5552a792656623a9f8",
   "FleetUnitHealth.tsx": "3ba1f2507241a63d839424bc1db28b6d584659c1",
@@ -36,7 +45,7 @@ const expected={
   "LastKnownCameraStatus.tsx": "40b4218e51b13c8e15d5f5e7ad81be410df4663d",
   "fleetDashboardModel.ts": "d98e1e1700ef34888a40b5caa0a9c9bdb3359d41",
   "fieldCameraHealth.ts": "f3f44410e9368919658330d18e8b14957e227753",
-  "cameraEvidence.ts": "78b71c8e063720a416449b4b6cfa335606191a0a",
+  "cameraEvidence.ts": "3eabba249ac6c8f4384eefd044a6d154e7904172",
   "api.ts": "b00323c7dc29b5e8cfb05851dcf65bf53c9108a7",
   "useCameraHealth.ts": "62382e9352b2c17cdafa144a784bc2f64fa04d51",
   "refreshCadence.ts": "c15e6e2959125f33ce43c2c152500062d8f5b167",
@@ -56,7 +65,8 @@ for (const [name,sha] of Object.entries(expected)) test('unit presentation prese
  if(name==='cameraEvidence.ts'){
   // Rule change, reviewer finding on #458: a camera health value older than
   // 20 minutes, missing, or in the future is grey Unknown (#94a3b8), never
-  // online and never Down. CAMERA_FRESH_MS and cameraTimestamp stay as pinned.
+  // online and never Down. CAMERA_FRESH_MS and cameraTimestamp stay as pinned;
+  // RECON_FRESH_MS sits beside them and changes neither.
   const marker='\n/** Grey used when a camera health value is not a current observation. */\n';
   const start=reviewed.indexOf(marker);
   const stop=reviewed.indexOf('export function resourceKind', start);
@@ -64,7 +74,7 @@ for (const [name,sha] of Object.entries(expected)) test('unit presentation prese
   const prior=reviewed.slice(0,start)+reviewed.slice(stop);
   const blob=text=>{const bytes=Buffer.from(text);return createHash('sha1').update('blob '+bytes.length+'\0').update(bytes).digest('hex');};
   assert.equal(blob(prior),sha);
-  assert.equal(blob(reviewed),'8d043f986b5e478c628181683012ffd4cdd4a40f');
+  assert.equal(blob(reviewed),'224f421291cf3170575e636578a382056527c31b');
   assert.match(reviewed.slice(start,stop),/presentedCameraHealth/);
   assert.match(reviewed.slice(start,stop),/#94a3b8/);
   return;

@@ -41,6 +41,12 @@ function readReceipt(value:unknown,batch:VerifyProduct[]):Receipt {
  }
  return v;
 }
+/** One unit's answer from a single-product verify, checked against the same contract Verify now uses.
+ * Throws when the response is not that contract or is not about this product. */
+export function readSingleVerification(value:unknown,productId:string):Omit<VerificationRow,'name'|'outcome'> {
+ const receipt=readReceipt(value,[{productId,unitNumber:''}]);
+ return receipt.items[0];
+}
 export async function runFleetVerification(products:VerifyProduct[],options:Options) {
  const snapshot=[...new Map(products.map(p=>[p.productId,{...p}])).values()];
  const rows:VerificationRow[]=[];

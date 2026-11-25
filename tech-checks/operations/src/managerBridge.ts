@@ -28,7 +28,13 @@ export type ManagerSnapshot = {
   exchanges: ManagerExchange[] | null;
   /** Null when the handoff check could not be read. */
   gaps: ManagerGaps | null;
+  /** Null when the SIM drawer could not be read. */
+  sims: ManagerSims | null;
 };
+export type ManagerSimStatus = 'in_drawer' | 'in_unit' | 'on_truck' | 'bad' | 'deactivated' | 'removed';
+export type ManagerSimCard = {sim: string; carrier: string; status: ManagerSimStatus; location: string; note: string; by: string; at: string | null};
+export type ManagerSims = {cards: ManagerSimCard[]; notListed: {sim: string; detail: string; by: string; at: string | null}[]};
+export type SimAddResult = {added: string[]; already: string[]; bad: string[]};
 export type ManagerGapKind = 'owner_override' | 'owner_edit_no_reason' | 'system' | 'log_mode' | 'other';
 export type ManagerGaps = {
   enforced: boolean;
@@ -121,6 +127,17 @@ function parseGaps(value: unknown): ManagerGaps | null {
   };
 }
 
+const simStatuses: ManagerSimStatus[] = ['in_drawer', 'in_unit', 'on_truck', 'bad', 'deactivated', 'removed'];
+function parseSims(value: unknown): ManagerSims | null {
+  if (!record(value)) return null;
+  return {
+    cards: list(value.cards, 2000).filter(record).map(row => ({sim: text(row.sim, 24), carrier: text(row.carrier, 40),
+      status: simStatuses.includes(row.status as ManagerSimStatus) ? row.status as ManagerSimStatus : 'removed' as ManagerSimStatus,
+      location: text(row.location, 120), note: text(row.note, 300), by: text(row.by, 80), at: time(row.at)})).filter(row => /^[0-9A-Z]{8,24}$/.test(row.sim)),
+    notListed: list(value.notListed, 100).filter(record).map(row => ({sim: text(row.sim, 24), detail: text(row.detail, 160), by: text(row.by, 80), at: time(row.at)})).filter(row => row.sim),
+  };
+}
+
 export function parseManagerSnapshot(value: unknown): ManagerSnapshot {
   if (!record(value) || typeof value.day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value.day) || !Array.isArray(value.techs)) throw new ManagerError(said.unavailable);
   return {
@@ -129,6 +146,7 @@ export function parseManagerSnapshot(value: unknown): ManagerSnapshot {
     it: list(value.it, 100).filter(record).map(tech => ({name: text(tech.name, 80), test: tech.test === true})).filter(tech => tech.name),
     exchanges: Array.isArray(value.exchanges) ? list(value.exchanges, 100).map(parseExchange).filter((row): row is ManagerExchange => row !== null) : null,
     gaps: parseGaps(value.gaps),
+    sims: parseSims(value.sims),
   };
 }
 
@@ -199,6 +217,24 @@ export function readManager(fresh = false, patient = managerKnown()): Promise<Ma
 export async function saveTruck(techId: string, kit: TruckKit): Promise<ManagerSnapshot> {
   await managerHello();
   await ask('truck', {techId, kit}, SAVE_MS);
+  held0 = null;
+  return readManager(true);
+}
+
+/** Adds SIM cards to the drawer, then reads everything again. */
+export async function addSims(numbers: string[], carrier: string, note: string): Promise<{result: SimAddResult; snapshot: ManagerSnapshot}> {
+  await managerHello();
+  const message = await ask('simAdd', {numbers: numbers.slice(0, 500), carrier: carrier.slice(0, 40), note: note.slice(0, 300)}, SAVE_MS);
+  const strings = (v: unknown) => list(v, 500).map(item => text(item, 24)).filter(Boolean);
+  const result = {added: strings(message.added), already: strings(message.already), bad: strings(message.bad)};
+  held0 = null;
+  return {result, snapshot: await readManager(true)};
+}
+
+/** Puts a SIM back in the drawer, or marks it bad, deactivated or removed, then reads everything again. */
+export async function markSim(sim: string, status: 'in_drawer' | 'bad' | 'deactivated' | 'removed', note: string): Promise<ManagerSnapshot> {
+  await managerHello();
+  await ask('simMark', {sim, status, note: note.slice(0, 300)}, SAVE_MS);
   held0 = null;
   return readManager(true);
 }

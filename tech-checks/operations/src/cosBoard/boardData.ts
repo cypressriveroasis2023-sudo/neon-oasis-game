@@ -1,6 +1,7 @@
 import {presentedCameraState, type CountUnit} from '../sharedFleetCounts';
 import {unitVerdict, type UnitCameraStatus} from '../../shared/starUnitStatus';
 import {exactUnitName, ROUTER_FRESHNESS_MS, type RouterRow} from '../../../supabase/functions/cos-operations-pages/routers';
+import {CAMERA_FRESH_MS, RECON_FRESH_MS} from '../cameraEvidence';
 import type {MhelpAddressMapResult} from '../mhelpAddressMapPins';
 
 /**
@@ -96,6 +97,9 @@ const VERDICT: Record<UnitCameraStatus['state'], BoardVerdict> = {GREEN: 'up', Y
 
 type Call = {excluded: boolean; place: 'field' | 'shop'; verdict: BoardVerdict; online: number; offline: number; cameras: number};
 
+/** Reconeyez reports by event, not on a clock, so it is judged by its own window. Everything else is polled. */
+const freshWindow = (feed: UnitCameraStatus) => feed.source === 'reconeyez' ? RECON_FRESH_MS : CAMERA_FRESH_MS;
+
 /**
  * One unit's place and verdict, decided the way selectFleetCounts decides it:
  * DO NOT USE and exceptions are out of every total, a shop unit is never down,
@@ -110,7 +114,7 @@ function call(feed: UnitCameraStatus, unit: CountUnit | undefined, now: number):
   if (unit.placement === 'unknown') {
     return {excluded, place: 'field', verdict: 'unknown', online: 0, offline: 0, cameras: unit.cameras.length};
   }
-  const states = unit.cameras.map(camera => presentedCameraState(camera, now));
+  const states = unit.cameras.map(camera => presentedCameraState(camera, now, freshWindow(feed)));
   const online = states.filter(state => state === 'online').length;
   const offline = states.filter(state => state === 'offline').length;
   return {excluded, place: 'field', verdict: VERDICT[unitVerdict(online, offline, states.length - online - offline)], online, offline, cameras: states.length};
@@ -118,7 +122,7 @@ function call(feed: UnitCameraStatus, unit: CountUnit | undefined, now: number):
 
 function cameraRows(feed: UnitCameraStatus, now: number): BoardCamera[] {
   return (feed.cameraList || []).map(camera => {
-    const state = camera.removed ? 'unknown' : presentedCameraState({state: camera.status, observedAt: feed.observedAt}, now);
+    const state = camera.removed ? 'unknown' : presentedCameraState({state: camera.status, observedAt: feed.observedAt}, now, freshWindow(feed));
     return {
       name: camera.name,
       type: camera.removed ? 'Taken off this unit by hand' : camera.atSite === false ? 'In the shop, not at the site' : '',
@@ -132,7 +136,7 @@ function cameraRows(feed: UnitCameraStatus, now: number): BoardCamera[] {
 function notOnline(feed: UnitCameraStatus, place: 'field' | 'shop', now: number): string {
   const listed = (feed.cameraList || []).filter(camera => !camera.removed && (place !== 'field' || camera.atSite !== false));
   const names = listed.length
-    ? listed.filter(camera => presentedCameraState({state: camera.status, observedAt: feed.observedAt}, now) !== 'online').map(camera => camera.name)
+    ? listed.filter(camera => presentedCameraState({state: camera.status, observedAt: feed.observedAt}, now, freshWindow(feed)) !== 'online').map(camera => camera.name)
     : (feed.down || []).map(camera => camera.name);
   return names.map(name => line(name).replace(/;/g, ',')).filter(Boolean).join(';');
 }

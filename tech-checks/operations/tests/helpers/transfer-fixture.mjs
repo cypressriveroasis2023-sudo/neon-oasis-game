@@ -51,6 +51,12 @@ export async function mountTransfers(page,{role='it',itActor=IT,serviceActor=SER
  }
  if(legacyHandoff)await db.exec(purposeMigration);
  await db.exec(await readFile(root+'database-maintenance/techcheck-owner-handoff-resolution-v1.sql','utf8'));
+ // The SIM drawer. The test database has no app_role type, so the drawer gets the same small stand-ins the live database has.
+ await db.exec(`create type public.app_role as enum('pending','it','service','owner');
+  create function public.current_app_role() returns public.app_role language sql stable security definer set search_path='' as $$select coalesce((select role::public.app_role from public.profiles where user_id=auth.uid() and active and archived_at is null),'pending'::public.app_role)$$;
+  create function public.require_role(allowed public.app_role[]) returns void language plpgsql stable security definer set search_path='' as $$begin if auth.uid() is null then raise exception 'Authentication required'; end if; if not (public.current_app_role()=any(allowed)) then raise exception 'Not authorized for this action'; end if; end$$;
+  create table if not exists public.service_truck_sims(service_tech_id uuid,slot_no integer,sim_number text,status text);`);
+ await db.exec(await readFile(root+'database-maintenance/techcheck-sim-drawer-v1.sql','utf8'));
  // The held placement-review package replaces the same function and is not yet updated for the Service checklist.
  if(!placementEvidence)await db.exec(await readFile(root+'database-maintenance/techcheck-service-receipt-checks-v1.sql','utf8'));
  if(placementEvidence){
@@ -81,7 +87,7 @@ export async function mountTransfers(page,{role='it',itActor=IT,serviceActor=SER
  if(name==='cos_verified_fleet_capabilities_v1')return {data:{fleetRead:fixture.role==='it'&&['${IT}','${TEST_IT}'].includes(fixture.actor)}};
  if(fixture.rpcFail)return {error:{message:'Synthetic connection interrupted'}};
  const response=await fetch('/synthetic/rpc',{method:'POST',headers:{'Content-Type':'application/json','x-actor':fixture.actor},body:JSON.stringify({name,args})});const result=await response.json();
- if(['submit_techcheck_transfer_v1','submit_techcheck_transfer_v2','classify_techcheck_transfer_purpose_v1','owner_resolve_techcheck_transfer_v1'].includes(name)&&fixture.loseResponse&&!result.error){fixture.loseResponse=false;return {error:{message:'Synthetic response lost'}};}return result;
+ if(['submit_techcheck_transfer_v1','submit_techcheck_transfer_v2','classify_techcheck_transfer_purpose_v1','owner_resolve_techcheck_transfer_v1','sim_drawer_v1'].includes(name)&&fixture.loseResponse&&!result.error){fixture.loseResponse=false;return {error:{message:'Synthetic response lost'}};}return result;
  },storage:{from:bucket=>({upload:async(path,blob)=>{if(fixture.uploadFail)return {error:{statusCode:503}};const r=await fetch('/synthetic/storage?name='+encodeURIComponent(path),{method:'POST',headers:{'x-actor':fixture.actor},body:blob});return r.ok?{}:{error:{statusCode:r.status}};},createSignedUrl:async path=>({data:{signedUrl:'/synthetic/photo?name='+encodeURIComponent(path)}})})}};
  window.TechCheckContext={db,getRole:()=>fixture.role,getEffectiveRole:()=>fixture.role,getProfile:()=>({full_name:name(),username:name(),user_id:fixture.actor,role:fixture.role,active:true,archived_at:null}),getSession:session};
  window.show=key=>{for(const v of ['it','svc','owner','morning'])document.getElementById('view-'+v).classList.toggle('hidden',key!==v);dispatchEvent(new Event('techcheck:view-changed'));};
@@ -96,7 +102,7 @@ export async function mountTransfers(page,{role='it',itActor=IT,serviceActor=SER
   const {name,args}=req.postDataJSON();calls.push({name,args});
   if(name==='techcheck_transfer_readiness_v1'&&readinessDelay)await new Promise(resolve=>setTimeout(resolve,readinessDelay));
   if(name==='techcheck_transfer_context_v1'&&rollout==='read-cache-missing')return route.fulfill({json:{error:{code:'PGRST202',message:'Synthetic missing schema cache'}}});
-  if(!['techcheck_transfer_readiness_v1','techcheck_transfer_context_v1','submit_techcheck_transfer_v1','submit_techcheck_transfer_v2','classify_techcheck_transfer_purpose_v1','owner_resolve_techcheck_transfer_v1'].includes(name)){unexpected.push(name);return route.abort();}
+  if(!['techcheck_transfer_readiness_v1','techcheck_transfer_context_v1','submit_techcheck_transfer_v1','submit_techcheck_transfer_v2','classify_techcheck_transfer_purpose_v1','owner_resolve_techcheck_transfer_v1','sim_drawer_v1'].includes(name)){unexpected.push(name);return route.abort();}
   try{const rows=await run(req.headers()['x-actor'],`select public.${name}(${Object.keys(args).map((k,i)=>k+'=> $'+(i+1)).join(',')}) result`,Object.values(args));return route.fulfill({json:{data:rows.rows[0].result}});}catch(e){return route.fulfill({json:{error:{message:e.message,code:e.code==='42883'?'PGRST202':e.code}}});}
  }
  if(url.pathname==='/synthetic/storage'){

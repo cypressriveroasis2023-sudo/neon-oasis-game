@@ -11,8 +11,9 @@
  */
 import mapData from './boardMap.json';
 import {BOARD_CSS} from './boardStyle';
+import {troubleWalk, troubleKnown, troubleNote, TROUBLE_CSS} from './boardTrouble';
 
-const SHELL = "<div class=\"cosb\" id=\"cosb\"><header class=\"top\"><div class=\"wrap\">\n  <div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div>\n  <span class=\"topbtns\"><button class=\"tvgo\" id=\"tvGo\" type=\"button\">TV board</button><button class=\"refresh\" id=\"refresh\" type=\"button\">Refresh</button></span>\n</div></header>\n<div class=\"asof\" id=\"asof\"><div class=\"wrap\"><span id=\"asofMain\">Loading the camera reading…</span><span id=\"asofSub\"></span></div></div>\n\n<main class=\"wrap\">\n  <div class=\"tabs\" role=\"tablist\">\n    <button class=\"tab\" role=\"tab\" id=\"tabBoard\" aria-selected=\"true\" type=\"button\">Board</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabMap\" aria-selected=\"false\" type=\"button\">Map</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabTech\" aria-selected=\"false\" type=\"button\">Tech check</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabManager\" aria-selected=\"false\" type=\"button\" hidden>Manager</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabPunch\" aria-selected=\"false\" type=\"button\">Punch list</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabActivity\" aria-selected=\"false\" type=\"button\">Changes</button>\n  </div>\n\n  <section id=\"viewBoard\">\n    <div id=\"boardMain\">\n    <div class=\"mode\" id=\"modeRow\"></div>\n    <div class=\"kpi\" id=\"kpi\">\n    <div class=\"tiles\" id=\"tiles\"></div>\n    <div class=\"shoprow\" id=\"shoprow\"></div>\n    </div>\n    <div id=\"boardList\">\n    <div class=\"controls\">\n      <input class=\"search\" id=\"q\" type=\"search\" placeholder=\"Find a unit, site, A# or IP\" autocomplete=\"off\" aria-label=\"Find a unit, site, A number or IP\">\n      <div class=\"chips\" id=\"fam\"></div>\n    </div>\n    <div class=\"count\" id=\"count\"></div>\n    <div class=\"list\" id=\"list\"></div>\n    <div class=\"screens\" id=\"screensRow\"><h3>Other COS screens</h3><div class=\"links\" id=\"screensLinks\"></div></div><ul class=\"foot\"><li>One unit counts once, however many cameras it has.</li><li>One count here, and it is mHelp’s camera units. mHelp’s own field total is higher because it counts stands and poles as well. The camera systems see fewer, because some units in mHelp have no camera record in COS yet; those show Unknown.</li><li>A unit in the shop never counts as down.</li><li>A reading that is missing or too old shows Unknown, never Down.</li><li>Router checks are a reference only. A router online does not prove the cameras work.</li><li>Hand fixes made here are saved in COS with your name and the time. Nothing here changes mHelp, Star4Live or InHand.</li></ul>\n    </div>\n    </div>\n    <aside id=\"boardSide\" aria-label=\"Map of field units\" hidden></aside>\n  </section>\n\n  <section id=\"viewMap\" hidden>\n    <div id=\"mapBlock\">\n    <div class=\"chips\" id=\"mapChips\"></div>\n    <div class=\"chips\" id=\"mapGo\" style=\"margin-top:8px\"></div>\n    <div class=\"mapwrap\" id=\"mapWrap\">\n      <svg id=\"mapSvg\" role=\"img\" aria-label=\"Map of field units\"><g id=\"mapBase\"></g><g id=\"mapLabels\"></g><g id=\"mapPins\"></g></svg>\n      <div class=\"mapbtns\"><button type=\"button\" id=\"zin\" aria-label=\"Zoom in\">+</button><button type=\"button\" id=\"zout\" aria-label=\"Zoom out\">&minus;</button></div>\n      <div class=\"mapmsg\" id=\"mapMsg\" hidden></div>\n      <div class=\"mapsel\" id=\"mapSel\" hidden></div>\n    </div>\n    <p class=\"note\" id=\"mapNote\" style=\"margin-top:10px\"></p>\n    <div class=\"list\" id=\"mapList\"></div>\n    </div>\n  </section>\n\n  <section id=\"viewTech\" hidden>\n    <div id=\"techForm\"></div>\n    <div id=\"techList\"></div>\n  </section>\n\n  <section id=\"viewManager\" hidden>\n    <div id=\"mgNow\"></div>\n    <div id=\"mgChecks\"></div>\n    <div id=\"mgTrucks\"></div>\n    <div id=\"mgGap\"></div>\n    <div id=\"mgX\"></div>\n    <div id=\"mgTools\"></div>\n  </section>\n\n  <section id=\"viewPunch\" hidden>\n    <div class=\"box\" id=\"punchTop\"><p class=\"note\">Loading the mHelp list…</p></div>\n    <div class=\"chips\" id=\"punchChips\" style=\"margin-top:12px\"></div>\n    <div class=\"count\" id=\"punchCount\"></div>\n    <div class=\"list\" id=\"punchList\"></div>\n  </section>\n\n  <section id=\"viewActivity\" hidden>\n    <p class=\"note\" id=\"actNote\">Every change made by hand on this board, newest first.</p>\n    <ul class=\"hist\" id=\"activity\"></ul>\n  </section>\n</main>\n\n<section id=\"viewTv\" hidden><header class=\"tvtop\"><div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div><div class=\"tvread\" id=\"tvRead\" role=\"status\">Loading the camera reading…</div><div class=\"tvclock\"><b id=\"tvClock\"></b><span id=\"tvDate\"></span></div><button type=\"button\" class=\"tvx\" id=\"tvExitTop\">Exit TV</button></header><div class=\"tvgrid\" id=\"tvGrid\"><div class=\"tvleft\"><div class=\"tvtiles\" id=\"tvTiles\"></div><div class=\"tvminis\" id=\"tvMinis\"></div><div class=\"tvhead\" id=\"tvHead\"></div><div class=\"tvlist\" id=\"tvList\"></div></div><div class=\"tvright\" id=\"tvRight\"><div class=\"tvmaptitle\" id=\"tvMapTitle\"></div><div class=\"tvmap\" id=\"tvMap\"></div></div></div><footer class=\"tvfoot\"><span id=\"tvNote\"></span><span class=\"tvbtns\"><button type=\"button\" id=\"tvRefresh\">Refresh</button><button type=\"button\" id=\"tvFull\">Full screen</button><button type=\"button\" id=\"tvExit\">Exit TV</button></span></footer></section><div class=\"sheet\" id=\"sheet\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"pname\"><div class=\"panel\" id=\"panel\"></div></div>\n<div class=\"toast\" id=\"toast\" role=\"status\" aria-live=\"polite\"></div></div>";
+const SHELL = "<div class=\"cosb\" id=\"cosb\"><header class=\"top\"><div class=\"wrap\">\n  <div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div>\n  <span class=\"topbtns\"><button class=\"tvgo\" id=\"tvGo\" type=\"button\">TV board</button><button class=\"refresh\" id=\"refresh\" type=\"button\">Refresh</button></span>\n</div></header>\n<div class=\"asof\" id=\"asof\"><div class=\"wrap\"><span id=\"asofMain\">Loading the camera reading…</span><span id=\"asofSub\"></span></div></div>\n\n<main class=\"wrap\">\n  <div class=\"tabs\" role=\"tablist\">\n    <button class=\"tab\" role=\"tab\" id=\"tabBoard\" aria-selected=\"true\" type=\"button\">Board</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabMap\" aria-selected=\"false\" type=\"button\">Map</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabTech\" aria-selected=\"false\" type=\"button\">Tech check</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabManager\" aria-selected=\"false\" type=\"button\" hidden>Manager</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabPunch\" aria-selected=\"false\" type=\"button\">Punch list</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabActivity\" aria-selected=\"false\" type=\"button\">Changes</button>\n  </div>\n\n  <section id=\"viewBoard\">\n    <div id=\"boardMain\">\n    <div class=\"mode\" id=\"modeRow\"></div>\n    <div class=\"kpi\" id=\"kpi\">\n    <p class=\"provnote\" id=\"provNote\" hidden></p>\n    <div class=\"tiles\" id=\"tiles\"></div>\n    <div class=\"shoprow\" id=\"shoprow\"></div>\n    </div>\n    <div id=\"boardList\">\n    <div class=\"controls\">\n      <input class=\"search\" id=\"q\" type=\"search\" placeholder=\"Find a unit, site, A# or IP\" autocomplete=\"off\" aria-label=\"Find a unit, site, A number or IP\">\n      <div class=\"chips\" id=\"fam\"></div>\n    </div>\n    <div class=\"count\" id=\"count\"></div>\n    <div class=\"list\" id=\"list\"></div>\n    <div class=\"screens\" id=\"screensRow\"><h3>Other COS screens</h3><div class=\"links\" id=\"screensLinks\"></div></div><ul class=\"foot\"><li>One unit counts once, however many cameras it has.</li><li>One count here, and it is mHelp’s camera units. mHelp’s own field total is higher because it counts stands and poles as well. The camera systems see fewer, because some units in mHelp have no camera record in COS yet; those show Unknown.</li><li>A unit in the shop never counts as down.</li><li>A reading that is missing or too old shows Unknown, never Down.</li><li>Router checks are a reference only. A router online does not prove the cameras work.</li><li>Hand fixes made here are saved in COS with your name and the time. Nothing here changes mHelp, Star4Live or InHand.</li></ul>\n    </div>\n    </div>\n    <aside id=\"boardSide\" aria-label=\"Map of field units\" hidden></aside>\n  </section>\n\n  <section id=\"viewMap\" hidden>\n    <div id=\"mapBlock\">\n    <div class=\"chips\" id=\"mapChips\"></div>\n    <div class=\"chips\" id=\"mapGo\" style=\"margin-top:8px\"></div>\n    <div class=\"mapwrap\" id=\"mapWrap\">\n      <svg id=\"mapSvg\" role=\"img\" aria-label=\"Map of field units\"><g id=\"mapBase\"></g><g id=\"mapLabels\"></g><g id=\"mapPins\"></g></svg>\n      <div class=\"mapbtns\"><button type=\"button\" id=\"zin\" aria-label=\"Zoom in\">+</button><button type=\"button\" id=\"zout\" aria-label=\"Zoom out\">&minus;</button></div>\n      <div class=\"mapmsg\" id=\"mapMsg\" hidden></div>\n      <div class=\"mapsel\" id=\"mapSel\" hidden></div>\n    </div>\n    <p class=\"note\" id=\"mapNote\" style=\"margin-top:10px\"></p>\n    <div class=\"list\" id=\"mapList\"></div>\n    </div>\n  </section>\n\n  <section id=\"viewTech\" hidden>\n    <div id=\"techForm\"></div>\n    <div id=\"techList\"></div>\n  </section>\n\n  <section id=\"viewManager\" hidden>\n    <div id=\"mgNow\"></div>\n    <div id=\"mgChecks\"></div>\n    <div id=\"mgTrucks\"></div>\n    <div id=\"mgGap\"></div>\n    <div id=\"mgSim\"></div>\n    <div id=\"mgX\"></div>\n    <div id=\"mgTools\"></div>\n  </section>\n\n  <section id=\"viewPunch\" hidden>\n    <div class=\"box\" id=\"punchTop\"><p class=\"note\">Loading the mHelp list…</p></div>\n    <div class=\"chips\" id=\"punchChips\" style=\"margin-top:12px\"></div>\n    <div class=\"count\" id=\"punchCount\"></div>\n    <div class=\"list\" id=\"punchList\"></div>\n  </section>\n\n  <section id=\"viewActivity\" hidden>\n    <p class=\"note\" id=\"actNote\">Every change made by hand on this board, newest first.</p>\n    <ul class=\"hist\" id=\"activity\"></ul>\n  </section>\n</main>\n\n<section id=\"viewTv\" hidden><header class=\"tvtop\"><div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div><div class=\"tvread\" id=\"tvRead\" role=\"status\">Loading the camera reading…</div><div class=\"tvclock\"><b id=\"tvClock\"></b><span id=\"tvDate\"></span></div><button type=\"button\" class=\"tvx\" id=\"tvExitTop\">Exit TV</button></header><div class=\"tvgrid\" id=\"tvGrid\"><div class=\"tvleft\" id=\"tvKpi\"><div class=\"tvtiles\" id=\"tvTiles\"></div><div class=\"tvminis\" id=\"tvMinis\"></div><div class=\"tvhead\" id=\"tvHead\"></div><div class=\"tvlist\" id=\"tvList\"></div></div><div class=\"tvright\" id=\"tvRight\"><div class=\"tvmaptitle\" id=\"tvMapTitle\"></div><div class=\"tvmap\" id=\"tvMap\"></div></div></div><footer class=\"tvfoot\"><span id=\"tvNote\"></span><span class=\"tvbtns\"><button type=\"button\" id=\"tvRefresh\">Refresh</button><button type=\"button\" id=\"tvFull\">Full screen</button><button type=\"button\" id=\"tvExit\">Exit TV</button></span></footer></section><div class=\"sheet\" id=\"sheet\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"pname\"><div class=\"panel\" id=\"panel\"></div></div>\n<div class=\"toast\" id=\"toast\" role=\"status\" aria-live=\"polite\"></div></div>";
 /* A shadow root can be attached to an element only once, so a host that is mounted again gets its first root back. */
 const ROOTS = new WeakMap();
 
@@ -21,7 +22,7 @@ export function mountCosBoard(host, hooks){
 let root = ROOTS.get(host);
 if(!root){ root = host.attachShadow({mode:'closed'}); ROOTS.set(host, root); }
 root.replaceChildren();
-const style = document.createElement('style'); style.textContent = BOARD_CSS;
+const style = document.createElement('style'); style.textContent = BOARD_CSS + TROUBLE_CSS;
 const frame = document.createElement('template'); frame.innerHTML = SHELL;
 root.append(style, frame.content);
 const cleanups=[];
@@ -34,7 +35,7 @@ const TZ = "America/Chicago";
 /* ---------- state ---------- */
 const S = { meta:null, units:[], edits:{}, filter:"down", fam:"all", q:"", view:"board", openId:null, form:null,
             db:null, user:null, mcp:null, uid:null, canWrite:null, feedNote:"", editsReady:false, busy:false,
-            mh:null, pdone:{}, psec:"place", pins0:null, checks:{}, tc:null, tcOpen:false };
+            mh:null, pdone:{}, psec:"place", pins0:null, checks:{}, tc:null, tcOpen:false, chk:null, tr:null };
 /* One count. A device that had picked a way of counting forgets it. */
 try{ localStorage.removeItem("cos-count-mode"); }catch(_){}
 const $ = id => root.getElementById(id);
@@ -123,7 +124,7 @@ function reconcile(vs, mh){
   for(const v of sorted){
     if(v.mhOnly || v.place!=="field" || v.u.s!=="a" || v.ip) continue;
     out.items.push({ id:"noip~"+v.id, sec:"noip", fixed:!!v.hand.ip, unit:v.id, name:v.name, st:v.status,
-      text:[["COS: ","no IP address saved, so this unit has never been checked"],["What to do: ","open the unit and add the IP under Fix it"]] });
+      text:[["COS: ","no IP address saved, so this unit has never been checked"],["What to do: ","open the unit and add the IP under Fix the record"]] });
   }
   const seen={}; for(const v of sorted){ if(out.match[v.id]) { const k=bk.get(v.id).join("|"); seen[k]=1; } }
   for(const v of still){ const k=bk.get(v.id); const dup = k[0] && seen[k.join("|")];
@@ -205,10 +206,18 @@ function render(){
   if(S.mh ? S.filter==="excl" : S.filter==="notin") S.filter="field";
   $("modeRow").replaceChildren(h("span",{class:"hint",text: S.mh ? "One count: mHelp, the official list"+(S.mh.meta.at ? ", read "+when(S.mh.meta.at) : "")+". A unit is in the field, at the site mHelp gives, until mHelp shows it back in the shop or it is moved by hand here."
     : "The mHelp list has not loaded, so this shows only what the camera systems can see. It is not the official count."}));
+  /* James read the board twice within a minute and got two different counts, because the first read came before
+     the mHelp list arrived. Both counts were honest: without mHelp the board can only count the camera records
+     COS holds, which is a different set of units. That count is still worth showing, and a board with no numbers
+     is worse, so it stays, marked so it cannot be taken for the official one. A sentence above the tiles did not
+     do that: a glance takes in the numbers, not the caveat. Dimmed, dashed and labelled in the block, it does. */
+  $("kpi").classList.toggle("prov", !S.mh);
   const tile=(key,cls)=>h("button",{class:"tile "+cls,type:"button","aria-pressed":String(S.filter===key),onclick:()=>setFilter(key)},h("span",{class:"num",text:c[key]}),h("span",{class:"lab",text:LABEL[key]}));
   $("tiles").replaceChildren(tile("down","t-down"),tile("issues","t-issues"),tile("unknown","t-unknown"),tile("up","t-up"));
   const mini=(key,num,lab)=>h("button",{class:"mini",type:"button","aria-pressed":String(S.filter===key),onclick:()=>setFilter(key)},h("b",{text:num}),lab);
   $("shoprow").replaceChildren(...[mini("field",c.down+c.issues+c.up+c.unknown,"in the field"),mini("shopAll",c.shop+c.shopOnline,"in the shop"),mini("shopOnline",c.shopOnline,"online in shop"), !S.mh ? (c.excl ? mini("excl",c.excl,"marked do not use") : null) : mini("notin",c.notin,"not in mHelp")].filter(Boolean));
+  $("provNote").textContent = S.mh ? "" : "Not the official count. These are what the camera systems can see, until mHelp has loaded.";
+  $("provNote").hidden = Boolean(S.mh);
   const fams=[["all","All"],["Alibi","Alibi"],["Avigilon","Avigilon"],["Recon II","Recon II"]];
   $("fam").replaceChildren(...fams.map(([k,l])=>h("button",{class:"chip",type:"button","aria-pressed":String(S.fam===k),onclick:()=>{S.fam=k;render();}},l)));
 
@@ -232,7 +241,7 @@ function render(){
   if(S.view==="manager") mgDraw("feed");
 }
 const PSEC = [["place","Placed differently","mHelp is official, so the board shows mHelp's placement. The other system says something different, and the other system is the one to fix. Never change mHelp or the tracker to match it."],
-  ["noip","Field, no IP in COS","COS tells whether these are up by pinging an address it has on record, and there is none, so they can only show Unknown. Open the unit and add the IP under Fix it. Only a tech or the 2027 tracker has it: mHelp does not hold it and no camera system reports it."],
+  ["noip","Field, no IP in COS","COS tells whether these are up by pinging an address it has on record, and there is none, so they can only show Unknown. Open the unit and add the IP under Fix the record. Only a tech or the 2027 tracker has it: mHelp does not hold it and no camera system reports it."],
   ["mhField","Field, no camera feed","mHelp says these are in the field. COS has no camera record for them, so the board cannot show whether they are up."],
   ["bdField","Field feed, not in mHelp","Cameras are reporting from a site under this name, but mHelp has no equipment by that name. Not counted until mHelp has it."],
   ["name","Names differ","Same number, different name in each system. Worth making the names match."],
@@ -305,7 +314,7 @@ function rowEl(v){
 function setFilter(k){ S.filter = (S.filter===k && k!=="field") ? "field" : k; render(); }
 
 /* ---------- one unit ---------- */
-function openUnit(id){ S.openId=id; S.form=null; S.ipShown=false; $("sheet").classList.add("open"); drawPanel(); $("sheet").scrollTop=0; }
+function openUnit(id){ S.openId=id; S.form=null; S.ipShown=false; S.tr={unit:id, ans:{}}; $("sheet").classList.add("open"); drawPanel(); $("sheet").scrollTop=0; }
 function closeUnit(){ S.openId=null; S.form=null; S.ipShown=false; $("sheet").classList.remove("open"); }
 function steps(v){
   if(v.mhOnly) return v.place==="field"
@@ -322,7 +331,7 @@ function steps0(v){
   if(v.status==="issues") return ["Some cameras are off, listed above. The unit itself is reachable.","Check power and cabling on just those cameras.","When it is fixed, tap Refresh on the board to confirm."];
   if(v.status==="unknown") return v.u.s==="a" && !v.u.ip
     ? ["COS has no IP address for this unit, so it cannot be checked at all. That is why it shows Unknown and not Down.",
-       "Add the IP under Fix it. COS checks the address within the hour and the unit stops being Unknown.",
+       "Add the IP under Fix the record. COS checks the address within the hour and the unit stops being Unknown.",
        "Only a tech or the 2027 tracker has that address. mHelp does not hold it and no camera system reports it."]
     : ["No fresh reading. Do not treat this as down.","Tap Refresh on the board. If it stays Unknown, check the unit directly."];
   if(v.status==="shopOnline") return ["This unit is online but sits in the shop.","If it is really on a site, use Move to field and set the site.","If it is on the bench, nothing to do."];
@@ -357,6 +366,7 @@ function diagnose(v){
   if(u.pw && u.pw.hf) ck.push({k:"Victron history", s:"warn", t:u.pw.hf.join(" · ")});
   if(u.pw && u.pw.sk && u.pw.sk.w) ck.push({k:"Weather, Victron", s:"warn", t:u.pw.sk.w});
   if(u.pw) ck.push({k:"Battery, Victron", s:u.pw.al && u.pw.q!=="stale" && u.pw.q!=="off" ? (u.pw.al.l===2 ? "bad" : "warn") : (PWQ[u.pw.q]||"unk"), t:powerText(u.pw)+(u.pw.t ? " · "+when(u.pw.t) : "")});
+  if(fs==="issues"){ const off=offCams(v); if(off.length) ck.unshift({k:"Off now", s:"bad", t:off.map(c=>c.name+(c.since ? " · since "+when(c.since)+" · "+ago(c.since)+" ago" : "")).join(" · ")}); }
   if(u.lo && fs!=="up") ck.push({k:"Last online", s:"info", t:when(u.lo)+" · "+ago(u.lo)+" ago"});
   const m = S.mh && S.rec ? S.rec.match[v.id] : null;
   if(S.mh){
@@ -368,11 +378,13 @@ function diagnose(v){
   let cause;
   if(v.status==="notin") cause="This has a camera record but is not in mHelp, so it is not counted.";
   else if(v.place==="shop") cause = (fs==="up"||fs==="issues") ? "Online, but filed under shop. If it is really on a site, the placement is what needs fixing." : "In the shop. Nothing to troubleshoot unless it should be on a site.";
-  else if(fs==="down" && u.pw && u.pw.q==="low") cause = "Victron shows the battery at "+u.pw.b+"%"+(u.pw.w!==null ? " with "+u.pw.w+" W of solar coming in" : "")+". The unit is most likely out of power. Check the panels and the charge controller before anything else."
+  else if(fs==="down" && lowBattery(u.pw)) cause = "Victron shows the battery at "+u.pw.b+"%"+(u.pw.w!==null ? " with "+u.pw.w+" W of solar coming in" : "")+". The unit is most likely out of power. Check the panels and the charge controller before anything else."
   else if(fs==="down") cause = r.off ? "The whole unit looks dark. Cameras and router are both not answering. Think site power, SIM or signal first."
     : r.on ? "The router answers, but nothing behind it is reporting. Think power to the cameras or recorder, the switch, or cabling."
     : "Cameras are not reporting and there is no router reading to narrow it down. Start with site power.";
-  else if(fs==="issues") cause="The unit is reachable. Only the cameras listed below are off. Check their power and cable.";
+  else if(fs==="issues"){ const off=offCams(v);
+    cause = off.length ? "The unit is reachable. Off: "+off.map(c=>c.name+(c.since ? " (since "+when(c.since)+")" : "")).join(", ")+". Troubleshoot below walks you through it."
+      : "The unit is reachable. Some cameras are off. Troubleshoot below walks you through it."; }
   else if(fs==="up") cause = r.off ? "Cameras are reporting. The router check fails, which usually means the router address on record is out of date." : "Nothing wrong. All cameras are reporting.";
   else cause = v.why || "No fresh reading. Do not treat this as down.";
   return { cause, ck };
@@ -389,6 +401,51 @@ function camsBox(v){
     h("div",null,h("b",{text:c.name}),h("span",{text:[c.type,c.model,c.fw ? "firmware "+c.fw : ""].filter(Boolean).join(" · ")})),
     h("span",{class:"cst "+(c.st===1?"ok":c.st===0?"bad":"unk"),text: c.st===1 ? "Online" : c.st===0 ? "Offline"+(c.lo ? " since "+when(c.lo) : "") : "No reading"}))),
     S.devAt ? h("p",{class:"note",text:"Camera list read "+when(S.devAt)+"."}) : null); }
+/* The cameras COS has as off right now, by name, with when each was last online. The camera list first; the unit's own list as a fallback. */
+function offCams(v){
+  const list = S.dev && S.dev[v.k];
+  if(list && list.length) return list.filter(c=>c.st===0).map(c=>({name:c.name, since:c.lo||0}));
+  return v.u.bad ? v.u.bad.split(";").map(x=>x.trim()).filter(Boolean).map(name=>({name, since:v.u.lo||0})) : [];
+}
+/* Out of power means the battery reading itself is low (under 20%), from a current reading. A Victron alarm on a full battery
+   (Felix found 95% flagged) is shown as an alarm on the card, but it is not a reason to tell a tech the unit ran out of power. */
+function lowBattery(pw){ return !!(pw && pw.q!=="off" && pw.q!=="stale" && pw.q!=="none" && typeof pw.b==="number" && pw.b<20); }
+function troubleFacts(v){
+  const u=v.u, r=routerRead(u), pw=u.pw, live = pw && pw.q!=="off" && pw.q!=="stale" && pw.q!=="none";
+  return { status:v.fs, place:v.place, offCams:v.fs==="issues" ? offCams(v) : [], routerOn:r.on, routerOff:r.off,
+    power: live ? {low:lowBattery(pw), battery:pw.b} : null,
+    canCheck: !!(hooks && typeof hooks.onCheckUnit==="function" && checkPid(v)),
+    routerPage: !!(u.ri && IPV4.test(u.ri) && /^\d+$/.test(u.rp)),
+    camPages: !!(v.ip && IPV4.test(v.ip) && (u.s==="a" || u.s==="v")) };
+}
+/* Troubleshoot: what COS knows first, then one question at a time. Returns null where there is nothing to troubleshoot. */
+function troubleBox(v){
+  if(v.mhOnly || v.u.s==="r") return null;
+  const f=troubleFacts(v), tr = S.tr && S.tr.unit===v.id ? S.tr : (S.tr={unit:v.id, ans:{}});
+  const walk=troubleWalk(f, tr.ans); if(!walk.at) return null;
+  const known=troubleKnown(f, when, s=>ago(s));
+  const box=h("div",{class:"box trb"},h("h3",{text:"Troubleshoot"}));
+  if(known.length) box.append(h("ul",{class:"trknown"},known.map(k=>h("li",{text:k}))),h("p",{class:"note",text:"COS already knows this, so you don't have to look it up."}));
+  if(walk.trail.length) box.append(h("ol",{class:"trtrail"},walk.trail.map((t,i)=>h("li",null,
+    h("button",{class:"trback",type:"button",onclick:()=>{ const keep={}; walk.trail.slice(0,i).forEach(x=>keep[x.id]=tr.ans[x.id]); tr.ans=keep; drawPanel(); }},
+      h("span",{text:t.question}),h("b",{text:t.answer}))))));
+  const at=walk.at;
+  if(at.kind==="step"){
+    box.append(h("span",{class:"trwho",text:at.who}),h("p",{class:"trq",text:at.question}),
+      h("ol",{class:"steps trhow"},at.how.map(t=>h("li",{text:t}))),
+      h("div",{class:"tropts"},at.options.map(o=>h("button",{class:"trbtn",type:"button",onclick:()=>{ tr.ans[at.id]=o.key; drawPanel(); }},o.label))));
+  } else {
+    const note=troubleNote(v.name, known, walk, fmtDate.format(new Date()));
+    box.append(h("div",{class:"trres t-"+at.tone},h("p",{class:"trq",text:at.title}),h("ul",null,at.todo.map(t=>h("li",{text:t}))),
+        h("p",{class:"trhelp",text:"Manager help: "+(at.managerHelp ? "YES — write what is needed; the manager arranges any visit." : "No")})),
+      h("pre",{class:"trnote",text:note}),
+      h("div",{class:"tropts two"},
+        h("button",{class:"trbtn go",type:"button",onclick:()=>{ try{ navigator.clipboard.writeText(note).then(()=>toast("Note copied."),()=>toast("Couldn't copy in this view.")); }catch(_){ toast("Couldn't copy in this view."); } }},"Copy note"),
+        h("button",{class:"trbtn",type:"button",onclick:()=>{ tr.ans={}; drawPanel(); }},"Start over")));
+  }
+  if(walk.trail.length && at.kind==="step") box.append(h("p",{class:"note",text:"Tap an answer above to change it."}));
+  return box;
+}
 const IPV4 = /^\d{1,3}(\.\d{1,3}){3}$/;
 /* Cards show the last part of an IP only. Copy IP and the unit links still use the whole address. */
 const ipCard = ip => S.ipShown ? String(ip||"") : ipShort(ip);
@@ -469,21 +526,23 @@ function drawPanel(){
   if(v.note) kv.push(["Note", v.note]);
   const dl=h("dl",{class:"kv"}); for(const [a,b] of kv) dl.append(h("dt",{text:a}),h("dd",{text:b}));
 
-  const body=[ resBox(resFor(v.name, v.k, mm&&mm.rec.label)), diagBox(v),
-    h("div",{class:"box"},h("h3",{text:"What to do"}),h("ol",{class:"steps"},steps(v).map(s=>h("li",{text:s})))),
-    camsBox(v), locBox(v), openBox(v), logBox(v),
+  const tb = troubleBox(v), ob = openBox(v);
+  const tbx = tb || h("div",{class:"box"},h("h3",{text:"What to do"}),h("ol",{class:"steps"},steps(v).map(s=>h("li",{text:s}))));
+  const body=[ resBox(resFor(v.name, v.k, mm&&mm.rec.label)), diagBox(v), camsBox(v),
+    tbx,
+    ob, locBox(v), logBox(v),
     h("div",{class:"box"},h("h3",{text:"Details"}),dl, v.why?h("p",{class:"note",text:v.why}):null) ];
   if(v.type==="Helios") body.push(powerBox(v));
 
   /* Fix it */
   const can = S.can===true;
-  const fx=h("div",{class:"box"},h("h3",{text:"Fix it"}));
+  const fx=h("div",{class:"box"},h("h3",{text:"Fix the record"}),h("p",{class:"note",text:"Only when COS has this unit's facts wrong. These change the record, not the cameras."}));
   if(!can) fx.append(h("p",{class:"note",text: S.canWhy || "Hand fixes are not available right now."}));
   else {
     const b=(label,key,alt)=>h("button",{class:"fixbtn"+(alt?" alt":""),type:"button",disabled:S.busy,onclick:()=>{S.form=key;drawPanel();}},label);
     fx.append(h("div",{class:"fix"},
-      h("button",{class:"fixbtn",type:"button",disabled:S.busy,onclick:()=>{ if(v.place==="field") save(v,{place:"shop"}); else { S.form="tofield"; drawPanel(); } }}, v.place==="field"?"Move to shop":"Move to field"),
-      b("Change site","site"), b("Rename","name",true), b("Correct IP","ip",true),
+      h("button",{class:"fixbtn alt",type:"button",disabled:S.busy,onclick:()=>{ if(v.place==="field") save(v,{place:"shop"}); else { S.form="tofield"; drawPanel(); } }}, v.place==="field"?"Move to shop":"Move to field"),
+      b("Change site","site",true), b("Rename","name",true), b("Correct IP","ip",true),
       v.edited ? b("Undo hand edits","undo",true) : null));
     const F={ site:["Site name",v.site,"site"], tofield:["Which site is it on?",v.site||v.feedSite,"site"], name:["Unit name",v.name,"name"], ip:["IP address",v.ip||"","ip"] }[S.form];
     if(S.form==="undo"){
@@ -500,8 +559,24 @@ function drawPanel(){
     }
     fx.append(h("p",{class:"note",text:"A fix made by hand wins in COS and stays until someone undoes it. No new reading from mHelp or Star4Live replaces it. It is saved with your name and the time. mHelp is the official count, so make the same change in mHelp."}));
   }
-  /* The fix comes first on the card, right under what is wrong. */
-  body.splice(2,0,fx);
+  /* Fixing the record comes after troubleshooting and the unit's own pages: most problems are not the record. */
+  body.splice(body.indexOf(ob)+1,0,fx);
+
+  /* Checking sits right before Troubleshoot, which uses it. James chose (25 Nov) to put troubleshooting ahead of
+     record fixes: the red record buttons under the diagnosis looked like the answer to a camera fault and are not.
+     Drawn only where the app can run a check and there is an A# to check against. */
+  if(!v.mhOnly && hooks && typeof hooks.onCheckUnit==="function"){
+    const c = S.chk && S.chk.unit===v.id ? S.chk : null, pid = checkPid(v);
+    const cb=h("div",{class:"box"},h("h3",{text:"Check it now"}));
+    if(!pid) cb.append(h("p",{class:"note",text:"This unit has no A# in COS yet, so there is nothing to check it against. Give it an A# in mHelp first."}));
+    else {
+      cb.append(h("div",{class:"fix"},h("button",{class:"fixbtn",type:"button",disabled:S.busy,
+        onclick:()=>checkNow(v)}, c && c.state==="run" ? "Checking…" : "Check this unit now")));
+      if(c && c.state!=="run") cb.append(h("p",{class:"note"+(c.state==="fail" ? " s-down" : c.tone==="up" ? " s-up" : c.tone==="down" ? " s-down" : ""),text:c.said}));
+      cb.append(h("p",{class:"note",text:"This asks the cameras at this unit right now instead of waiting for the next reading. It changes nothing in mHelp, Star4Live or InHand."}));
+    }
+    body.splice(body.indexOf(tbx),0,cb);
+  }
   body.push(histBox(v));
 
   P.className="panel s-"+v.status;
@@ -733,6 +808,30 @@ async function save(v, ch){
   S.busy=false; render();
 }
 
+/* ---------- check one unit on demand ----------
+   Refresh asks for the latest saved reading. This asks the cameras themselves, for this unit only, so a tech
+   standing at a unit does not wait for the next sweep. A check that does not run says so: a stale reading is
+   never redrawn as if it were current, and nothing is written to mHelp, Star4Live or InHand. */
+function checkPid(v){
+  /* The unit's own A# first. An mHelp match counts only when it is exact: a fuzzy name match can belong to another unit,
+     and checking it would report that unit's cameras on this card. */
+  if(v.u.pid) return v.u.pid;
+  const mm = S.mh ? (S.rec && S.rec.match[v.id]) : undefined;
+  return (mm && !mm.fuzzy && mm.rec && mm.rec.id) || "";
+}
+async function checkNow(v){
+  if(S.busy || v.mhOnly || !hooks || typeof hooks.onCheckUnit!=="function") return;
+  S.busy=true; S.chk={unit:v.id, state:"run", said:""}; drawPanel();
+  try{
+    const got = await hooks.onCheckUnit(v.k, checkPid(v));
+    const said = got && typeof got==="object" ? got.said : got, tone = got && typeof got==="object" ? got.tone : "info";
+    S.chk={unit:v.id, state:"done", tone: tone==="up"||tone==="down" ? tone : "info", said: said || "The check finished, but COS was not told what it found. Tap Refresh."};
+  }catch(err){
+    S.chk={unit:v.id, state:"fail", said: (err && err.message) || "COS could not run the check."};
+  }
+  S.busy=false; render();
+}
+
 /* ---------- fresh reading on demand ---------- */
 async function refresh(){
   const btn=$("refresh"); if(btn.disabled) return;
@@ -799,7 +898,7 @@ function mgDraw(part){
     if(feed) return;
     const body = MG.state==="failed" ? h("div",{class:"box"},h("p",{text:MG.err}),h("div",{class:"links"},h("button",{class:"lk",type:"button",onclick:()=>mgLoad(true)},"Try again"),mgTool("team","Open the older truck screen")))
       : h("div",{class:"box"},h("p",{class:"note",text:"Loading trucks and inspections…"}));
-    $("mgChecks").replaceChildren(body); $("mgTrucks").replaceChildren(); $("mgGap").replaceChildren(); $("mgX").replaceChildren(); $("mgTools").replaceChildren(); return;
+    $("mgChecks").replaceChildren(body); $("mgTrucks").replaceChildren(); $("mgGap").replaceChildren(); $("mgSim").replaceChildren(); $("mgX").replaceChildren(); $("mgTools").replaceChildren(); return;
   }
   const real=d.techs.filter(t=>!t.test), tests=d.techs.filter(t=>t.test), idx=mgIndex(vs);
   if(!part || part==="checks") $("mgChecks").replaceChildren(mgChecks(d, real));
@@ -811,6 +910,7 @@ function mgDraw(part){
     if(editing) mgEditSync(editing);
   }
   if(!part || part==="x"){ $("mgGap").replaceChildren(mgGaps(d)); $("mgX").replaceChildren(mgExchanges(d, idx)); }
+  if(!part || part==="x" || part==="sim") $("mgSim").replaceChildren(mgSims(d));
   if(!part || part==="tools") $("mgTools").replaceChildren(mgTools());
 }
 
@@ -950,6 +1050,74 @@ function mgGaps(d){
       x.from+" to "+x.to+" · "+(MGSTATE[x.state]||[x.state.replace(/_/g," ")])[0]+(x.hours!==null ? " · waiting "+Math.round(x.hours)+" h" : "")))),
     h("p",{class:"note",text:(g.enforced ? "A new unit can only go on a Service truck after IT hands it over in Tech Check and Service signs for it." : "The handoff block is switched off. Units are let through and listed here.")+" Units on the trucks on 25 Nov 2026 were counted as handed over."}));
 }
+/* SIM drawer: every SIM card on hand, and where each one went. */
+const SIMSTATE = { in_drawer:["In the drawer","s-up"], in_unit:["In a unit","s-unknown"], on_truck:["On a truck","s-unknown"], bad:["Bad","s-down"], deactivated:["Deactivated","s-down"], removed:["Removed","s-unknown"] };
+const SIMF = { open:false, text:"", carrier:"", note:"", busy:false, err:"", done:"", mark:null, show:"in_drawer", all:false };
+const simSplit = t => String(t||"").split(/[\r\n,;]+/).map(x=>x.replace(/[^0-9A-Za-z]/g,"")).filter(Boolean);
+function mgSims(d){
+  const title=h("h3",{text:"SIM drawer"});
+  const g=d.sims;
+  if(!g) return h("div",{class:"box"},title,h("p",{class:"note",text:"The SIM drawer could not be read just now."}));
+  const by=st=>g.cards.filter(c=>c.status===st);
+  const inDrawer=by("in_drawer"), out=g.cards.filter(c=>c.status==="in_unit"||c.status==="on_truck"), bad=g.cards.filter(c=>c.status==="bad"||c.status==="deactivated");
+  const tab=(key,label,n)=>h("button",{type:"button",class:"lk"+(SIMF.show===key?" on":""),"aria-pressed":String(SIMF.show===key),onclick:()=>{ SIMF.show=key; SIMF.all=false; SIMF.mark=null; mgDraw("sim"); }},label+" ("+n+")");
+  const shown=SIMF.show==="out"?out:SIMF.show==="bad"?bad:inDrawer;
+  const rows=(SIMF.all?shown:shown.slice(0,12)).map(simRow);
+  return h("div",{class:"box",id:"mgSimBox"},title,
+    h("p",{class:"big",text:mgPlural(inDrawer.length,"SIM")+" in the drawer."}),
+    h("p",{class:"note",text:out.length+" out in units or on trucks · "+bad.length+" bad or deactivated."}),
+    g.notListed.length ? h("div",{class:"prow s-issues"},h("div",{class:"pmain"},h("span",{class:"name",text:mgPlural(g.notListed.length,"SIM")+" handed out that were not on the drawer list"}),
+      h("span",{class:"sub",text:g.notListed.slice(0,5).map(x=>x.sim+" ("+x.detail+")").join(" · ")+(g.notListed.length>5?" …":"")}))) : null,
+    h("div",{class:"links"},tab("in_drawer","In the drawer",inDrawer.length),tab("out","Out",out.length),tab("bad","Bad",bad.length)),
+    ...(rows.length ? rows : [h("p",{class:"note",text:SIMF.show==="in_drawer" ? "No cards on the list yet. Add them below." : "None."})]),
+    shown.length>12 && !SIMF.all ? h("div",{class:"links"},h("button",{class:"lk",type:"button",onclick:()=>{ SIMF.all=true; mgDraw("sim"); }},"Show all "+shown.length)) : null,
+    simAddForm());
+}
+function simRow(c){
+  const st=SIMSTATE[c.status]||SIMSTATE.removed, marking=SIMF.mark && SIMF.mark.sim===c.sim;
+  const act=(status,label)=>h("button",{class:"lk",type:"button",disabled:SIMF.busy,onclick:()=>{ if(status==="in_drawer"){ simMark(c.sim,"in_drawer",""); } else { SIMF.mark={sim:c.sim,status,note:"",err:""}; mgDraw("sim"); } }},label);
+  return h("div",{class:"prow "+st[1]},
+    h("div",{class:"pmain"},h("span",{class:"name",text:c.sim+(c.carrier?" · "+c.carrier:"")}),
+      h("span",{class:"sub",text:st[0]+(c.location?" · "+c.location:"")+(c.note?" · "+c.note:"")+(c.by?" · "+c.by:"")+(c.at?" · "+mgWhen(c.at):"")})),
+    marking ? h("div",{class:"simmark",style:"grid-column:1 / -1;display:flex;flex-direction:column;gap:8px"},
+      h("label",{class:"mgfield"},"Why is "+c.sim+" "+SIMF.mark.status+"?",h("input",{class:"tin",type:"text",maxlength:"300",value:SIMF.mark.note,oninput:e=>{ SIMF.mark.note=e.target.value; }})),
+      SIMF.mark.err ? h("p",{class:"note",role:"alert",text:SIMF.mark.err}) : null,
+      h("div",{class:"links"},h("button",{class:"fixbtn",type:"button",disabled:SIMF.busy,onclick:()=>{ if(!SIMF.mark.note.trim()){ SIMF.mark.err="Write why first."; mgDraw("sim"); return; } simMark(c.sim,SIMF.mark.status,SIMF.mark.note); }},"Save"),
+        h("button",{class:"lk",type:"button",onclick:()=>{ SIMF.mark=null; mgDraw("sim"); }},"Cancel")))
+    : h("div",{class:"links"},...(c.status==="in_drawer" ? [act("bad","Mark bad"),act("removed","Remove")] : [act("in_drawer","Back in drawer"),act("bad","Mark bad"),act("deactivated","Deactivated")])));
+}
+async function simMark(sim,status,note){
+  if(SIMF.busy) return; SIMF.busy=true;
+  try{ MG.data=await MGK.simMark(sim,status,note); MG.at=Date.now(); SIMF.mark=null; toast(status==="in_drawer" ? sim+" is back in the drawer." : sim+" is marked "+status+".", 6000); }
+  catch(x){ if(SIMF.mark) SIMF.mark.err=(x && x.message) || "That could not be saved."; else toast((x && x.message) || "That could not be saved.", 8000); }
+  SIMF.busy=false; mgDraw("sim");
+}
+function simAddForm(){
+  if(!SIMF.open) return h("div",{class:"links"},h("button",{class:"fixbtn",type:"button",onclick:()=>{ SIMF.open=true; SIMF.done=""; mgDraw("sim"); }},"Add SIM cards"),
+    SIMF.done ? h("span",{class:"note",role:"status",text:SIMF.done}) : null);
+  const n=simSplit(SIMF.text).length;
+  return h("div",{class:"simadd mgedit",style:"display:flex;flex-direction:column;gap:9px;margin-top:10px"},
+    h("label",{class:"mgfield"},"SIM numbers (one per line, or scan them)",h("textarea",{class:"tin",rows:"5","aria-label":"SIM numbers",oninput:e=>{ SIMF.text=e.target.value; const c=$("simCount"); if(c) c.textContent=mgPlural(simSplit(SIMF.text).length,"number")+" entered"; }},SIMF.text)),
+    h("p",{class:"note",id:"simCount",text:mgPlural(n,"number")+" entered"}),
+    h("label",{class:"mgfield"},"Carrier",h("input",{class:"tin",type:"text",maxlength:"40",list:"simCarriers",value:SIMF.carrier,oninput:e=>{ SIMF.carrier=e.target.value; }}),
+      h("datalist",{id:"simCarriers"},h("option",{value:"Simetry"}),h("option",{value:"Vendera"}))),
+    h("label",{class:"mgfield"},"Note (optional)",h("input",{class:"tin",type:"text",maxlength:"300",value:SIMF.note,oninput:e=>{ SIMF.note=e.target.value; }})),
+    SIMF.done ? h("p",{class:"note",role:"status",text:SIMF.done}) : null,
+    SIMF.err ? h("p",{class:"note",role:"alert",text:SIMF.err}) : null,
+    h("div",{class:"links"},h("button",{class:"fixbtn",type:"button",disabled:SIMF.busy,onclick:simAdd},SIMF.busy?"Adding…":"Add to drawer"),
+      h("button",{class:"lk",type:"button",onclick:()=>{ SIMF.open=false; SIMF.err=""; mgDraw("sim"); }},"Close")));
+}
+async function simAdd(){
+  const numbers=simSplit(SIMF.text);
+  if(!numbers.length){ SIMF.err="Enter at least one SIM number."; mgDraw("sim"); return; }
+  if(numbers.length>500){ SIMF.err="Add at most 500 at a time."; mgDraw("sim"); return; }
+  SIMF.busy=true; SIMF.err=""; mgDraw("sim");
+  try{ const {result,snapshot}=await MGK.simAdd(numbers,SIMF.carrier.trim(),SIMF.note.trim()); MG.data=snapshot; MG.at=Date.now();
+    SIMF.done=mgPlural(result.added.length,"SIM")+" added."+(result.already.length?" "+result.already.length+" already on the list.":"")+(result.bad.length?" Not SIM numbers: "+result.bad.join(", ")+".":"");
+    SIMF.text=""; SIMF.note=""; SIMF.open=result.bad.length>0; SIMF.show="in_drawer"; }
+  catch(x){ SIMF.err=(x && x.message) || "The cards could not be added."; }
+  SIMF.busy=false; mgDraw("sim");
+}
 function mgExchanges(d, idx){
   const title=h("h3",{text:"Handed between IT and Service"});
   if(d.exchanges===null) return h("div",{class:"box"},title,h("p",{class:"note",text:"The handoff log could not be read just now."}),h("div",{class:"links"},mgTool("handoffs","Open the handoffs desk")));
@@ -1007,11 +1175,16 @@ function mgTools(){
 const W = { wide:false, side:false };
 /* The one map lives on the Map tab, and on a wide Board tab it sits beside the list. */
 function placeMap(){
-  const side = W.wide && S.view==="board", block=$("mapBlock"), home = side ? $("boardSide") : $("viewMap");
-  if(block.parentNode!==home) home.append(block);
+  /* The board is the first screen of the day, so the map is on it, not a tab away. On a desk it sits beside the
+     list; on a phone there is no room beside, so it goes under the counts and above the list. Same map either way. */
+  const side = W.wide && S.view==="board", onBoard = !W.wide && S.view==="board";
+  const block=$("mapBlock"), home = side ? $("boardSide") : onBoard ? $("boardMain") : $("viewMap");
+  if(block.parentNode!==home){ if(onBoard) $("boardMain").insertBefore(block, $("boardList")); else home.append(block); }
+  block.classList.toggle("onboard", onBoard);
   $("boardSide").hidden = !side;
-  /* Beside the list the count tiles choose what the map shows. Back on its own tab the map shows everything again. */
-  if(W.side!==side){ W.side=side; M.fitted=false; M.sel=null; M.w=0; if(!side) M.f="all"; }
+  /* On the board the count tiles choose what the map shows. On its own tab the map shows everything again. */
+  const withList = side || onBoard;
+  if(W.side!==withList){ W.side=withList; M.fitted=false; M.sel=null; M.w=0; if(!withList) M.f="all"; }
   sideFilter();
 }
 function sideFilter(){ if(!W.side) return; const f=["down","issues","unknown","up"].includes(S.filter) ? S.filter : "all"; if(M.f!==f){ M.f=f; M.sel=null; } }
@@ -1115,6 +1288,8 @@ function drawTv(vs, c){
   read.classList.toggle("stale", stale);
   if(!at) read.replaceChildren("Star4Live has not given a reading time.");
   else read.replaceChildren(stale ? "Old reading. " : "", "Star4Live read ", h("b",{text:when(at)}), " · "+ago(at)+" ago");
+  /* The wall screen is read from across the shop, so the mark has to carry at that distance: the block dims. */
+  $("tvKpi").classList.toggle("prov", !S.mh);
   const tile=(key,cls)=>h("div",{class:"tile "+cls+(c[key]?"":" zero")},h("span",{class:"num",text:c[key]}),h("span",{class:"lab",text:LABEL[key]}));
   $("tvTiles").replaceChildren(tile("down","t-down"),tile("issues","t-issues"),tile("unknown","t-unknown"),tile("up","t-up"));
   const mini=(num,lab)=>h("span",{},h("b",{text:num}),lab);
@@ -1122,7 +1297,7 @@ function drawTv(vs, c){
   const byName=(a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true});
   TV.rows=[...vs.filter(v=>v.status==="down").sort(byName), ...vs.filter(v=>v.status==="issues").sort(byName)];
   const feeds = !S.mh;
-  $("tvNote").textContent=(feeds ? "Counting what the camera systems see." : "Counting what mHelp lists.")+" A unit in the shop never counts as down. A reading that is missing or too old shows Unknown, never Down.";
+  $("tvNote").textContent=(feeds ? "Not the official count: what the camera systems see, until mHelp has loaded." : "Counting what mHelp lists.")+" A unit in the shop never counts as down. A reading that is missing or too old shows Unknown, never Down.";
   tvSize(); tvList();
   drawMap(vs); tvAreas(); tvTour();
 }

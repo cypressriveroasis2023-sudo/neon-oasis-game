@@ -1,5 +1,6 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
 import {api, openLegacy} from './api';
+import {readSingleVerification} from './fleetVerificationRun';
 import {cameraFeedCensus, cameraFeedClock, recorderLinksFromHealth} from './sharedFleetCounts';
 import {STAR_UNIT_STATUS_CONTRACT, type UnitCameraStatus} from '../shared/starUnitStatus';
 import type {CameraRow} from './cameraEvidence';
@@ -15,7 +16,7 @@ import {readVrmHistory, type HistoryPoint} from './vrmHistory';
 import {boardEditState, handFixRequest, type BoardEditFlags, type BoardEditState, type BoardFixStep} from './cosBoard/boardEdit';
 import {mountCosBoard} from './cosBoard/boardApp';
 import {loadBoardFonts} from './cosBoard/boardFonts';
-import {managerHost, managerKnown, managerPhoto, readManager, rememberManager, saveTruck, takeBoardView, type TruckKit} from './managerBridge';
+import {addSims, managerHost, managerKnown, managerPhoto, markSim, readManager, rememberManager, saveTruck, takeBoardView, type TruckKit} from './managerBridge';
 
 /**
  * Tells the page around the frame that the board is, or is no longer, the TV display, so it gives the frame the
@@ -194,6 +195,26 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
         setLocked(false);
       },
       onEdit: (unitKey: string, steps: BoardFixStep[]) => fix.current(unitKey, steps),
+      // A tech standing at a unit asks the cameras now rather than waiting for the next sweep. This is the same
+      // check Verify now runs, for one unit, followed by a fresh board read so the card shows what came back.
+      // A check that cannot run throws: the board says so and keeps showing the old reading as old.
+      onCheckUnit: async (_unitKey: string, productId: string) => {
+        if (writing.current) throw new Error('A save is still in progress. Try again once it finishes.');
+        if (!productId) throw new Error('This unit has no A# in COS, so there is nothing to check it against.');
+        const started = generation.current;
+        // Say what the check found, not that it ran. An answer COS cannot confirm, or one where the cameras were not
+        // reached, is not a check: the card keeps the old reading and says so.
+        const item = readSingleVerification((await api.post('/api/product-connections/verify', {productIds: [productId]})).data, productId);
+        if (item.status === 'unknown') throw new Error('The check did not reach the cameras' + (item.reason ? ': ' + item.reason : '.') + ' Still showing the last reading.');
+        const at = item.checkedAt ? new Date(item.checkedAt).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'}) : '';
+        const found = (item.status === 'online' ? 'Online' : 'Offline') + (at ? ' at ' + at : '') + (item.reason ? ' · ' + item.reason : '');
+        const tone = item.status === 'online' ? 'up' as const : 'down' as const;
+        const result = checked((await api.get('/api/unit-camera-status')).data);
+        // The board moved on while the check ran. The answer is still true; this reading may not be.
+        if (started !== generation.current) return {said: found + '. The board had already moved on, so tap Refresh to see it.', tone};
+        take.current(result);
+        return {said: found + '.', tone};
+      },
       // Tech checks are their own screen in COS.
       // An IT sign-in keeps its tech checks in the Tech Check app around this frame, so the tab opens them there.
       // James: "i clicked tech check on the IT board and it is showing return to my IT tech checks."
@@ -211,6 +232,8 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
         read: (fresh: boolean) => readManager(fresh, true),
         save: (techId: string, kit: TruckKit) => saveTruck(techId, kit),
         photo: (path: string) => managerPhoto(path),
+        simAdd: (numbers: string[], carrier: string, note: string) => addSims(numbers, carrier, note),
+        simMark: (sim: string, status: 'in_drawer' | 'bad' | 'deactivated' | 'removed', note: string) => markSim(sim, status, note),
         open: (route: string) => openLegacy(route),
         known: (shown: boolean) => rememberManager(shown),
         wasKnown: () => managerKnown(),
