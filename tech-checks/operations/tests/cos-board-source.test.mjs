@@ -136,7 +136,9 @@ test('the board is the Fleet screen, and the older screen only stands in when th
   const board = read('../src/FleetBoard.tsx');
   const css = read('../src/sourceAttention.css');
   // Fleet hands the board what it needs and one thing more: why a unit asked for from another screen could not be opened.
-  assert.ok(fleet.includes(' onFeed={setCameraUnits} notice={selectionNotice}/>}'));
+  assert.ok(fleet.includes(' onFeed={setCameraUnits} notice={selectionNotice} unitAsked={boardAsk.n?boardAsk:null}/>}'));
+  // A unit asked for from another screen opens on the board's own card, not the older details drawer (James, 25 Nov).
+  assert.ok(fleet.includes('if(boardShownHere()&&(matches.length===1||initialUnitLabel)){'));
   assert.match(board, /\{notice && <p className='cos-board-notice' role='status'>\{notice\}<\/p>\}\s*<Suspense /);
   assert.ok(css.includes("#root#root .cos-fleet-dashboard:has(>.cos-board-landing>.cos-board-notice)>.cos-fleet-content>p.cos-fleet-message[role='status']{display:none}"));
   // While the board is on screen the older view, its jump button and its row of tabs are all out of sight. One rule each, nothing else.
@@ -263,7 +265,7 @@ test('the board counts one way, and a hand fix comes first on the card and says 
   assert.ok(app.includes('["done","Fixed by hand","Set by hand in COS, so these are off the list and stay off.'));
   // The card says in so many words that a hand fix is kept.
   assert.ok(app.includes('A fix made by hand wins in COS and stays until someone undoes it. No new reading from mHelp or Star4Live replaces it.'));
-  assert.match(app, /render\(\);\n  announce\(\);\n  saidSaved\(\);\n\}/);
+  assert.match(app, /render\(\);\n  announce\(\);\n  saidSaved\(\);\n  if\(S\.ask\) openByName\(S\.ask\);\n\}/);
   assert.ok(app.includes('" The count changed: "+moved.join(", ")+"."'));
 });
 

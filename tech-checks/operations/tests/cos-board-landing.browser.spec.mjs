@@ -286,7 +286,8 @@ test('a hand fix on the board is saved through the Camera status route and shows
   test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');
   const {app, state, host, server} = await phoneBoard(page);
   await openUnit(host, 'Spotter 002');
-  await expect.poll(() => fixButtons(host)).toEqual(['Move to shop', 'Change site', 'Rename', 'Correct IP']);
+  // None of these fixture units has an A#, so Add A# is offered with the other record fixes (James, 25 Nov).
+  await expect.poll(() => fixButtons(host)).toEqual(['Move to shop', 'Change site', 'Rename', 'Correct IP', 'Add A#']);
   // What is wrong comes first, then troubleshooting; fixing the record comes after the unit's own pages.
   const heads = await inBoard(host, root => [...root.querySelectorAll('#panel .box > h3')].map(head => head.textContent));
   expect(heads[0]).toBe('Diagnosis');
@@ -308,7 +309,7 @@ test('a hand fix on the board is saved through the Camera status route and shows
   expect(sheet).toContain('Shop · set by hand');
   expect(sheet).toContain('Set by hand on this unit');
   expect(sheet).toContain('Fixture Owner set placement to “Shop”');
-  expect(await fixButtons(host)).toEqual(['Move to field', 'Change site', 'Rename', 'Correct IP', 'Undo hand edits']);
+  expect(await fixButtons(host)).toEqual(['Move to field', 'Change site', 'Rename', 'Correct IP', 'Add A#', 'Undo hand edits']);
   // The Changes tab lists every hand fix in force.
   await inBoard(host, root => root.querySelector('#panel .close').click());
   await inBoard(host, root => root.getElementById('tabActivity').click());
@@ -325,7 +326,7 @@ test('a hand fix on the board is saved through the Camera status route and shows
   expect(server.sent[1]).toMatchObject({unitKey: 'SPOTTER 002', field: 'placement', action: 'clear'});
   expect('value' in server.sent[1]).toBe(false);
   await expect.poll(() => tiles(host)).toEqual({Down: '1', 'Camera issues': '1', Unknown: '1', Up: '1'});
-  await expect.poll(() => fixButtons(host)).toEqual(['Move to shop', 'Change site', 'Rename', 'Correct IP']);
+  await expect.poll(() => fixButtons(host)).toEqual(['Move to shop', 'Change site', 'Rename', 'Correct IP', 'Add A#']);
   expect(state.errors).toEqual([]);
 });
 
@@ -335,7 +336,7 @@ test('moving a shop unit to a site sends the placement, then the site', async ({
   await inBoard(host, root => [...root.querySelectorAll('.mini')].find(mini => /in the shop/.test(mini.textContent)).click());
   await openUnit(host, 'Sniper 4-100');
   // Every unit can have its IP put right by hand, an Avigilon unit included: COS checks it at that address.
-  await expect.poll(() => fixButtons(host)).toEqual(['Move to field', 'Change site', 'Rename', 'Correct IP']);
+  await expect.poll(() => fixButtons(host)).toEqual(['Move to field', 'Change site', 'Rename', 'Correct IP', 'Add A#']);
   await pressFix(host, 'Move to field');
   expect(await panel(host)).toContain('Which site is it on?');
   await typeAndSave(host, 'fixInput', 'Fixture yard 2');
@@ -403,7 +404,7 @@ test('a save that cannot be confirmed stops hand fixes until the person refreshe
   server.fail = null;
   const reads = server.reads;
   await inBoard(host, root => root.getElementById('refresh').click());
-  await expect.poll(() => fixButtons(host)).toEqual(['Move to shop', 'Change site', 'Rename', 'Correct IP']);
+  await expect.poll(() => fixButtons(host)).toEqual(['Move to shop', 'Change site', 'Rename', 'Correct IP', 'Add A#']);
   expect(server.reads).toBeGreaterThan(reads);
   expect(server.sent).toHaveLength(1);
   expect(state.errors).toEqual([]);
