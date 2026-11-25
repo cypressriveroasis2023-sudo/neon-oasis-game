@@ -61,7 +61,8 @@ export type BoardUnit = {
 export type BoardHandEdit = {f: string; b: string; by: string; role: string; at: number; why: string; pv: string};
 export type BoardChange = BoardHandEdit & {k: string; nm: string};
 
-export type BoardCamera = {name: string; type: string; model: string; fw: string; st: 1 | 0 | null; lo: number};
+/** p = the router's forwarded web port for this camera (1400/1500/1600/1700/1900), when COS knows it. */
+export type BoardCamera = {name: string; type: string; model: string; fw: string; st: 1 | 0 | null; lo: number; p?: number};
 
 export type BoardMhelpRecord = {
   id: string; label: string; cat: string; flag: '' | 'D' | 'M'; place: 'field' | 'shop';
@@ -129,6 +130,7 @@ function cameraRows(feed: UnitCameraStatus, now: number): BoardCamera[] {
       model: '', fw: '',
       st: state === 'online' ? 1 : state === 'offline' ? 0 : null,
       lo: 0,
+      ...(typeof camera.port === 'number' && [1400, 1500, 1600, 1700, 1900].includes(camera.port) ? {p: camera.port} : {}),
     };
   });
 }

@@ -1,10 +1,10 @@
 import {test,expect} from '@playwright/test';
-import {mountTransfers,SERVICE,OTHER,passServiceChecks} from './helpers/transfer-fixture.mjs';
+import {mountTransfers,SERVICE,OTHER,passServiceChecks,setFamily} from './helpers/transfer-fixture.mjs';
 const photo={name:'synthetic.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=','base64')};
 let f;test.afterEach(async()=>{await f?.close();f=null;});
 async function sign(page,name){await passServiceChecks(page);await page.getByRole('radio',{name:'Type signature',exact:true}).check();await page.getByRole('textbox',{name:'Type your full name',exact:true}).fill(name);await page.getByRole('checkbox',{name:'I confirm this report is accurate',exact:true}).check();}
 async function fillUnit(page,tag='001',sim='00123456789012345670'){
- await page.getByLabel('Unit family / name 1',{exact:true}).fill('Sniper');await page.getByLabel('Unit number 1',{exact:true}).fill(tag);await page.getByLabel('Exact SIM numbers (one per line; blank only when none) 1',{exact:true}).fill(sim);await page.getByLabel('Batteries / battery boxes on this unit 1',{exact:true}).fill('2');await page.getByLabel('Additional parts (one per line: name | quantity) 1',{exact:true}).fill('SD card | 1');
+ await setFamily(page,'Sniper');await page.getByLabel('Unit number 1',{exact:true}).fill(tag);await page.getByLabel('Exact SIM numbers (one per line; blank only when none) 1',{exact:true}).fill(sim);await page.getByLabel('Batteries / battery boxes on this unit 1',{exact:true}).fill('2');await page.getByLabel('Additional parts (one per line: name | quantity) 1',{exact:true}).fill('SD card | 1');
  await page.getByLabel('Equipment photo 1',{exact:true}).setInputFiles(photo);await expect(page.locator('.tc-evidence img')).toBeVisible();
 }
 test('desktop IT opens Fleet Map plus Camera Health; unrelated workspaces stay denied',async({page},info)=>{
@@ -147,6 +147,7 @@ test('the database refuses a receipt with a blank check even if the screen is sk
 test('IT picks a SIM from the drawer during a handoff, and that SIM leaves the drawer',async({page})=>{
  await page.setViewportSize({width:390,height:844});f=await mountTransfers(page);
  await f.db.query("insert into app_private.sim_drawer(sim_number,carrier) values('89852350825066019344','Smart SIM'),('89852350825066019369','Smart SIM')");
+ await page.reload();
  await page.getByRole('button',{name:'Check Out / Hand Off',exact:true}).click();await page.getByLabel('What is this equipment for?',{exact:true}).selectOption('installation');await page.getByLabel('Receiving Service technician').selectOption(SERVICE);await page.getByLabel('Select equipment').selectOption('sniper:001');await page.getByRole('button',{name:'Add unit to handoff'}).click();
  await fillUnit(page,'001','');
  const pick=page.getByLabel('Pick a SIM from the drawer 1',{exact:true});
@@ -160,4 +161,39 @@ test('IT picks a SIM from the drawer during a handoff, and that SIM leaves the d
  const cards=(await f.db.query('select sim_number,status,location from app_private.sim_drawer order by sim_number')).rows;
  expect(cards).toEqual([{sim_number:'89852350825066019344',status:'in_unit',location:'Sniper 001 → Synthetic Service'},{sim_number:'89852350825066019369',status:'in_drawer',location:null}]);
  expect(f.errors).toEqual([]);
+});
+
+test('a note that says something is still needed cannot go out with every check passed, unless IT confirms it is only information',async({page})=>{
+ await page.setViewportSize({width:390,height:844});f=await mountTransfers(page);
+ await page.getByRole('button',{name:'Check Out / Hand Off',exact:true}).click();await page.getByLabel('What is this equipment for?',{exact:true}).selectOption('installation');await page.getByLabel('Receiving Service technician').selectOption(SERVICE);await page.getByLabel('Select equipment').selectOption('sniper:001');await page.getByRole('button',{name:'Add unit to handoff'}).click();await fillUnit(page);
+ for(const check of await page.locator('fieldset input[type=checkbox]').all())await check.check();
+ await page.getByLabel('Transfer notes',{exact:true}).fill('Need semitry sim.');
+ await expect(page.getByText('Your note says something is still needed. Fix it before handing over, or confirm:')).toBeVisible();
+ await sign(page,'Synthetic IT');
+ await page.getByRole('button',{name:'Sign & send handoff',exact:true}).click();
+ await expect(page.locator('.tc-submit-error')).toContainText('Your note says something is still needed');
+ expect((await f.db.query('select * from app_private.techcheck_transfers')).rows).toHaveLength(0);
+ await page.getByRole('checkbox',{name:'This note is only information — the equipment is ready',exact:true}).check();
+ const confirm=page.getByRole('checkbox',{name:'I confirm this report is accurate',exact:true});if(!(await confirm.isChecked()))await confirm.check();
+ await page.getByRole('button',{name:'Sign & send handoff',exact:true}).click();await expect(page.getByText('Awaiting Service verification',{exact:true})).toBeVisible();
+ const [event]=(await f.db.query("select snapshot from app_private.techcheck_transfer_events where kind='checkout'")).rows;
+ expect(event.snapshot.checks._note_ready).toBe(true);
+});
+
+test('the database refuses a contradicting note on its own, and SIMs written differently are not a difference',async({page})=>{
+ f=await mountTransfers(page,{role:'service',seedHandoff:true,handoffPurpose:'truck_replenishment'});
+ const [t]=(await f.db.query('select id,revision,purpose,manifest from app_private.techcheck_transfers')).rows;
+ const rules=(await f.db.query("select bool_fields from app_private.techcheck_transfer_rules where workflow_type='Sniper'")).rows[0].bool_fields;
+ const checks={'sniper:001':Object.fromEntries(rules.filter(r=>!['delivery_batteries_charged_ok'].includes(r)).map(r=>[r,true]))};
+ // same SIM, written with spaces and dashes
+ const items=t.manifest.map(({equipment_key,family,unit_tag,sims,parts,battery_count,battery_configuration})=>({equipment_key,family:family.toUpperCase(),unit_tag,sims:sims.map(s=>' '+s.slice(0,4)+'-'+s.slice(4)+' '),parts,battery_count,battery_configuration}));
+ const call=(notes,c)=>f.db.query("select submit_techcheck_transfer_v2($1,$2,'receipt',$3,$4,$5::jsonb,$6::jsonb,$7::jsonb,'[]'::jsonb,$8,$9) r",
+  [crypto.randomUUID(),t.id,t.revision,SERVICE,JSON.stringify(items),JSON.stringify(c),JSON.stringify({method:'typed',name:'Synthetic Service',confirmed:true}),notes,t.purpose]);
+ await f.db.exec('reset role');await f.db.query("select set_config('test.actor',$1,false)",[SERVICE]);await f.db.exec('set role authenticated');
+ try{
+  await expect(call('Missing the SD card',checks)).rejects.toThrow(/Your note says something is wrong or missing/);
+  const {rows:[{r}]}=await call('Missing the SD card',{...checks,_note_ready:true});
+  expect(r.differences).toEqual([]);
+  expect(r.state).toBe('accepted');
+ }finally{await f.db.exec('reset role');}
 });

@@ -54,7 +54,7 @@ function nodes(f: TroubleFacts): Record<string, Node> {
     },
     reboot: {
       question: 'Reboot ' + cam + ' from its own page. Is it back after 5 minutes?',
-      how: [f.camPages ? 'Under Open on this card, tap the camera’s page and sign in.' : 'Open the camera’s own page through the router and sign in.', 'Reboot only this camera. Rebooting the router drops every camera.', 'Wait 5 minutes, then tap Check this unit now.'],
+      how: [f.camPages ? 'In Cameras on this unit, tap Web next to ' + cam + ' and sign in.' : 'Open the camera’s own page through the router and sign in.', 'Reboot only this camera. Rebooting the router drops every camera.', 'Wait 5 minutes, then tap Check this unit now.'],
       options: [['back', 'It’s back', 'r:fixed'], ['off', 'Still off', 'r:camera']],
     },
     port: {
@@ -187,6 +187,7 @@ export const TROUBLE_CSS = `
 .trres ul{margin:0 0 8px;padding-left:20px}.trres li{margin:3px 0}
 .trsend{width:100%;text-align:center;margin:10px 0 0;min-height:54px;font-size:17px}
 .trsent{margin-top:10px!important;font-weight:650}
+.camlinks{display:flex;gap:8px;margin-top:6px}.camlk{padding:6px 12px!important;font-size:13px!important}
 .trhelp{font-weight:700;background:var(--s2);border-radius:10px;padding:8px 11px}
 .trnote{white-space:pre-wrap;font-size:13px;line-height:1.45;background:var(--bg2);border:1px solid var(--line2);border-radius:10px;padding:10px 12px;margin:0;color:var(--tx2);overflow-wrap:anywhere}
 `;

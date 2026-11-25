@@ -849,12 +849,19 @@ test('a unit with cameras off names them and walks a tech through it without lea
   const value = structuredClone(field);
   value.uploadInventory = {contract: 'COS_MHELP_UPLOAD_INVENTORY_V1', source: 'mhelpdesk_api', countBasis: 'mhelp_product_records_not_unique_physical_units', sourceSha256: 'a'.repeat(64), receivedAt: fresh, lastApiReadAt: fresh,
     records: [record(3, 'Spotter 003', 'FIELD')], summary: {totalRecords: 1, fieldRecords: 1, shopRecords: 0, unflaggedFieldRecords: 1, doNotUseRecords: 0, missingRecords: 0}};
-  const {app, state} = await mountFleet(page, false, {cameraStatus: report, field: value, skipInitialFieldCount: true});
+  // Each camera carries its forwarded web port; the card links Web and HTTPS for it.
+  const withPorts = structuredClone(report);
+  for (const unit of withPorts.units) if (unit.cameraList) unit.cameraList = unit.cameraList.map((camera, i) => ({...camera, port: [1400, 1500, 1600, 1700][i] ?? undefined}));
+  for (const unit of withPorts.units) if (/SPOTTER 003/i.test(unit.unit)) unit.publicIp = '203.0.113.130';
+  const {app, state} = await mountFleet(page, false, {cameraStatus: withPorts, field: value, skipInitialFieldCount: true});
   const host = app.locator('.cos-board-host');
   await expect.poll(() => tiles(host)).toMatchObject({'Camera issues': '1'});
   await inBoard(host, root => [...root.querySelectorAll('.tile')].find(tile => tile.querySelector('.lab').textContent === 'Camera issues').click());
   await openUnit(host, 'Spotter 003');
   const card = await panel(host);
+  const camLinks = await inBoard(host, root => [...root.querySelectorAll('#panel .camlinks a')].map(a => a.textContent + ' ' + new URL(a.href).port));
+  expect(camLinks.slice(0, 4)).toEqual(['Web 1400', 'HTTPS 1443', 'Web 1500', 'HTTPS 1543']);
+  if (process.env.SHOT) { await inBoard(host, root => root.querySelector('#panel .camlinks')?.closest('.box')?.scrollIntoView()); await page.screenshot({path: process.env.SHOT.replace('.png', '-cams.png')}); }
   // The diagnosis names the camera that is off, instead of saying "listed below".
   expect(card).toContain('Off: SPOTTER 003 / Cam 2');
   expect(card).not.toContain('listed below');
