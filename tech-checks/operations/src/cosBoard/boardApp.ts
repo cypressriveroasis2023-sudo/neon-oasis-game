@@ -412,7 +412,7 @@ function lowBattery(pw){ return !!(pw && pw.q!=="off" && pw.q!=="stale" && pw.q!
 function troubleFacts(v){
   const u=v.u, r=routerRead(u), pw=u.pw, live = pw && pw.q!=="off" && pw.q!=="stale" && pw.q!=="none";
   return { status:v.fs, place:v.place, offCams:v.fs==="issues" ? offCams(v) : [], routerOn:r.on, routerOff:r.off,
-    power: live ? {low:lowBattery(pw), battery:pw.b} : null,
+    power: live ? {low:lowBattery(pw), battery:pw.b, nightLow: typeof pw.nl==="number" ? pw.nl : null} : null,
     canCheck: !!(hooks && typeof hooks.onCheckUnit==="function" && checkPid(v)),
     routerPage: !!(u.ri && IPV4.test(u.ri) && /^\d+$/.test(u.rp)),
     camPages: !!(v.ip && IPV4.test(v.ip) && (u.s==="a" || u.s==="v")) };
@@ -436,7 +436,8 @@ function troubleBox(v){
   const known=troubleKnown(f, when, s=>ago(s));
   const box=h("div",{class:"box trb",id:"trBox"},h("h3",{text:"Troubleshoot"}));
   if(known.length) box.append(h("ul",{class:"trknown"},known.map(k=>h("li",{text:k}))),h("p",{class:"note",text:"COS already knows this, so you don't have to look it up."}));
-  if(walk.trail.length) box.append(h("ol",{class:"trtrail"},walk.trail.map((t,i)=>h("li",null,
+  if(walk.trail.length) box.append(h("ol",{class:"trtrail"},walk.trail.map((t,i)=>t.auto ? h("li",null,
+    h("div",{class:"trback trauto"},h("span",{text:t.question}),h("b",{text:t.answer}))) : h("li",null,
     h("button",{class:"trback",type:"button",onclick:()=>{ const keep={}; walk.trail.slice(0,i).forEach(x=>keep[x.id]=tr.ans[x.id]); tr.ans=keep; drawPanel(); }},
       h("span",{text:t.question}),h("b",{text:t.answer}))))));
   const at=walk.at;
@@ -463,7 +464,7 @@ const ipShort = ip => { ip=String(ip||""); return IPV4.test(ip) ? "ending ."+ip.
 function openBox(v){
   const u=v.u, m = S.mh && S.rec ? S.rec.match[v.id] : (v.mhOnly ? {rec:v.rec} : null), sys=[], own=[];
   const lk=(label,url)=>h("a",{class:"lk",href:url,target:"_blank",rel:"noopener noreferrer"},label);
-  if(u.s==="v") sys.push(lk("Star4Live","https://global.star4live.com/userWeb/device/device-management"));
+  /* No Star4Live link: James, 25 Nov — "We shouldn't have to go to Star4Live for anything ever again." */
   if(u.rs || u.rr || u.ri) sys.push(lk("InHand routers","https://iot.inhandnetworks.com/device/list"));
   if(v.type==="Helios" || /^Helios/.test(v.type)) sys.push(lk("Victron VRM","https://vrm.victronenergy.com/"));
   sys.push(lk("Watchful","https://v2.watchful.co.nz/alerts"));

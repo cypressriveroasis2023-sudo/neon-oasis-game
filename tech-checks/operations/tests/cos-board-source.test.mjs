@@ -287,12 +287,18 @@ test('checking one unit asks the app, never the network, and never fakes a readi
   assert.match(app, /mm && !mm\.fuzzy && mm\.rec && mm\.rec\.id/);
 });
 
+test('the card has no Star4Live link', () => {
+  // James, 25 Nov: "We shouldn't have to go to Star4Live for anything ever again."
+  assert.doesNotMatch(app, /star4live\.com/);
+  assert.doesNotMatch(app, /lk\("Star4Live"/);
+});
+
 test('a full battery with a Victron alarm is not called out of power', () => {
   // Felix: 95% was flagged as a power problem, because a level-2 Victron alarm turns the shared tone "low".
   // On the board, out of power means the battery reading itself is under 20%, from a current reading.
   assert.match(app, /function lowBattery\(pw\)\{ return !!\(pw && pw\.q!=="off" && pw\.q!=="stale" && pw\.q!=="none" && typeof pw\.b==="number" && pw\.b<20\); \}/);
   assert.match(app, /fs==="down" && lowBattery\(u\.pw\)/);
-  assert.match(app, /power: live \? \{low:lowBattery\(pw\), battery:pw\.b\} : null/);
+  assert.match(app, /power: live \? \{low:lowBattery\(pw\), battery:pw\.b, nightLow:/);
   assert.doesNotMatch(app, /u\.pw\.q==="low"\) cause/);
 });
 
