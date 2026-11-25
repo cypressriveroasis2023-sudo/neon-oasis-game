@@ -5,6 +5,8 @@ const ALERTS: [string, string, string][] = [
   ['Will run low tonight', 'At the rate it is draining, it reaches 20% before 7 AM.', 'Open the unit and follow "What to do" under Tonight.'],
   ['Getting low', 'Between 20% and 34%.', 'Keep an eye on it. Look again later in the day.'],
   ['Dropped to N% overnight', 'Last night it went under 30% before sunrise.', 'The battery is not lasting the night. Check panels, the load and battery age.'],
+  ["Didn't fill up today · best was N%", 'The sun is done and the battery never got to 95% today.', 'It will start the night short. Check for dirty or shaded panels, a loose solar cable, or a cloudy day. Two days in a row = tell the manager.'],
+  ['Using more power than usual', 'At night it is pulling much more than its normal (1.5x and 10 W or more).', 'Something new is drawing power: a camera rebooting over and over, a heater, or extra gear plugged in. Check its cameras on the COS Board.'],
   ['Solar N% of yesterday', 'Today it is making much less solar than yesterday by this time.', 'If it was cloudy, ignore it. If it was sunny, check for dirty or shaded panels or a charger problem.'],
   ['Tight tonight', 'Should make it, but only about 20–29% at 7 AM.', 'Check again before end of shift.'],
   ['Power unknown / Not in the latest sync', 'No reading from Victron in the last 45 minutes.', 'If the unit should be running, check its internet connection or router. If it was unplugged on purpose, ignore it.'],
