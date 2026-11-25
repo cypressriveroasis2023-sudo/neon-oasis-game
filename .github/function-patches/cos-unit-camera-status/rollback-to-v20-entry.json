@@ -1,0 +1,31 @@
+{
+  "slug": "cos-unit-camera-status",
+  "projectRef": "tughscoxralhofrckvxy",
+  "sourceCommit": "95e3e5a4f81f0f823e7e646a01a8235da7c5f425",
+  "deployedFileNames": {
+    "index.ts": "cos-unit-camera-status/index.ts",
+    "deno.json": "cos-unit-camera-status/deno.json"
+  },
+  "entrypointPath": "cos-unit-camera-status/index.ts",
+  "importMapPath": "cos-unit-camera-status/deno.json",
+  "verifyJwt": false,
+  "sourceDir": "tech-checks/docs/cos-unit-camera-status-v20-entry",
+  "description": "Redeploy the exact live cos-unit-camera-status v20 bytes (v19 plus a-links-v19), undoing vcc-moves-v20. Live v20 archive sha256 a9cc477fb694a0e4711f86dc79930cc2dd354277812ad1af6d41315da0760ba5.",
+  "authorization": "Rollback material. Running it still requires an explicit instruction for that specific run.",
+  "releaseStatus": "ROLLBACK_ONLY",
+  "sourceRecord": "tech-checks/docs/cos-unit-camera-status-v20-entry/index.ts",
+  "requireLiveBeforeDeploy": {
+    "status": "ACTIVE"
+  },
+  "edits": [],
+  "expectedBefore": {
+    "index.ts": "60a851de56dd962de727dfba577c7d84c4ddf4ce0e2a7b6b639a72b7b9ad63e2",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "expectedAfter": {
+    "index.ts": "60a851de56dd962de727dfba577c7d84c4ddf4ce0e2a7b6b639a72b7b9ad63e2",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "dryRun": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/rollback-to-v20-entry.json --dry-run",
+  "deploy": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/rollback-to-v20-entry.json --deploy"
+}

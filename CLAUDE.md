@@ -59,6 +59,12 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-25** — Tech Check: Moved in VCC. `public.cos_vcc_moves_state_v1` /
+  `cos_vcc_move_apply_v1` (Owner or approved IT) list and apply camera records that
+  no longer match VCC (moved / new / gone); applies write `camera_devices` one row at
+  a time and log to `app_private.cos_vcc_move_log`. No audit row. Operations patch
+  `cos-unit-camera-status/vcc-moves-v20` is **prepared, not deployed** (starts
+  from live v20). Record in `tech-checks/docs/db-changes/20261125_vcc_moves.md`.
 - **2026-11-25** — Linked 31 InHand routers to COS units by exact name
   (James approved the list) with `cos_router_link_v1`: 31 `ADD_ROUTER_LINK` rows,
   safe after_state; watchdog `ok` after. 37 left unlinked on purpose. Record in

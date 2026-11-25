@@ -4,7 +4,7 @@
 // the origin checks and the CORS replies. To avoid standing up a second copy of
 // the whole API, every other path is rewritten to one the handler does not know,
 // so the handler answers "not found" in its own words, with its own headers.
-export const UNIT_CAMERA_STATUS_PATHS = ['/api/unit-camera-status', '/api/unit-camera-status/edit', '/api/unit-camera-status/troubleshoot', '/api/unit-camera-status/link-a'];
+export const UNIT_CAMERA_STATUS_PATHS = ['/api/unit-camera-status', '/api/unit-camera-status/edit', '/api/unit-camera-status/troubleshoot', '/api/unit-camera-status/link-a', '/api/unit-camera-status/vcc-move'];
 export const NOT_SERVED_HERE = '/api/not-served-by-this-function';
 
 /**
