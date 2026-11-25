@@ -5,6 +5,10 @@ on:
   pull_request:
     paths:
       - 'tech-checks/ticketfree-returns/**'
+      - 'tech-checks/truck-moves/**'
+      - 'tech-checks/transfers/client.js'
+      - 'tech-checks/database-maintenance/techcheck-truck-extras-v1.sql'
+      - 'tech-checks/operations/tests/truck-*'
       - 'tech-checks/service-basics-host.js'
       - 'tech-checks/database-maintenance/techcheck-ticketfree-*.sql'
       - 'tech-checks/operations/tests/ticketfree-return*'
@@ -28,13 +32,13 @@ jobs:
         run: npm ci
         working-directory: tech-checks/operations
       - name: Ticket-free PostgreSQL transactions and client isolation
-        run: node --import tsx --test tests/ticketfree-returns-sql.test.mjs tests/ticketfree-returns-client.test.mjs
+        run: node --import tsx --test tests/ticketfree-returns-sql.test.mjs tests/ticketfree-returns-client.test.mjs tests/truck-extras-sql.test.mjs
         working-directory: tech-checks/operations
       - name: Preserve signed handoffs and Service daily evidence
         run: node --import tsx --test --test-concurrency=1 tests/transfer-core.test.mjs tests/transfer-readiness.test.mjs tests/transfer-rollout-sql.test.mjs tests/transfer-integration.test.mjs tests/service-daily-report-sql.test.mjs tests/service-daily-delivery.test.mjs tests/it-daily-availability.test.mjs tests/it-daily-camera.test.mjs
         working-directory: tech-checks/operations
       - name: Verify new UI syntax
-        run: node --check tech-checks/ticketfree-returns/host.js
+        run: node --check tech-checks/ticketfree-returns/host.js && node --check tech-checks/truck-moves/host.js && node --check tech-checks/truck-moves/client.js
       - name: Preserve Operations types and build
         run: npm run typecheck && npm run build
         working-directory: tech-checks/operations

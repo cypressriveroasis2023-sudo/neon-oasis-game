@@ -59,6 +59,30 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-25** — Tech Check: truck standard + extras + tech-to-tech moves
+  (`techcheck-truck-extras-v1.sql`). New `app_private.truck_extra_units` /
+  `truck_moves` / `truck_standard`, bucket `techcheck-truck-moves`, trigger
+  `techcheck_extra_place_guard_v1` on `service_truck_units`. Edits (anchored):
+  `techcheck_handoff_covering_v1`, `techcheck_transfer_custody_hold_v1`,
+  `techcheck_ticketfree_context_v1`, `submit_techcheck_ticketfree_return_v1` (also
+  releases an accepted handoff's hold). A truck "has" = slot + extras. Record in
+  `tech-checks/docs/db-changes/20261125_techcheck_truck_extras.md`.
+- **2026-11-25** — Deployed `cos-unit-camera-status/vcc-moves-v20` (#537): live now
+  **v21 `ac4a0ff3`** (pins updated). The camera-status read carries `vccMoves` for the
+  Owner and approved IT, and `POST /api/unit-camera-status/vcc-move` applies one item
+  (Tech Check `cos_vcc_move_apply_v1`). Rollback `rollback-to-v20-entry`. A next
+  patch to this function must start from v21.
+- **2026-11-25** — Tech Check: Moved in VCC. `public.cos_vcc_moves_state_v1` /
+  `cos_vcc_move_apply_v1` (Owner or approved IT) list and apply camera records that
+  no longer match VCC (moved / new / gone); applies write `camera_devices` one row at
+  a time and log to `app_private.cos_vcc_move_log`. No audit row. Operations patch
+  `cos-unit-camera-status/vcc-moves-v20` is **prepared, not deployed** (starts
+  from live v20). Record in `tech-checks/docs/db-changes/20261125_vcc_moves.md`.
+- **2026-11-25** — Tech Check returns: `app_private.techcheck_ticketfree_photos_v1`
+  now needs at least one photo (Service send and IT check-in), and
+  `techcheck_handoff_gaps_v1` adds `returns_not_checked_in` (Manager tab). Old
+  definitions in `app_private.techcheck_returns_evidence_backup_v1`. Record in
+  `tech-checks/docs/db-changes/20261125_techcheck_returns_evidence.md`.
 - **2026-11-25** — Linked 31 InHand routers to COS units by exact name
   (James approved the list) with `cos_router_link_v1`: 31 `ADD_ROUTER_LINK` rows,
   safe after_state; watchdog `ok` after. 37 left unlinked on purpose. Record in

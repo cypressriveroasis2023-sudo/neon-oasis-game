@@ -309,9 +309,27 @@ function managerGaps(data) {
     loaded:rows(data.loaded_without_handoff, 100).map(row => ({ tech:managerText(row.service_tech, 80) || 'Service tech', unit:unit(row),
       by:managerText(row.by, 80) || 'Unknown', reason:managerText(row.reason, 200), at:managerTime(row.at),
       kind:['owner_override','owner_edit_no_reason','system','log_mode'].includes(row.kind) ? row.kind : 'other' })).filter(row => row.unit),
+    returns:rows(data.returns_not_checked_in, 100).map(row => ({ unit:managerText(row.unit, 90), from:managerText(row.from, 80) || 'Service',
+      state:managerText(row.state, 40) || 'waiting_it', hours:typeof row.hours_waiting === 'number' && Number.isFinite(row.hours_waiting) ? Math.max(0, Math.min(99999, row.hours_waiting)) : null })).filter(row => row.unit),
     late:rows(data.handoffs_not_finished, 100).map(row => ({ units:(Array.isArray(row.units) ? row.units : []).slice(0, 20).map(item => managerText(item, 90)).filter(Boolean),
       from:managerText(row.from, 80) || 'IT', to:managerText(row.to, 80) || 'Service', state:managerText(row.state, 40) || 'unknown',
       hours:typeof row.hours_waiting === 'number' && Number.isFinite(row.hours_waiting) ? Math.max(0, Math.min(99999, row.hours_waiting)) : null })),
+  };
+}
+// Every Service truck against the standard: how many of each unit it has, by number.
+const MANAGER_TRUCK_TYPES = ['Sniper','Ranger','Spotter','Solar Spotter'];
+function managerTruckStd(data) {
+  const rows = (value, max) => Array.isArray(value) ? value.slice(0, max).filter(row => row && typeof row === 'object') : [];
+  const count = value => Number.isSafeInteger(value) && value >= 0 && value <= 99 ? value : 0;
+  const move = row => ({ type:managerText(row.type, 30), tag:managerText(row.tag, 40), from:managerText(row.from, 80), to:managerText(row.to, 80),
+    state:['waiting','accepted','refused','cancelled'].includes(row.state) ? row.state : 'waiting', at:managerTime(row.decided_at) || managerTime(row.sent_at), note:managerText(row.take_note, 200) });
+  return {
+    standard:rows(data.standard, 10).filter(row => MANAGER_TRUCK_TYPES.includes(row.type)).map(row => ({ type:row.type, required:count(row.required) })),
+    trucks:rows(data.trucks, 50).map(row => ({ id:managerUuid(row.id) ? row.id.toLowerCase() : '', name:managerText(row.name, 80),
+      kinds:rows(row.kinds, 10).filter(k => MANAGER_TRUCK_TYPES.includes(k.type)).map(k => ({ type:k.type, required:count(k.required), have:count(k.have),
+        slot:managerText(k.slot?.tag, 40), extras:rows(k.extras, 20).map(x => ({ id:managerUuid(x.id) ? x.id.toLowerCase() : '', tag:managerText(x.tag, 40) })).filter(x => x.id && x.tag) })),
+      waiting:rows(row.waiting, 20).map(move).filter(m => m.tag) })).filter(t => t.id && t.name),
+    moves:rows(data.moves, 10).map(move).filter(m => m.tag),
   };
 }
 async function managerRead() {
@@ -338,7 +356,13 @@ async function managerRead() {
     const read = await db.rpc('sim_drawer_v1');
     if (!read?.error && read?.data && typeof read.data === 'object') sims = managerSims(read.data);
   } catch {}
-  return { day, at:new Date().toISOString(), gaps, sims,
+  // Trucks against the standard, extras and moves between techs. Read only here.
+  let standard = null;
+  try {
+    const read = await db.rpc('owner_truck_board_v1');
+    if (!read?.error && read?.data && typeof read.data === 'object') standard = managerTruckStd(read.data);
+  } catch {}
+  return { day, at:new Date().toISOString(), gaps, sims, standard,
     techs:board.data.service_techs.slice(0, 100).map(managerTech).filter(Boolean),
     it:(Array.isArray(board.data.it_techs) ? board.data.it_techs : []).slice(0, 100).map(row => managerText(row?.name, 80)).filter(Boolean).map(name => ({ name, test:managerTest(name) })),
     exchanges };
@@ -373,6 +397,18 @@ async function managerAnswer(data) {
   if (data.kind === 'simMark') {
     if (typeof data.sim !== 'string' || !['in_drawer','bad','deactivated','removed'].includes(data.status)) return { error:'invalid' };
     const saved = await context().db.rpc('sim_drawer_mark_v1', { p_number:data.sim.slice(0, 40), p_status:data.status, p_note:managerText(data.note, 300) || null });
+    if (saved?.error) return { error:'rejected', message:managerText(saved.error.message, 200) };
+    return {};
+  }
+  if (data.kind === 'truckStandard') {
+    if (!MANAGER_TRUCK_TYPES.includes(data.unitType) || !Number.isSafeInteger(data.required) || data.required < 0 || data.required > 10) return { error:'invalid' };
+    const saved = await context().db.rpc('owner_truck_standard_set_v1', { p_type:data.unitType, p_required:data.required });
+    if (saved?.error) return { error:'rejected', message:managerText(saved.error.message, 200) };
+    return {};
+  }
+  if (data.kind === 'truckExtraRemove') {
+    if (!managerUuid(data.extraId) || typeof data.reason !== 'string') return { error:'invalid' };
+    const saved = await context().db.rpc('owner_truck_extra_remove_v1', { p_extra:data.extraId, p_reason:data.reason.slice(0, 300) });
     if (saved?.error) return { error:'rejected', message:managerText(saved.error.message, 200) };
     return {};
   }

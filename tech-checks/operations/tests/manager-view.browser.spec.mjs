@@ -1,7 +1,7 @@
 import {test, expect} from '@playwright/test';
 import {openWorkspace} from './navigation-helper.mjs';
 import {now} from './fleet-dashboard-fixtures.mjs';
-import {RILEY, manager, mount, inBoard, seen, textOf, press, fill, rpcCalls, openManager} from './manager-view-fixtures.mjs';
+import {AVERY, RILEY, manager, mount, inBoard, seen, textOf, press, fill, rpcCalls, openManager} from './manager-view-fixtures.mjs';
 
 test('the owner gets a Manager tab instead of a tech check, and Tech Check opens it', async ({page}) => {
   const {frame, host, errors} = await mount(page);
@@ -200,14 +200,16 @@ test('the Manager tab shows the handoff check: trucks with no handoff, loads wit
   fixture.manager.gaps = {mode: 'enforce',
     on_truck_without_handoff: [{service_tech: 'Riley Fixture', equipment_type: 'Sniper', unit_tag: '102', loaded_by: 'Riley Fixture', loaded_at: '2026-11-25T14:00:00Z', in_equipment_list: false}],
     loaded_without_handoff: [{service_tech: 'Riley Fixture', equipment_type: 'Ranger', unit_tag: '008', by: 'Owner Fixture', reason: 'Swapped on site', kind: 'owner_override', at: '2026-11-25T15:00:00Z'}],
-    handoffs_not_finished: [{state: 'awaiting_service', from: 'Jordan Fixture', to: 'Riley Fixture', hours_waiting: 5.4, units: ['Spotter 268']}]};
+    handoffs_not_finished: [{state: 'awaiting_service', from: 'Jordan Fixture', to: 'Riley Fixture', hours_waiting: 5.4, units: ['Spotter 268']}],
+    returns_not_checked_in: [{unit: 'Ranger 011', from: 'Abel Fixture', state: 'waiting_it', hours_waiting: 30.2}]};
   const {frame, host} = await mount(page, fixture);
   await openManager(frame, host);
-  await expect.poll(() => textOf(host, 'mgGap')).toContain('3 things to look at.');
+  await expect.poll(() => textOf(host, 'mgGap')).toContain('4 things to look at.');
   const text = await textOf(host, 'mgGap');
   for (const part of ['On a truck with no handoff', 'Riley Fixture · Sniper 102', 'Not in the COS equipment list',
     'Loaded without a handoff (last 7 days)', 'Riley Fixture · Ranger 008', 'You loaded it without a handoff', 'Swapped on site',
-    'Handoffs not finished after 4 hours', 'Spotter 268', 'Jordan Fixture to Riley Fixture', 'Waiting on Service', 'waiting 5 h']) expect(text).toContain(part);
+    'Handoffs not finished after 4 hours', 'Spotter 268', 'Jordan Fixture to Riley Fixture', 'Waiting on Service', 'waiting 5 h',
+    'Returns not checked in by IT after 4 hours', 'Ranger 011', 'Sent back by Abel Fixture', 'Waiting for IT', 'waiting 30 h']) expect(text).toContain(part);
 });
 
 test('the handoff check says all clear when nothing is missing, and says so when it cannot be read', async ({page}) => {
@@ -272,4 +274,34 @@ test('the SIM drawer shows what is in the drawer and what is out, and the owner 
   expect(await textOf(host, 'mgSim')).toContain('Will not register');
   const calls = (await page.evaluate(() => window.fixture.rpc)).map(c => c.name).filter(n => n.startsWith('sim_drawer_') && n !== 'sim_drawer_v1');
   expect(calls).toEqual(['sim_drawer_add_v1', 'sim_drawer_mark_v1']);
+});
+
+test('the Manager tab shows every truck against the standard; the owner changes the standard and takes an extra off with a reason', async ({page}) => {
+  const fixture = {manager: manager()};
+  const extra = '00000000-0000-4000-8000-00000000e001';
+  fixture.manager.truckStd = {standard: ['Sniper', 'Ranger', 'Spotter', 'Solar Spotter'].map(type => ({type, required: 1})),
+    trucks: [
+      {id: AVERY, name: 'Avery Fixture', kinds: [{type: 'Sniper', required: 1, have: 1, slot: {tag: '101'}, extras: []}, {type: 'Ranger', required: 1, have: 2, slot: {tag: '007'}, extras: [{id: extra, tag: '011'}]},
+        {type: 'Spotter', required: 1, have: 1, slot: {tag: '002'}, extras: []}, {type: 'Solar Spotter', required: 1, have: 1, slot: {tag: '013'}, extras: []}], waiting: []},
+      {id: RILEY, name: 'Riley Fixture', kinds: [{type: 'Sniper', required: 1, have: 1, slot: {tag: '102'}, extras: []}, {type: 'Ranger', required: 1, have: 0, slot: null, extras: []},
+        {type: 'Spotter', required: 1, have: 1, slot: {tag: '055'}, extras: []}, {type: 'Solar Spotter', required: 1, have: 1, slot: {tag: '014'}, extras: []}],
+        waiting: [{type: 'Sniper', tag: '102', from: 'Riley Fixture', to: 'Avery Fixture', state: 'waiting'}]}],
+    moves: [{type: 'Ranger', tag: '011', from: 'Riley Fixture', to: 'Avery Fixture', state: 'accepted', decided_at: '2026-10-06T15:00:00Z'}]};
+  const {frame, host} = await mount(page, fixture);
+  await openManager(frame, host);
+  await expect.poll(() => textOf(host, 'mgStd')).toContain('1 type short on a truck.');
+  let text = await textOf(host, 'mgStd');
+  for (const part of ['Riley Fixture: Ranger 0 of 1', 'Ranger: has 2 of 1', '007 · 011 (extra)', 'On its way: Sniper 102 from Riley Fixture to Avery Fixture',
+    'Last moves between techs', 'Ranger 011: Riley Fixture → Avery Fixture · signed']) expect(text).toContain(part);
+  expect(await inBoard(host, root => { const b = root.querySelector('#mgStdBox button[aria-label="One more Ranger"]'); b?.click(); return Boolean(b); })).toBe(true);
+  await expect.poll(() => textOf(host, 'mgStd')).toContain('Riley Fixture: Ranger 0 of 2');
+  expect(await textOf(host, 'mgStd')).toContain('Ranger: has 2 of 2');
+  await press(host, '#mgStdBox', 'Take 011 off');
+  await press(host, '#mgStdBox', 'Take it off');
+  await expect.poll(() => textOf(host, 'mgStd')).toContain('Write why (at least 10 characters).');
+  await typeIn(host, '#mgStdBox input.tin', 'Counted twice by mistake');
+  await press(host, '#mgStdBox', 'Take it off');
+  await expect.poll(() => textOf(host, 'mgStd')).not.toContain('011 (extra)');
+  const calls = (await page.evaluate(() => window.fixture.rpc)).map(c => c.name).filter(n => n.startsWith('owner_truck_') && n !== 'owner_truck_board_v1');
+  expect(calls).toEqual(['owner_truck_standard_set_v1', 'owner_truck_extra_remove_v1']);
 });

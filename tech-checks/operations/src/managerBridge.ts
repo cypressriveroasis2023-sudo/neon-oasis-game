@@ -30,6 +30,8 @@ export type ManagerSnapshot = {
   gaps: ManagerGaps | null;
   /** Null when the SIM drawer could not be read. */
   sims: ManagerSims | null;
+  /** Null when the truck standard could not be read. */
+  standard: ManagerTruckStd | null;
 };
 export type ManagerSimStatus = 'in_drawer' | 'in_unit' | 'on_truck' | 'bad' | 'deactivated' | 'removed';
 export type ManagerSimCard = {sim: string; carrier: string; status: ManagerSimStatus; location: string; note: string; by: string; at: string | null};
@@ -41,6 +43,8 @@ export type ManagerGaps = {
   noHandoff: {tech: string; unit: string; by: string; at: string | null; listed: boolean}[];
   loaded: {tech: string; unit: string; by: string; reason: string; at: string | null; kind: ManagerGapKind}[];
   late: {units: string[]; from: string; to: string; state: string; hours: number | null}[];
+  /** Units Service sent back that IT has not checked in after 4 hours. */
+  returns: {unit: string; from: string; state: string; hours: number | null}[];
 };
 /** One truck as it should be after the save. A blank unit comes off the truck; a blank SIM is left as it is. */
 export type TruckKit = {units: Record<string, string>; sims: Record<string, string>; stock: Record<string, number>};
@@ -122,8 +126,39 @@ function parseGaps(value: unknown): ManagerGaps | null {
     noHandoff: list(value.noHandoff, 100).filter(record).map(row => ({tech: text(row.tech, 80) || 'Service tech', unit: text(row.unit, 90), by: text(row.by, 80), at: time(row.at), listed: row.listed !== false})).filter(row => row.unit),
     loaded: list(value.loaded, 100).filter(record).map(row => ({tech: text(row.tech, 80) || 'Service tech', unit: text(row.unit, 90), by: text(row.by, 80) || 'Unknown', reason: text(row.reason, 200), at: time(row.at),
       kind: gapKinds.includes(row.kind as ManagerGapKind) ? row.kind as ManagerGapKind : 'other'})).filter(row => row.unit),
+    returns: list(value.returns, 100).filter(record).map(row => ({unit: text(row.unit, 90), from: text(row.from, 80) || 'Service', state: text(row.state, 40) || 'waiting_it',
+      hours: typeof row.hours === 'number' && Number.isFinite(row.hours) ? Math.max(0, Math.min(99999, row.hours)) : null})).filter(row => row.unit),
     late: list(value.late, 100).filter(record).map(row => ({units: list(row.units, 20).map(item => text(item, 90)).filter(Boolean), from: text(row.from, 80) || 'IT', to: text(row.to, 80) || 'Service',
       state: text(row.state, 40) || 'unknown', hours: typeof row.hours === 'number' && Number.isFinite(row.hours) ? Math.max(0, Math.min(99999, row.hours)) : null})),
+  };
+}
+
+/** Every Service truck against the owner's standard. */
+export type TruckType = 'Sniper' | 'Ranger' | 'Spotter' | 'Solar Spotter';
+const truckTypes: TruckType[] = ['Sniper', 'Ranger', 'Spotter', 'Solar Spotter'];
+export type ManagerMove = {type: string; tag: string; from: string; to: string; state: 'waiting' | 'accepted' | 'refused' | 'cancelled'; at: string; note: string};
+export type ManagerTruckStd = {
+  standard: {type: TruckType; required: number}[];
+  trucks: {id: string; name: string; kinds: {type: TruckType; required: number; have: number; slot: string; extras: {id: string; tag: string}[]}[]; waiting: ManagerMove[]}[];
+  moves: ManagerMove[];
+};
+const moveStates = ['waiting', 'accepted', 'refused', 'cancelled'] as const;
+const small = (v: unknown) => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0 && v <= 99 ? v : 0;
+const uuidish = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v) ? v.toLowerCase() : '';
+function parseMove(row: Record<string, unknown>): ManagerMove {
+  return {type: text(row.type, 30), tag: text(row.tag, 40), from: text(row.from, 80), to: text(row.to, 80),
+    state: moveStates.includes(row.state as ManagerMove['state']) ? row.state as ManagerMove['state'] : 'waiting', at: time(row.at) || '', note: text(row.note, 200)};
+}
+function parseTruckStd(value: unknown): ManagerTruckStd | null {
+  if (!record(value)) return null;
+  const isType = (v: unknown): v is TruckType => truckTypes.includes(v as TruckType);
+  return {
+    standard: list(value.standard, 10).filter(record).filter(r => isType(r.type)).map(r => ({type: r.type as TruckType, required: small(r.required)})),
+    trucks: list(value.trucks, 50).filter(record).map(t => ({id: uuidish(t.id), name: text(t.name, 80),
+      kinds: list(t.kinds, 10).filter(record).filter(k => isType(k.type)).map(k => ({type: k.type as TruckType, required: small(k.required), have: small(k.have), slot: text(k.slot, 40),
+        extras: list(k.extras, 20).filter(record).map(x => ({id: uuidish(x.id), tag: text(x.tag, 40)})).filter(x => x.id && x.tag)})),
+      waiting: list(t.waiting, 20).filter(record).map(parseMove).filter(m => m.tag)})).filter(t => t.id && t.name),
+    moves: list(value.moves, 10).filter(record).map(parseMove).filter(m => m.tag),
   };
 }
 
@@ -147,6 +182,7 @@ export function parseManagerSnapshot(value: unknown): ManagerSnapshot {
     exchanges: Array.isArray(value.exchanges) ? list(value.exchanges, 100).map(parseExchange).filter((row): row is ManagerExchange => row !== null) : null,
     gaps: parseGaps(value.gaps),
     sims: parseSims(value.sims),
+    standard: parseTruckStd(value.standard),
   };
 }
 
@@ -235,6 +271,22 @@ export async function addSims(numbers: string[], carrier: string, note: string):
 export async function markSim(sim: string, status: 'in_drawer' | 'bad' | 'deactivated' | 'removed', note: string): Promise<ManagerSnapshot> {
   await managerHello();
   await ask('simMark', {sim, status, note: note.slice(0, 300)}, SAVE_MS);
+  held0 = null;
+  return readManager(true);
+}
+
+/** Sets how many of one unit type every Service truck must carry, then reads everything again. */
+export async function setTruckStandard(type: TruckType, required: number): Promise<ManagerSnapshot> {
+  await managerHello();
+  await ask('truckStandard', {unitType: type, required}, SAVE_MS);
+  held0 = null;
+  return readManager(true);
+}
+
+/** Takes an extra unit off a truck in the app, with the owner's reason, then reads everything again. */
+export async function removeTruckExtra(extraId: string, reason: string): Promise<ManagerSnapshot> {
+  await managerHello();
+  await ask('truckExtraRemove', {extraId, reason: reason.slice(0, 300)}, SAVE_MS);
   held0 = null;
   return readManager(true);
 }

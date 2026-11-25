@@ -29,7 +29,7 @@ const ROUTER_CSS = `
 .rtr dd a{color:inherit}
 `;
 
-const SHELL = "<div class=\"cosb\" id=\"cosb\"><header class=\"top\"><div class=\"wrap\">\n  <div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div>\n  <span class=\"topbtns\"><button class=\"tvgo\" id=\"tvGo\" type=\"button\">TV board</button><button class=\"refresh\" id=\"refresh\" type=\"button\">Refresh</button></span>\n</div></header>\n<div class=\"asof\" id=\"asof\"><div class=\"wrap\"><span id=\"asofMain\">Loading the camera reading…</span><span id=\"asofSub\"></span></div></div>\n\n<main class=\"wrap\">\n  <div class=\"tabs\" role=\"tablist\">\n    <button class=\"tab\" role=\"tab\" id=\"tabBoard\" aria-selected=\"true\" type=\"button\">Board</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabMap\" aria-selected=\"false\" type=\"button\">Map</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabTech\" aria-selected=\"false\" type=\"button\">Tech check</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabManager\" aria-selected=\"false\" type=\"button\" hidden>Manager</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabPunch\" aria-selected=\"false\" type=\"button\">Punch list</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabActivity\" aria-selected=\"false\" type=\"button\">Changes</button>\n  </div>\n\n  <section id=\"viewBoard\">\n    <div id=\"boardMain\">\n    <div class=\"mode\" id=\"modeRow\"></div>\n    <div class=\"kpi\" id=\"kpi\">\n    <p class=\"provnote\" id=\"provNote\" hidden></p>\n    <div class=\"tiles\" id=\"tiles\"></div>\n    <div class=\"shoprow\" id=\"shoprow\"></div>\n    </div>\n    <div id=\"boardList\">\n    <div class=\"controls\">\n      <input class=\"search\" id=\"q\" type=\"search\" placeholder=\"Find a unit, site, A# or IP\" autocomplete=\"off\" aria-label=\"Find a unit, site, A number or IP\">\n      <div class=\"chips\" id=\"fam\"></div>\n    </div>\n    <div class=\"count\" id=\"count\"></div>\n    <div class=\"list\" id=\"list\"></div>\n    <div class=\"screens\" id=\"screensRow\"><h3>Other COS screens</h3><div class=\"links\" id=\"screensLinks\"></div></div><ul class=\"foot\"><li>One unit counts once, however many cameras it has.</li><li>One count here, and it is mHelp’s camera units. mHelp’s own field total is higher because it counts stands and poles as well. The camera systems see fewer, because some units in mHelp have no camera record in COS yet; those show Unknown.</li><li>A unit in the shop never counts as down.</li><li>A reading that is missing or too old shows Unknown, never Down.</li><li>Router checks are a reference only. A router online does not prove the cameras work.</li><li>Hand fixes made here are saved in COS with your name and the time. Nothing here changes mHelp, Star4Live or InHand.</li></ul>\n    </div>\n    </div>\n    <aside id=\"boardSide\" aria-label=\"Map of field units\" hidden></aside>\n  </section>\n\n  <section id=\"viewMap\" hidden>\n    <div id=\"mapBlock\">\n    <div class=\"chips\" id=\"mapChips\"></div>\n    <div class=\"chips\" id=\"mapGo\" style=\"margin-top:8px\"></div>\n    <div class=\"mapwrap\" id=\"mapWrap\">\n      <svg id=\"mapSvg\" role=\"img\" aria-label=\"Map of field units\"><g id=\"mapBase\"></g><g id=\"mapLabels\"></g><g id=\"mapPins\"></g></svg>\n      <div class=\"mapbtns\"><button type=\"button\" id=\"zin\" aria-label=\"Zoom in\">+</button><button type=\"button\" id=\"zout\" aria-label=\"Zoom out\">&minus;</button></div>\n      <div class=\"mapmsg\" id=\"mapMsg\" hidden></div>\n      <div class=\"mapsel\" id=\"mapSel\" hidden></div>\n    </div>\n    <p class=\"note\" id=\"mapNote\" style=\"margin-top:10px\"></p>\n    <div class=\"list\" id=\"mapList\"></div>\n    </div>\n  </section>\n\n  <section id=\"viewTech\" hidden>\n    <div id=\"techForm\"></div>\n    <div id=\"techList\"></div>\n  </section>\n\n  <section id=\"viewManager\" hidden>\n    <div id=\"mgNow\"></div>\n    <div id=\"mgChecks\"></div>\n    <div id=\"mgTrucks\"></div>\n    <div id=\"mgGap\"></div>\n    <div id=\"mgSim\"></div>\n    <div id=\"mgX\"></div>\n    <div id=\"mgTools\"></div>\n  </section>\n\n  <section id=\"viewPunch\" hidden>\n    <div class=\"box\" id=\"punchTop\"><p class=\"note\">Loading the mHelp list…</p></div>\n    <div class=\"chips\" id=\"punchChips\" style=\"margin-top:12px\"></div>\n    <div class=\"count\" id=\"punchCount\"></div>\n    <div class=\"list\" id=\"punchList\"></div>\n  </section>\n\n  <section id=\"viewActivity\" hidden>\n    <p class=\"note\" id=\"actNote\">Every change made by hand on this board, newest first.</p>\n    <ul class=\"hist\" id=\"activity\"></ul>\n  </section>\n</main>\n\n<section id=\"viewTv\" hidden><header class=\"tvtop\"><div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div><div class=\"tvread\" id=\"tvRead\" role=\"status\">Loading the camera reading…</div><div class=\"tvclock\"><b id=\"tvClock\"></b><span id=\"tvDate\"></span></div><button type=\"button\" class=\"tvx\" id=\"tvExitTop\">Exit TV</button></header><div class=\"tvgrid\" id=\"tvGrid\"><div class=\"tvleft\" id=\"tvKpi\"><div class=\"tvtiles\" id=\"tvTiles\"></div><div class=\"tvminis\" id=\"tvMinis\"></div><div class=\"tvhead\" id=\"tvHead\"></div><div class=\"tvlist\" id=\"tvList\"></div></div><div class=\"tvright\" id=\"tvRight\"><div class=\"tvmaptitle\" id=\"tvMapTitle\"></div><div class=\"tvmap\" id=\"tvMap\"></div></div></div><footer class=\"tvfoot\"><span id=\"tvNote\"></span><span class=\"tvbtns\"><button type=\"button\" id=\"tvRefresh\">Refresh</button><button type=\"button\" id=\"tvFull\">Full screen</button><button type=\"button\" id=\"tvExit\">Exit TV</button></span></footer></section><div class=\"sheet\" id=\"sheet\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"pname\"><div class=\"panel\" id=\"panel\"></div></div>\n<div class=\"toast\" id=\"toast\" role=\"status\" aria-live=\"polite\"></div></div>";
+const SHELL = "<div class=\"cosb\" id=\"cosb\"><header class=\"top\"><div class=\"wrap\">\n  <div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div>\n  <span class=\"topbtns\"><button class=\"tvgo\" id=\"tvGo\" type=\"button\">TV board</button><button class=\"refresh\" id=\"refresh\" type=\"button\">Refresh</button></span>\n</div></header>\n<div class=\"asof\" id=\"asof\"><div class=\"wrap\"><span id=\"asofMain\">Loading the camera reading…</span><span id=\"asofSub\"></span></div></div>\n\n<main class=\"wrap\">\n  <div class=\"tabs\" role=\"tablist\">\n    <button class=\"tab\" role=\"tab\" id=\"tabBoard\" aria-selected=\"true\" type=\"button\">Board</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabMap\" aria-selected=\"false\" type=\"button\">Map</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabTech\" aria-selected=\"false\" type=\"button\">Tech check</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabManager\" aria-selected=\"false\" type=\"button\" hidden>Manager</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabPunch\" aria-selected=\"false\" type=\"button\">Punch list</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabActivity\" aria-selected=\"false\" type=\"button\">Changes</button>\n  </div>\n\n  <section id=\"viewBoard\">\n    <div id=\"boardMain\">\n    <div class=\"mode\" id=\"modeRow\"></div>\n    <div class=\"kpi\" id=\"kpi\">\n    <p class=\"provnote\" id=\"provNote\" hidden></p>\n    <div class=\"tiles\" id=\"tiles\"></div>\n    <div class=\"shoprow\" id=\"shoprow\"></div>\n    </div>\n    <div id=\"boardList\">\n    <div class=\"controls\">\n      <input class=\"search\" id=\"q\" type=\"search\" placeholder=\"Find a unit, site, A# or IP\" autocomplete=\"off\" aria-label=\"Find a unit, site, A number or IP\">\n      <div class=\"chips\" id=\"fam\"></div>\n    </div>\n    <div class=\"count\" id=\"count\"></div>\n    <div class=\"list\" id=\"list\"></div>\n    <div class=\"screens\" id=\"screensRow\"><h3>Other COS screens</h3><div class=\"links\" id=\"screensLinks\"></div></div><ul class=\"foot\"><li>One unit counts once, however many cameras it has.</li><li>One count here, and it is mHelp’s camera units. mHelp’s own field total is higher because it counts stands and poles as well. The camera systems see fewer, because some units in mHelp have no camera record in COS yet; those show Unknown.</li><li>A unit in the shop never counts as down.</li><li>A reading that is missing or too old shows Unknown, never Down.</li><li>Router checks are a reference only. A router online does not prove the cameras work.</li><li>Hand fixes made here are saved in COS with your name and the time. Nothing here changes mHelp, Star4Live or InHand.</li></ul>\n    </div>\n    </div>\n    <aside id=\"boardSide\" aria-label=\"Map of field units\" hidden></aside>\n  </section>\n\n  <section id=\"viewMap\" hidden>\n    <div id=\"mapBlock\">\n    <div class=\"chips\" id=\"mapChips\"></div>\n    <div class=\"chips\" id=\"mapGo\" style=\"margin-top:8px\"></div>\n    <div class=\"mapwrap\" id=\"mapWrap\">\n      <svg id=\"mapSvg\" role=\"img\" aria-label=\"Map of field units\"><g id=\"mapBase\"></g><g id=\"mapLabels\"></g><g id=\"mapPins\"></g></svg>\n      <div class=\"mapbtns\"><button type=\"button\" id=\"zin\" aria-label=\"Zoom in\">+</button><button type=\"button\" id=\"zout\" aria-label=\"Zoom out\">&minus;</button></div>\n      <div class=\"mapmsg\" id=\"mapMsg\" hidden></div>\n      <div class=\"mapsel\" id=\"mapSel\" hidden></div>\n    </div>\n    <p class=\"note\" id=\"mapNote\" style=\"margin-top:10px\"></p>\n    <div class=\"list\" id=\"mapList\"></div>\n    </div>\n  </section>\n\n  <section id=\"viewTech\" hidden>\n    <div id=\"techForm\"></div>\n    <div id=\"techList\"></div>\n  </section>\n\n  <section id=\"viewManager\" hidden>\n    <div id=\"mgNow\"></div>\n    <div id=\"mgChecks\"></div>\n    <div id=\"mgTrucks\"></div>\n    <div id=\"mgStd\"></div>\n    <div id=\"mgGap\"></div>\n    <div id=\"mgSim\"></div>\n    <div id=\"mgX\"></div>\n    <div id=\"mgTools\"></div>\n  </section>\n\n  <section id=\"viewPunch\" hidden>\n    <div class=\"box\" id=\"punchTop\"><p class=\"note\">Loading the mHelp list…</p></div>\n    <div class=\"chips\" id=\"punchChips\" style=\"margin-top:12px\"></div>\n    <div class=\"count\" id=\"punchCount\"></div>\n    <div class=\"list\" id=\"punchList\"></div>\n  </section>\n\n  <section id=\"viewActivity\" hidden>\n    <p class=\"note\" id=\"actNote\">Every change made by hand on this board, newest first.</p>\n    <ul class=\"hist\" id=\"activity\"></ul>\n  </section>\n</main>\n\n<section id=\"viewTv\" hidden><header class=\"tvtop\"><div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div><div class=\"tvread\" id=\"tvRead\" role=\"status\">Loading the camera reading…</div><div class=\"tvclock\"><b id=\"tvClock\"></b><span id=\"tvDate\"></span></div><button type=\"button\" class=\"tvx\" id=\"tvExitTop\">Exit TV</button></header><div class=\"tvgrid\" id=\"tvGrid\"><div class=\"tvleft\" id=\"tvKpi\"><div class=\"tvtiles\" id=\"tvTiles\"></div><div class=\"tvminis\" id=\"tvMinis\"></div><div class=\"tvhead\" id=\"tvHead\"></div><div class=\"tvlist\" id=\"tvList\"></div></div><div class=\"tvright\" id=\"tvRight\"><div class=\"tvmaptitle\" id=\"tvMapTitle\"></div><div class=\"tvmap\" id=\"tvMap\"></div></div></div><footer class=\"tvfoot\"><span id=\"tvNote\"></span><span class=\"tvbtns\"><button type=\"button\" id=\"tvRefresh\">Refresh</button><button type=\"button\" id=\"tvFull\">Full screen</button><button type=\"button\" id=\"tvExit\">Exit TV</button></span></footer></section><div class=\"sheet\" id=\"sheet\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"pname\"><div class=\"panel\" id=\"panel\"></div></div>\n<div class=\"toast\" id=\"toast\" role=\"status\" aria-live=\"polite\"></div></div>";
 /* A shadow root can be attached to an element only once, so a host that is mounted again gets its first root back. */
 const ROOTS = new WeakMap();
 
@@ -263,6 +263,7 @@ const PSEC = [["place","Placed differently","mHelp is official, so the board sho
   ["name","Names differ","Same number, different name in each system. Worth making the names match."],
   ["mhShop","Shop, no camera feed","In mHelp's shop list with no camera record. Normal for units on the shelf."],
   ["bdShop","Shop feed, not in mHelp","Camera records under shop with nothing in mHelp: test devices, retired units, old tracker rows. Not counted."],
+  ["vcc","Moved in VCC","Camera records in COS that no longer match VCC: a camera VCC names for another unit, a camera VCC has that COS has never recorded, or one VCC stopped listing. VCC is right about its own cameras. Fix one with its button, or fix the name in VCC when there is no button."],
   ["done","Fixed by hand","Set by hand in COS, so these are off the list and stay off. mHelp still shows them differently: make the same change there when you can."]];
 /* The answers James added for the punch list: where each unit really is, what record to fix, and who fixes it. */
 function normName(n){ return String(n||"").toUpperCase().replace(/SOLAR\s*SPOTTER/,"SS").replace(/RECON\s*(II|2)/,"RII").replace(/CAM[\s-]*V/,"CAMV").replace(/[^A-Z0-9.]/g,""); }
@@ -293,7 +294,9 @@ function drawPunch(vs){
       h("span",{class:"lb",text:"Camera units"}),h("b",{text:cam}),h("b",{text:real.length})),
     h("p",{class:"note",text:"mHelp is the official count: "+mh.meta.total+" pieces of equipment, "+mh.meta.field+" in the field and "+mh.meta.shop+" in the shop. "+mh.meta.stands+" of those are stands, poles and skids ("+mh.meta.standsField+" in the field). They count, but they have no cameras, so they are not listed on this board."}),
     h("p",{class:"note",text:"mHelp read "+when(mh.meta.at)+". Camera systems read "+when(S.meta.v)+"."}));
-  $("punchChips").replaceChildren(...PSEC.map(([k,l])=>h("button",{class:"chip",type:"button","aria-pressed":String(S.psec===k),onclick:()=>{S.psec=k;drawPunch();}},l+" · "+(cnt[k]||0))));
+  cnt.vcc = S.vcc ? S.vcc.items.length : 0;
+  $("punchChips").replaceChildren(...PSEC.filter(([k])=>k!=="vcc" || S.vcc).map(([k,l])=>h("button",{class:"chip",type:"button","aria-pressed":String(S.psec===k),onclick:()=>{S.psec=k;drawPunch();}},l+" · "+(cnt[k]||0))));
+  if(S.psec==="vcc"){ drawVcc(); return; }
   const sec=PSEC.find(p=>p[0]===S.psec), rows = S.psec==="done" ? items.filter(settled) : open.filter(i=>i.sec===S.psec);
   $("punchCount").textContent=sec[2];
   const can = S.db && S.canWrite!==false;
@@ -307,6 +310,33 @@ function drawPunch(vs){
     return h("div",{class:"prow"+(uv?" s-"+uv.status:"")},main,btn);
   }) : [h("div",{class:"empty",text:"Nothing here."})]));
 }
+/* Moved in VCC (James, 25 Nov). VCC is right about its own cameras; COS's records follow it one tap at a time.
+   Tech Check works the list out again before any change and refuses one that is no longer listed or not safe. */
+const VCC_KIND = { moved:"Moved in VCC", new:"New in VCC", gone:"Gone from VCC" };
+const VCC_BTN = { moved:"Move it", new:"Add it", gone:"Turn it off in COS" };
+function drawVcc(){
+  const vc=S.vcc, sec=PSEC.find(p=>p[0]==="vcc");
+  $("punchCount").textContent = sec[2] + (vc && !vc.fresh ? " The last VCC read is too old to act on, so nothing can be changed until the next one." : "");
+  const items = vc ? vc.items : [];
+  const go = !!(hooks && typeof hooks.onVccMove==="function") && S.can===true && vc && vc.fresh;
+  $("punchList").replaceChildren(...(items.length ? items.map(it=>{
+    const unit = it.toUnit || it.fromUnit || "", uv = Object.values(S.vmap||{}).find(v=>v.k===unit);
+    const lines = [["What: ", VCC_KIND[it.kind]||it.kind], it.vccName ? ["VCC calls it: ", it.vccName] : null, it.cosName ? ["COS calls it: ", it.cosName+(it.fromUnit ? " on "+it.fromUnit : "")] : null,
+      it.toUnit ? ["Goes to: ", it.toUnit] : null, ["Why: ", it.why||""]].filter(Boolean);
+    const main=h("button",{class:"pmain",type:"button",disabled:!uv,onclick:()=>{ if(uv) openUnit(uv.id); }},
+      h("span",{class:"name",text: it.vccName || it.cosName || it.serial}), lines.map(([a,b])=>h("span",{class:"sub"},h("b",{text:a}),b)));
+    const btn = go && it.canApply ? h("button",{class:"pdone",type:"button",disabled:S.busy,onclick:()=>vccMove(it)}, VCC_BTN[it.kind]||"Apply") : null;
+    return h("div",{class:"prow"+(uv?" s-"+uv.status:"")},main,btn);
+  }) : [h("div",{class:"empty",text: vc ? "COS and VCC agree on every camera." : "Nothing here."})]));
+}
+async function vccMove(it){
+  if(S.busy || S.can!==true || !hooks || typeof hooks.onVccMove!=="function") return;
+  S.busy=true; drawPunch();
+  try{ const said = await hooks.onVccMove(it.key); toast(said || "Done.", 9000); }
+  catch(err){ toast("Not changed. "+((err && err.message) || "COS could not confirm the change."), 14000); }
+  S.busy=false; render();
+}
+function setVcc(v){ S.vcc = v && Array.isArray(v.items) ? {fresh: v.fresh===true, syncedAt: v.syncedAt||null, items: v.items.filter(x=>x && typeof x.key==="string")} : null; if(S.meta) render(); }
 async function markPunch(it, on){
   if(!S.db || S.busy) return; S.busy=true;
   try{ if(on){ const d={by:S.uid,at:Date.now(),name:it.name,sec:it.sec}; await S.db.doc("punch/"+it.id).set(d); S.pdone[it.id]=d; } else { await S.db.doc("punch/"+it.id).delete(); delete S.pdone[it.id]; } }
@@ -904,7 +934,10 @@ function drawMap(vs){
   sizeMap(); buildBase();
   if(!M.fitted && pts.length && M.w){ fitPts(pts,36,60); M.fitted=true; }
   const hand=pts.filter(q=>q.p.kind==="hand").length;
-  $("mapNote").textContent = pts.length+" field units on the map"+(hand ? ", "+hand+" from an address typed by hand" : "")+". A full colour means every unit at that spot is in that state. A ring is a mix, and its red number is how many are down. Tap a pin to open it. Pins mark the site address from mHelp unless someone typed an address in COS. Shop units are not on the map."+(M.failed ? " The background map didn't load, but the pins still work." : "");
+  // The board's tiles count every field unit; the map can only draw the ones
+  // with a pin. Saying "193 of 198" here ties the two screens together, so the
+  // gap reads as units without a pin rather than as the two screens disagreeing.
+  $("mapNote").textContent = pts.length+" of "+field.length+" field units on the map"+(hand ? ", "+hand+" from an address typed by hand" : "")+". A full colour means every unit at that spot is in that state. A ring is a mix, and its red number is how many are down. Tap a pin to open it. Pins mark the site address from mHelp unless someone typed an address in COS. Shop units are not on the map."+(M.failed ? " The background map didn't load, but the pins still work." : "");
   $("mapList").replaceChildren(...(none.length ? [h("div",{class:"count",text:none.length+" field unit"+(none.length===1?"":"s")+" with no pin yet."}), ...none.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true})).map(rowEl)] : []));
   drawMsg(); drawSel(); paint();
 }
@@ -1062,7 +1095,7 @@ function mgDraw(part){
     if(feed) return;
     const body = MG.state==="failed" ? h("div",{class:"box"},h("p",{text:MG.err}),h("div",{class:"links"},h("button",{class:"lk",type:"button",onclick:()=>mgLoad(true)},"Try again"),mgTool("team","Open the older truck screen")))
       : h("div",{class:"box"},h("p",{class:"note",text:"Loading trucks and inspections…"}));
-    $("mgChecks").replaceChildren(body); $("mgTrucks").replaceChildren(); $("mgGap").replaceChildren(); $("mgSim").replaceChildren(); $("mgX").replaceChildren(); $("mgTools").replaceChildren(); return;
+    $("mgChecks").replaceChildren(body); $("mgTrucks").replaceChildren(); $("mgStd").replaceChildren(); $("mgGap").replaceChildren(); $("mgSim").replaceChildren(); $("mgX").replaceChildren(); $("mgTools").replaceChildren(); return;
   }
   const real=d.techs.filter(t=>!t.test), tests=d.techs.filter(t=>t.test), idx=mgIndex(vs);
   if(!part || part==="checks") $("mgChecks").replaceChildren(mgChecks(d, real));
@@ -1075,6 +1108,7 @@ function mgDraw(part){
   }
   if(!part || part==="x"){ $("mgGap").replaceChildren(mgGaps(d)); $("mgX").replaceChildren(mgExchanges(d, idx)); }
   if(!part || part==="x" || part==="sim") $("mgSim").replaceChildren(mgSims(d));
+  if(!part || part==="x" || part==="std") $("mgStd").replaceChildren(mgStd(d));
   if(!part || part==="tools") $("mgTools").replaceChildren(mgTools());
 }
 
@@ -1201,7 +1235,7 @@ function mgGaps(d){
   const title=h("h3",{text:"Handoff check"});
   const g=d.gaps;
   if(!g) return h("div",{class:"box"},title,h("p",{class:"note",text:"The handoff check could not be read just now."}));
-  const total=g.noHandoff.length+g.loaded.length+g.late.length;
+  const total=g.noHandoff.length+g.loaded.length+g.late.length+(g.returns||[]).length;
   const row=(cls, main, sub)=>h("div",{class:"prow "+cls},h("div",{class:"pmain"},h("span",{class:"name",text:main}),h("span",{class:"sub",text:sub})));
   const part=(head, rows)=>rows.length ? h("div",null,h("p",null,h("b",{text:head})),...rows) : null;
   return h("div",{class:"box",id:"mgGapBox"},title,
@@ -1212,10 +1246,57 @@ function mgGaps(d){
       (MGGAPKIND[x.kind]||MGGAPKIND.other)+" · "+x.by+(x.at ? " · "+mgWhen(x.at) : "")+(x.reason ? " · "+x.reason : "")))),
     part("Handoffs not finished after 4 hours", g.late.map(x=>row("s-issues", (x.units.join(", ")||"Equipment"),
       x.from+" to "+x.to+" · "+(MGSTATE[x.state]||[x.state.replace(/_/g," ")])[0]+(x.hours!==null ? " · waiting "+Math.round(x.hours)+" h" : "")))),
+    part("Returns not checked in by IT after 4 hours", (g.returns||[]).map(x=>row("s-issues", x.unit,
+      "Sent back by "+x.from+" · "+(x.state==="identity_review" ? "Unit ID review" : "Waiting for IT")+(x.hours!==null ? " · waiting "+Math.round(x.hours)+" h" : "")))),
     h("p",{class:"note",text:(g.enforced ? "A new unit can only go on a Service truck after IT hands it over in Tech Check and Service signs for it." : "The handoff block is switched off. Units are let through and listed here.")+" Units on the trucks on 25 Nov 2026 were counted as handed over."}));
 }
 /* SIM drawer: every SIM card on hand, and where each one went. */
 const SIMSTATE = { in_drawer:["In the drawer","s-up"], in_unit:["In a unit","s-unknown"], on_truck:["On a truck","s-unknown"], bad:["Bad","s-down"], deactivated:["Deactivated","s-down"], removed:["Removed","s-unknown"] };
+/* Truck standard: every Service truck against how many of each unit it must carry. */
+const STDF = { busy:false, err:"", remove:null };
+function mgStd(d){
+  const title=h("h3",{text:"Truck standard"});
+  const g=d.standard;
+  if(!g) return h("div",{class:"box"},title,h("p",{class:"note",text:"The truck standard could not be read just now."}));
+  const short=g.trucks.flatMap(t=>t.kinds.filter(k=>k.have<k.required).map(k=>t.name+": "+k.type+" "+k.have+" of "+k.required));
+  const setter=s=>h("div",{class:"prow"},h("div",{class:"pmain"},h("span",{class:"name",text:s.type}),h("span",{class:"sub",text:"Every truck carries "+s.required})),
+    h("div",{class:"links"},
+      h("button",{class:"lk",type:"button","aria-label":"One less "+s.type,disabled:STDF.busy||s.required<=0,onclick:()=>stdSet(s.type,s.required-1)},"−"),
+      h("span",{class:"big",style:"min-width:2ch;text-align:center",text:String(s.required)}),
+      h("button",{class:"lk",type:"button","aria-label":"One more "+s.type,disabled:STDF.busy||s.required>=10,onclick:()=>stdSet(s.type,s.required+1)},"+")));
+  const truck=t=>h("div",{class:"box",style:"margin:10px 0 0"},h("h4",{text:t.name}),
+    ...t.kinds.map(k=>h("div",{class:"prow "+(k.have<k.required?"s-down":"s-up")},
+      h("div",{class:"pmain"},h("span",{class:"name",text:k.type+": has "+k.have+" of "+k.required}),
+        h("span",{class:"sub",text:[k.slot,...k.extras.map(x=>x.tag+" (extra)")].filter(Boolean).join(" · ")||"None"})),
+      h("div",{class:"links"},...k.extras.map(x=>h("button",{class:"lk",type:"button",disabled:STDF.busy,onclick:()=>{ STDF.remove={id:x.id,label:k.type+" "+x.tag+" on "+t.name+"'s truck",reason:"",err:""}; mgDraw("std"); }},"Take "+x.tag+" off"))))),
+    ...t.waiting.map(m=>h("p",{class:"note",text:"On its way: "+m.type+" "+m.tag+" from "+m.from+" to "+m.to+" (waiting for the signature)"})));
+  const remove=STDF.remove ? h("div",{class:"mgedit",style:"display:flex;flex-direction:column;gap:8px;margin-top:10px"},
+    h("label",{class:"mgfield"},"Why is "+STDF.remove.label+" coming off in the app?",h("input",{class:"tin",type:"text",maxlength:"300",value:STDF.remove.reason,oninput:e=>{ STDF.remove.reason=e.target.value; }})),
+    STDF.remove.err ? h("p",{class:"note",role:"alert",text:STDF.remove.err}) : null,
+    h("div",{class:"links"},h("button",{class:"fixbtn",type:"button",disabled:STDF.busy,onclick:()=>stdRemove()},"Take it off"),h("button",{class:"lk",type:"button",onclick:()=>{ STDF.remove=null; mgDraw("std"); }},"Cancel"))) : null;
+  const moves=g.moves.filter(m=>m.state!=="waiting").slice(0,5);
+  return h("div",{class:"box",id:"mgStdBox"},title,
+    h("p",{class:"big",text: short.length ? mgPlural(short.length,"type")+" short on a truck." : "Every truck meets the standard."}),
+    short.length ? h("p",{class:"note",text:short.join(" · ")}) : null,
+    ...g.standard.map(setter),
+    STDF.err ? h("p",{class:"note",role:"alert",text:STDF.err}) : null,
+    ...g.trucks.map(truck), remove,
+    moves.length ? h("div",{},h("h4",{text:"Last moves between techs"}),...moves.map(m=>h("p",{class:"note",text:m.type+" "+m.tag+": "+m.from+" → "+m.to+" · "+(m.state==="accepted"?"signed":m.state==="refused"?"not taken"+(m.note?" ("+m.note+")":""):"cancelled")+(m.at?" · "+mgWhen(m.at):"")}))) : null);
+}
+async function stdSet(type,required){
+  if(STDF.busy) return; STDF.busy=true; STDF.err=""; mgDraw("std");
+  try{ MG.data=await MGK.truckStandard(type,required); MG.at=Date.now(); toast("Every truck now carries "+required+" "+type+".", 6000); }
+  catch(x){ STDF.err=(x && x.message) || "That could not be saved."; }
+  STDF.busy=false; mgDraw("std");
+}
+async function stdRemove(){
+  const r=STDF.remove; if(!r || STDF.busy) return;
+  if(r.reason.trim().length<10){ r.err="Write why (at least 10 characters)."; mgDraw("std"); return; }
+  STDF.busy=true; mgDraw("std");
+  try{ MG.data=await MGK.truckExtraRemove(r.id,r.reason.trim()); MG.at=Date.now(); STDF.remove=null; toast("Taken off in the app.", 6000); }
+  catch(x){ r.err=(x && x.message) || "That could not be saved."; }
+  STDF.busy=false; mgDraw("std");
+}
 const SIMF = { open:false, text:"", carrier:"", note:"", busy:false, err:"", done:"", mark:null, show:"in_drawer", all:false };
 const simSplit = t => String(t||"").split(/[\r\n,;]+/).map(x=>x.replace(/[^0-9A-Za-z]/g,"")).filter(Boolean);
 function mgSims(d){
@@ -1562,5 +1643,5 @@ function openByName(name){
 /* Whether this person may make a hand fix right now, and the reason when not. */
 function setEdit(state){ S.can = !!(state && state.can===true); S.canWhy = (state && state.why) || ""; if(S.meta) render(); }
 function destroy(){ for(const fn of cleanups.splice(0)){ try{ fn(); }catch(_){} } clearTimeout(toastTimer); clearTimeout(announceTimer); clearTimeout(savedTimer); cancelAnimationFrame(M.raf); root.replaceChildren(); }
-return { update, setEdit, destroy, root, setTurn: tvTurn, openByName };
+return { update, setEdit, setVcc, destroy, root, setTurn: tvTurn, openByName };
 }
