@@ -64,6 +64,18 @@ Newest first. One line: date, what changed, what to watch.
   002 CAM 2 matched to VCC's names. Moved in VCC also lists camera-number
   differences inside a unit. No audit row. Record in
   `tech-checks/docs/db-changes/20261125_ss029_cam_numbers.md`.
+- **2026-11-25** — Board, three merged: #517 the maps draw CARTO `dark_all`
+  instead of inverting OpenStreetMap light tiles in CSS (all three
+  `.leaflet-tile-pane` filters removed — do not add one back, it erases the
+  streets); #520 `canonicalCameraUnit` lets a **Recon only** carry a trailing
+  site after a space, so all 36 Reconeyez keys like `RII005 - Newmark/Gembler`
+  resolve instead of reading "No site on record" at Unknown (the two anchored
+  patterns are unchanged, `RII-007-junk` is still nothing, and the durable
+  backend `savedFleetBoard.mjs` + preview manifest were repackaged because they
+  bundle that parser); #526 the map note now reads "193 of 198 field units on
+  the map". Watch: `dist` conflicts on every one of these — `verify` takes ~75
+  min while main moves every ~15, so a `dist`-touching PR needs the
+  resolve/rebuild/push/merge done in one pass.
 - **2026-11-25** — Tech Check: truck standard + extras + tech-to-tech moves
   (`techcheck-truck-extras-v1.sql`). New `app_private.truck_extra_units` /
   `truck_moves` / `truck_standard`, bucket `techcheck-truck-moves`, trigger
