@@ -30,7 +30,10 @@ test('the board is isolated from the rest of COS and sends nothing itself', () =
   assert.doesNotMatch(app, /unit-camera-status|\bapi\.(?:get|post)\(|from '\.\.?\/api'/);
   const landing = read('../src/CosBoardLanding.tsx');
   assert.equal(landing.split("api.post('/api/unit-camera-status/edit', handFixRequest(unit, step, crypto.randomUUID()))").length - 1, 1);
-  assert.equal(landing.split('api.post(').length - 1, 1);
+  // Exactly two sends, both named here on purpose: the hand fix, and checking one unit on demand. The count stays
+  // exact so a third has to be argued for in this test rather than appearing quietly.
+  assert.equal(landing.split('api.post(').length - 1, 2);
+  assert.equal(landing.split("api.post('/api/product-connections/verify', {productIds: [productId]})").length - 1, 1);
   // The work log and the board's own tech check form would need that store, so they are off.
   assert.match(app, /function logBox\(\)\{ return null; \}/);
   assert.doesNotMatch(app, /drawTechForm|techCard|sendTech/);
@@ -251,4 +254,33 @@ test('the board counts one way, and a hand fix comes first on the card and says 
   assert.ok(app.includes('A fix made by hand wins in COS and stays until someone undoes it. No new reading from mHelp or Star4Live replaces it.'));
   assert.match(app, /render\(\);\n  announce\(\);\n  saidSaved\(\);\n\}/);
   assert.ok(app.includes('" The count changed: "+moved.join(", ")+"."'));
+});
+
+test('checking one unit asks the app, never the network, and never fakes a reading', () => {
+  // The board draws; the app around it is the only thing that sends. Checking is no exception.
+  assert.match(app, /await hooks\.onCheckUnit\(v\.k, checkPid\(v\)\)/);
+  assert.doesNotMatch(app, /product-connections\/verify/);
+
+  // A button that cannot do anything is worse than no button: drawn only where the app supplies the hook.
+  assert.match(app, /typeof hooks\.onCheckUnit==="function"/);
+  // And only where there is an A# to check against, rather than silently checking nothing.
+  assert.match(app, /nothing to check it against/);
+
+  // A failed check reports the failure. It must not fall through to a success message.
+  assert.match(app, /catch\(err\)\{\s*S\.chk=\{unit:v\.id, state:"fail"/);
+
+  // Checking must not run while a hand fix is in flight, and must not run twice at once.
+  assert.match(app, /if\(S\.busy \|\| v\.mhOnly \|\| !hooks \|\| typeof hooks\.onCheckUnit!=="function"\) return;/);
+});
+
+test('the app checks one unit with the same verify the rest of COS uses, then re-reads the board', () => {
+  const landing = read('../src/CosBoardLanding.tsx');
+  assert.match(landing, /onCheckUnit: async/);
+  // The existing endpoint, not a new path of its own.
+  assert.match(landing, /api\.post\('\/api\/product-connections\/verify', \{productIds: \[productId\]\}\)/);
+  // A check is only worth anything if the card then shows what came back.
+  assert.match(landing, /api\.get\('\/api\/unit-camera-status'\)/);
+  // A save in flight and a board that moved on are both refused rather than guessed at.
+  assert.match(landing, /A save is still in progress/);
+  assert.match(landing, /started !== generation\.current/);
 });

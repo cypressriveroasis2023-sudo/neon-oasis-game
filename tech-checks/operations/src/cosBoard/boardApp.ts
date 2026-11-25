@@ -34,7 +34,7 @@ const TZ = "America/Chicago";
 /* ---------- state ---------- */
 const S = { meta:null, units:[], edits:{}, filter:"down", fam:"all", q:"", view:"board", openId:null, form:null,
             db:null, user:null, mcp:null, uid:null, canWrite:null, feedNote:"", editsReady:false, busy:false,
-            mh:null, pdone:{}, psec:"place", pins0:null, checks:{}, tc:null, tcOpen:false };
+            mh:null, pdone:{}, psec:"place", pins0:null, checks:{}, tc:null, tcOpen:false, chk:null };
 /* One count. A device that had picked a way of counting forgets it. */
 try{ localStorage.removeItem("cos-count-mode"); }catch(_){}
 const $ = id => root.getElementById(id);
@@ -487,6 +487,21 @@ function drawPanel(){
   }
   /* The fix comes first on the card, right under what is wrong. */
   body.splice(2,0,fx);
+
+  /* Checking comes before fixing: find out what is true now, then change it.
+     Drawn only where the app can actually run a check, and only where there is an A# to check against. */
+  if(!v.mhOnly && hooks && typeof hooks.onCheckUnit==="function"){
+    const c = S.chk && S.chk.unit===v.id ? S.chk : null, pid = checkPid(v);
+    const cb=h("div",{class:"box"},h("h3",{text:"Check it now"}));
+    if(!pid) cb.append(h("p",{class:"note",text:"This unit has no A# in COS yet, so there is nothing to check it against. Give it an A# in mHelp first."}));
+    else {
+      cb.append(h("div",{class:"fix"},h("button",{class:"fixbtn",type:"button",disabled:S.busy,
+        onclick:()=>checkNow(v)}, c && c.state==="run" ? "Checking…" : "Check this unit now")));
+      if(c && c.state!=="run") cb.append(h("p",{class:"note s-"+(c.state==="fail"?"down":"up"),text:c.said}));
+      cb.append(h("p",{class:"note",text:"This asks the cameras at this unit right now instead of waiting for the next reading. It changes nothing in mHelp, Star4Live or InHand."}));
+    }
+    body.splice(2,0,cb);
+  }
   body.push(histBox(v));
 
   P.className="panel s-"+v.status;
@@ -715,6 +730,26 @@ async function save(v, ch){
   const was=countNow();
   try{ const said = await hooks.onEdit(v.k, steps); S.form=null; S.saved={was, said: said || "Saved.", unit:v.id, ip:steps.some(x=>x.field==="public_ip")}; clearTimeout(savedTimer); savedTimer=setTimeout(saidSaved, 1500); }
   catch(err){ S.form=null; toast("Not saved. "+((err && err.message) || "COS could not confirm the save."), 14000); }
+  S.busy=false; render();
+}
+
+/* ---------- check one unit on demand ----------
+   Refresh asks for the latest saved reading. This asks the cameras themselves, for this unit only, so a tech
+   standing at a unit does not wait for the next sweep. A check that does not run says so: a stale reading is
+   never redrawn as if it were current, and nothing is written to mHelp, Star4Live or InHand. */
+function checkPid(v){
+  const mm = S.mh ? (S.rec && S.rec.match[v.id]) : undefined;
+  return (mm && mm.rec && mm.rec.id) || v.u.pid || "";
+}
+async function checkNow(v){
+  if(S.busy || v.mhOnly || !hooks || typeof hooks.onCheckUnit!=="function") return;
+  S.busy=true; S.chk={unit:v.id, state:"run", said:""}; drawPanel();
+  try{
+    const said = await hooks.onCheckUnit(v.k, checkPid(v));
+    S.chk={unit:v.id, state:"done", said: said || "Checked just now."};
+  }catch(err){
+    S.chk={unit:v.id, state:"fail", said: (err && err.message) || "COS could not run the check."};
+  }
   S.busy=false; render();
 }
 

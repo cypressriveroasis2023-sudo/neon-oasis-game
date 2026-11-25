@@ -160,6 +160,20 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
         setLocked(false);
       },
       onEdit: (unitKey: string, steps: BoardFixStep[]) => fix.current(unitKey, steps),
+      // A tech standing at a unit asks the cameras now rather than waiting for the next sweep. This is the same
+      // check Verify now runs, for one unit, followed by a fresh board read so the card shows what came back.
+      // A check that cannot run throws: the board says so and keeps showing the old reading as old.
+      onCheckUnit: async (_unitKey: string, productId: string) => {
+        if (writing.current) throw new Error('A save is still in progress. Try again once it finishes.');
+        if (!productId) throw new Error('This unit has no A# in COS, so there is nothing to check it against.');
+        const started = generation.current;
+        await api.post('/api/product-connections/verify', {productIds: [productId]});
+        const result = checked((await api.get('/api/unit-camera-status')).data);
+        // The board moved on while the check ran. Saying it was checked would be true; showing this reading would not.
+        if (started !== generation.current) return 'Checked. The board had already moved on, so tap Refresh to see it.';
+        take.current(result);
+        return 'Checked just now.';
+      },
       // Tech checks are their own screen in COS.
       // An IT sign-in keeps its tech checks in the Tech Check app around this frame, so the tab opens them there.
       // James: "i clicked tech check on the IT board and it is showing return to my IT tech checks."
