@@ -53,7 +53,7 @@ test('the host hands the manager view only what it draws, in a fixed shape', asy
     ? {data: {service_techs: [boardRow(), {name: 'No id is dropped'}, boardRow({user_id: '00000000-0000-4000-8000-00000000a009', name: 'Test Service'})], it_techs: [{name: 'Jordan Fixture'}, {name: 'Test IT'}]}, error: null}
     : {data: {transfers}, error: null}});
   const {snapshot} = await answer({kind: 'read'});
-  assert.deepEqual(calls.map(call => call.name), ['owner_tech_command_board_v2', 'techcheck_transfer_context_v1', 'techcheck_handoff_gaps_v1', 'sim_drawer_v1']);
+  assert.deepEqual(calls.map(call => call.name), ['owner_tech_command_board_v2', 'techcheck_transfer_context_v1', 'techcheck_handoff_gaps_v1', 'sim_drawer_v1', 'owner_truck_board_v1']);
   assert.deepEqual(snapshot.gaps, {enforced: true, noHandoff: [], loaded: [], late: [], returns: []});
   assert.match(calls[0].args.p_date, /^\d{4}-\d{2}-\d{2}$/);
   assert.match(snapshot.day, /^\d{4}-\d{2}-\d{2}$/);
@@ -125,7 +125,7 @@ test('a truck save is the truck editor call with an exact, checked shape, and no
   assert.equal(refused.state.refreshed, 0);
   // Every database call in the manager part is one of these three.
   const block = hostSource.slice(hostSource.indexOf('// ---- Manager view'), hostSource.indexOf("window.addEventListener('message', async event => {"));
-  assert.deepEqual([...block.matchAll(/\.rpc\('([a-z0-9_]+)'/g)].map(match => match[1]), ['owner_tech_command_board_v2', 'techcheck_transfer_context_v1', 'techcheck_handoff_gaps_v1', 'sim_drawer_v1', 'sim_drawer_add_v1', 'sim_drawer_mark_v1', 'owner_save_service_truck_inventory_batch_v1']);
+  assert.deepEqual([...block.matchAll(/\.rpc\('([a-z0-9_]+)'/g)].map(match => match[1]), ['owner_tech_command_board_v2', 'techcheck_transfer_context_v1', 'techcheck_handoff_gaps_v1', 'sim_drawer_v1', 'owner_truck_board_v1', 'sim_drawer_add_v1', 'sim_drawer_mark_v1', 'owner_truck_standard_set_v1', 'owner_truck_extra_remove_v1', 'owner_save_service_truck_inventory_batch_v1']);
   assert.doesNotMatch(block, /\.from\('(?!techcheck-transfer-evidence'\))|\.(?:insert|update|delete|upsert|upload|remove)\(|fetch\(|localStorage|innerHTML/);
 });
 
@@ -247,4 +247,28 @@ test('the SIM drawer is read in a fixed shape, and adding or marking a card is t
   assert.deepEqual(plain(calls.at(-1)), {name: 'sim_drawer_mark_v1', args: {p_number: '89012600000000000002', p_status: 'bad', p_note: 'Will not register'}});
   assert.deepEqual(plain(await answer({kind: 'simMark', sim: '89012600000000000002', status: 'on_truck'})), {error: 'invalid'});
   assert.deepEqual(plain(await answer({kind: 'simAdd', numbers: []})), {error: 'invalid'});
+});
+
+test('the truck standard is read in a fixed shape; changing it or taking an extra off is one owner call each', async () => {
+  const id = '00000000-0000-4000-8000-00000000a001', extra = '00000000-0000-4000-8000-00000000e001';
+  const board = {secret: 'x', standard: [{type: 'Ranger', required: 1}, {type: 'Bogus', required: 3}],
+    trucks: [{id, name: 'Riley Fixture', private: 'y', kinds: [{type: 'Ranger', required: 1, have: 2, slot: {tag: '008'}, extras: [{id: extra, tag: '007', came_from: 'tech_move'}, {id: 'not-an-id', tag: '9'}]}],
+      waiting: [{type: 'Sniper', tag: '332', from: 'Riley Fixture', to: 'Jordan Fixture', state: 'waiting', sent_at: '2026-11-25T16:00:00Z', photos: ['x']}]}, {name: 'No id is dropped'}],
+    moves: [{type: 'Ranger', tag: '007', from: 'Jordan Fixture', to: 'Riley Fixture', state: 'accepted', decided_at: '2026-11-25T17:00:00Z', take_note: ''}]};
+  const {answer, calls, plain} = host({rpc: name => name === 'owner_tech_command_board_v2' ? {data: {service_techs: []}, error: null}
+    : name === 'owner_truck_board_v1' ? {data: board, error: null}
+    : ['owner_truck_standard_set_v1', 'owner_truck_extra_remove_v1'].includes(name) ? {data: board, error: null} : {data: null, error: {message: 'held'}}});
+  const {snapshot} = await answer({kind: 'read'});
+  assert.deepEqual(plain(snapshot.standard), {
+    standard: [{type: 'Ranger', required: 1}],
+    trucks: [{id, name: 'Riley Fixture', kinds: [{type: 'Ranger', required: 1, have: 2, slot: '008', extras: [{id: extra, tag: '007'}]}],
+      waiting: [{type: 'Sniper', tag: '332', from: 'Riley Fixture', to: 'Jordan Fixture', state: 'waiting', at: '2026-11-25T16:00:00.000Z', note: ''}]}],
+    moves: [{type: 'Ranger', tag: '007', from: 'Jordan Fixture', to: 'Riley Fixture', state: 'accepted', at: '2026-11-25T17:00:00.000Z', note: ''}],
+  });
+  assert.deepEqual(plain(await answer({kind: 'truckStandard', unitType: 'Ranger', required: 2})), {});
+  assert.deepEqual(plain(calls.at(-1)), {name: 'owner_truck_standard_set_v1', args: {p_type: 'Ranger', p_required: 2}});
+  assert.deepEqual(plain(await answer({kind: 'truckExtraRemove', extraId: extra, reason: 'Counted twice by mistake'})), {});
+  assert.deepEqual(plain(calls.at(-1)), {name: 'owner_truck_extra_remove_v1', args: {p_extra: extra, p_reason: 'Counted twice by mistake'}});
+  for (const bad of [{kind: 'truckStandard', unitType: 'Bogus', required: 1}, {kind: 'truckStandard', unitType: 'Ranger', required: 11}, {kind: 'truckStandard', unitType: 'Ranger', required: 1.5},
+    {kind: 'truckExtraRemove', extraId: 'nope', reason: 'x'}]) assert.deepEqual(plain(await answer(bad)), {error: 'invalid'});
 });

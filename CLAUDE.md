@@ -59,6 +59,14 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-25** — Tech Check: truck standard + extras + tech-to-tech moves
+  (`techcheck-truck-extras-v1.sql`). New `app_private.truck_extra_units` /
+  `truck_moves` / `truck_standard`, bucket `techcheck-truck-moves`, trigger
+  `techcheck_extra_place_guard_v1` on `service_truck_units`. Edits (anchored):
+  `techcheck_handoff_covering_v1`, `techcheck_transfer_custody_hold_v1`,
+  `techcheck_ticketfree_context_v1`, `submit_techcheck_ticketfree_return_v1` (also
+  releases an accepted handoff's hold). A truck "has" = slot + extras. Record in
+  `tech-checks/docs/db-changes/20261125_techcheck_truck_extras.md`.
 - **2026-11-25** — Deployed `cos-unit-camera-status/vcc-moves-v20` (#537): live now
   **v21 `ac4a0ff3`** (pins updated). The camera-status read carries `vccMoves` for the
   Owner and approved IT, and `POST /api/unit-camera-status/vcc-move` applies one item
