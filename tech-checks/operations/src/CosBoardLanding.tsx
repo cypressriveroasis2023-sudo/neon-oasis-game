@@ -17,7 +17,7 @@ import {readRouterDetails} from './routerDetails';
 import {boardEditState, handFixRequest, type BoardEditFlags, type BoardEditState, type BoardFixStep} from './cosBoard/boardEdit';
 import {mountCosBoard} from './cosBoard/boardApp';
 import {loadBoardFonts} from './cosBoard/boardFonts';
-import {addSims, managerHost, managerKnown, managerPhoto, markSim, readManager, rememberManager, saveTruck, takeBoardView, type TruckKit} from './managerBridge';
+import {addSims, managerHost, managerKnown, managerPhoto, markSim, readManager, rememberManager, removeTruckExtra, saveTruck, setTruckStandard, takeBoardView, type TruckKit, type TruckType} from './managerBridge';
 
 /**
  * Tells the page around the frame that the board is, or is no longer, the TV display, so it gives the frame the
@@ -285,6 +285,8 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
         photo: (path: string) => managerPhoto(path),
         simAdd: (numbers: string[], carrier: string, note: string) => addSims(numbers, carrier, note),
         simMark: (sim: string, status: 'in_drawer' | 'bad' | 'deactivated' | 'removed', note: string) => markSim(sim, status, note),
+        truckStandard: (type: TruckType, required: number) => setTruckStandard(type, required),
+        truckExtraRemove: (extraId: string, reason: string) => removeTruckExtra(extraId, reason),
         open: (route: string) => openLegacy(route),
         known: (shown: boolean) => rememberManager(shown),
         wasKnown: () => managerKnown(),
