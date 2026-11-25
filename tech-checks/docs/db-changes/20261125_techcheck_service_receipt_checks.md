@@ -4,6 +4,12 @@ Project: Tech Check `goqrnolcvqnirjmzaeyk`
 SQL: `tech-checks/database-maintenance/techcheck-service-receipt-checks-v1.sql`
 Screen: `tech-checks/transfers/desk.js` (Pass / Problem for every check on the receipt)
 
+**Applied 2026-11-25 ~14:55 UTC** after PR #506 was published (Pages check confirmed
+the live `desk.js` matched). New `pg_get_functiondef` md5 `48e6000eaea32a059fb1b446d51121e6`;
+grants unchanged. Live check through `public.submit_techcheck_transfer_v2` as Josh
+(rolled back): blank checks refused, Problem without a note refused, all Pass
+reached the photo rule.
+
 Order: publish the screen first, then apply the SQL, so Service is never asked
 for checks the screen cannot give.
 
