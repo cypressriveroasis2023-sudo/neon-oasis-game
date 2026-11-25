@@ -4,10 +4,11 @@
 // operations-pages v169/5a2b1c67 became v170.
 // Pin refresh 2026-11-25: camera v17/6d64057b became v18 (troubleshoot-route-v17).
 // Pin refresh 2026-11-25: camera v18/3c521a58 became v19 (camera-ports-v18).
+// Pin refresh 2026-11-25: camera v19/c434eaf6 became v20 (a-links-v19).
 export const LIVE_FUNCTION_PINS = Object.freeze({
   'cos-unit-camera-status': Object.freeze({
-    version: 19,
-    ezbr_sha256: 'c434eaf6f135cff295ec0f97cfbf46c669801af5f2d6c14a7ed49a3c7d226a68',
+    version: 20,
+    ezbr_sha256: 'a9cc477fb694a0e4711f86dc79930cc2dd354277812ad1af6d41315da0760ba5',
   }),
   'cos-operations-pages': Object.freeze({
     version: 170,

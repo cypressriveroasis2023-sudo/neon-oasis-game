@@ -596,11 +596,16 @@ function openBox(v){
     for(const [label,proto,port] of ports) own.push(lk(label, proto+"://"+v.ip+((port===80||port===443) ? "" : ":"+port)));
   }
   if(u.ri && IPV4.test(u.ri) && /^\d+$/.test(u.rp)) own.push(lk("Router page", "http://"+u.ri+":"+u.rp));
+  /* SIM and cell signal (James, 25 Nov): carrier coverage at the site, carrier outages, and Simetry to work on the SIM.
+     Simetry opens its own sign-in page; the long sign-in link James pasted expires, so it is not kept. */
+  const sim=[lk("Coverage map","https://map.coveragemap.com/"), lk("Downdetector","https://downdetector.com/"), lk("Simetry","https://simetry.onelogin.com/login2/")];
   const copy = v.ip ? h("button",{class:"lk",type:"button",onclick:()=>{ try{ navigator.clipboard.writeText(v.ip).then(()=>toast("IP copied."),()=>toast("Couldn't copy the IP in this view.")); }catch(_){ toast("Couldn't copy the IP in this view."); } }},"Copy IP") : null;
   const show = v.ip && IPV4.test(v.ip) ? h("button",{class:"lk",type:"button",onclick:()=>{ S.ipShown=!S.ipShown; drawPanel(); }}, S.ipShown ? "Hide IP" : "Show IP") : null;
   return h("div",{class:"box"},h("h3",{text:"Open"}),
     S.ipShown && v.ip ? h("p",{style:"margin:0 0 8px;font-size:18px;font-weight:700;letter-spacing:.02em",text:v.ip}) : null,
     h("div",{class:"links"},sys,show,copy),
+    h("p",{class:"note",style:"margin-top:10px",text:"SIM and cell signal: check the carrier's coverage at the site, look for a carrier outage, and work on the SIM in Simetry."}),
+    h("div",{class:"links simtools"},sim),
     own.length ? h("p",{class:"note",style:"margin-top:10px",text:"This unit's own pages. They only open if the unit is online and your network can reach it."}) : null,
     own.length ? h("div",{class:"links"},own) : null); }
 function logBox(){ return null; }
