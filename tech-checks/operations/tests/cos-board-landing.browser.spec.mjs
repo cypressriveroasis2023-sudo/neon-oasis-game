@@ -786,6 +786,49 @@ test('the other COS screens open from the board, by the names IT sees', async ({
   await expect.poll(() => host.evaluate(element => element.ownerDocument.defaultView.location.hash)).toBe('#camera-health');
 });
 
+test('Moved in VCC lists camera records VCC disagrees with, and one tap fixes one', async ({page}, info) => {
+  test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');
+  // James, 25 Nov: a camera moved from 253 to 265 in VCC stayed under 253 in COS. VCC is right about its own cameras.
+  const record = (id, unitNumber, category, placement, customer) => ({recordId: 'mhelp_product:' + id, productId: String(id), unitNumber, category, placement, uploadLifecycle: 'UNFLAGGED', customer});
+  const value = structuredClone(field);
+  value.uploadInventory = {
+    contract: 'COS_MHELP_UPLOAD_INVENTORY_V1', source: 'mhelpdesk_api', countBasis: 'mhelp_product_records_not_unique_physical_units', sourceSha256: 'c'.repeat(64), receivedAt: fresh, lastApiReadAt: fresh,
+    records: [record(1, 'Helios 001', 'Helios Solar Tower', 'FIELD', 'Fixture Homes'), record(2, 'Spotter 002', 'Spotter', 'FIELD', 'Fixture Homes: Lot 2')],
+    summary: {totalRecords: 2, fieldRecords: 2, shopRecords: 0, unflaggedFieldRecords: 2, doNotUseRecords: 0, missingRecords: 0},
+  };
+  const moved = {key: 'moved:sn-moved-1', kind: 'moved', cameraId: 7, serial: 'SN-MOVED-1', vccName: 'Spotter 002 CAM 4', cosName: 'Helios 001 Cam 2', fromUnit: 'HELIOS 001', toUnit: 'SPOTTER 002', canApply: true, why: 'VCC names this camera for SPOTTER 002. COS has it under HELIOS 001.'};
+  const shop = {key: 'new:sn-shop', kind: 'new', serial: 'SN-SHOP', vccName: 'Shop', toUnit: null, canApply: false, why: 'Its VCC name gives no unit.'};
+  const vccMoves = {fresh: true, syncedAt: fresh, items: [moved, shop]};
+  const {app, state} = await mountFleet(page, false, {cameraStatus: reportOf(units, {vccMoves}), field: value, skipInitialFieldCount: true});
+  const host = app.locator('.cos-board-host');
+  await expect(host).toBeVisible();
+  const sent = [];
+  await page.route('**/functions/v1/cos-unit-camera-status', async route => {
+    const request = route.request();
+    if (request.method() === 'OPTIONS') return route.fallback();
+    const envelope = JSON.parse(request.postData() || '{}');
+    if (envelope.path !== '/api/unit-camera-status/vcc-move') return route.fallback();
+    sent.push(envelope.body);
+    return route.fulfill({status: 200, headers: {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+      json: {...reportOf(units, {vccMoves: {fresh: true, syncedAt: fresh, items: [shop]}}), vccMoved: {key: moved.key, kind: 'moved', unit: 'SPOTTER 002', name: 'Spotter 002 CAM 4', state: 'active', by: 'Fixture Owner'}}});
+  });
+  await inBoard(host, root => root.getElementById('tabPunch').click());
+  const chips = () => inBoard(host, root => [...root.querySelectorAll('#punchChips .chip')].map(chip => chip.textContent));
+  await expect.poll(chips).toContain('Moved in VCC \u00b7 2');
+  await inBoard(host, root => [...root.querySelectorAll('#punchChips .chip')].find(chip => chip.textContent.startsWith('Moved in VCC')).click());
+  const shown = await inBoard(host, root => root.getElementById('viewPunch').textContent);
+  expect(shown).toContain('VCC names this camera for SPOTTER 002');
+  expect(shown).toContain('Its VCC name gives no unit');
+  // Only the item with one safe answer gets a button.
+  expect(await inBoard(host, root => [...root.querySelectorAll('#punchList .pdone')].map(b => b.textContent))).toEqual(['Move it']);
+  await inBoard(host, root => root.querySelector('#punchList .pdone').click());
+  await expect.poll(() => sent.length).toBe(1);
+  expect(sent[0]).toEqual({key: 'moved:sn-moved-1'});
+  await expect.poll(() => toastText(host)).toContain('Spotter 002 CAM 4 is now on SPOTTER 002');
+  await expect.poll(chips).toContain('Moved in VCC \u00b7 1');
+  expect(state.errors).toEqual([]);
+});
+
 test('a field unit COS cannot check at all is a job on the punch list', async ({page}, info) => {
   test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');
   const record = (id, unitNumber, category, placement, customer) => ({recordId: 'mhelp_product:' + id, productId: String(id), unitNumber, category, placement, uploadLifecycle: 'UNFLAGGED', customer});

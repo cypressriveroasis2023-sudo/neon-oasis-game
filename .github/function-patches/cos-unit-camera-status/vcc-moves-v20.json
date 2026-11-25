@@ -1,0 +1,83 @@
+{
+  "slug": "cos-unit-camera-status",
+  "projectRef": "tughscoxralhofrckvxy",
+  "sourceCommit": "95e3e5a4f81f0f823e7e646a01a8235da7c5f425",
+  "deployedFileNames": {
+    "index.ts": "cos-unit-camera-status/index.ts",
+    "deno.json": "cos-unit-camera-status/deno.json"
+  },
+  "entrypointPath": "cos-unit-camera-status/index.ts",
+  "importMapPath": "cos-unit-camera-status/deno.json",
+  "verifyJwt": false,
+  "sourceDir": "tech-checks/docs/cos-unit-camera-status-v20-entry",
+  "description": "Moved in VCC. The camera-status read also reads, for the Owner and approved IT, the camera records that no longer match VCC (Tech Check public.cos_vcc_moves_state_v1: moved, new, gone), and POST /api/unit-camera-status/vcc-move applies one listed item through public.cos_vcc_move_apply_v1, which works the list out again and applies it only if still listed and safe. Nine exact edits to live v20; nothing else changes.",
+  "authorization": "James, 2026-11-25: 'Build move in VCC'. Running the deploy still needs his explicit go for that run.",
+  "releaseStatus": "PREPARED",
+  "sourceRecord": "tech-checks/docs/cos-unit-camera-status-v20-entry/index.ts",
+  "requireLiveBeforeDeploy": {
+    "status": "ACTIVE",
+    "version": 20,
+    "ezbr_sha256": "a9cc477fb694a0e4711f86dc79930cc2dd354277812ad1af6d41315da0760ba5"
+  },
+  "edits": [
+    {
+      "file": "index.ts",
+      "needle": "          const [cameras, integrations, handEdits, otherDevices, otherHealth, aLinks] = await Promise.all([\n",
+      "replacement": "          const [cameras, integrations, handEdits, otherDevices, otherHealth, aLinks, vccMoves] = await Promise.all([\n",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "v?.contract === \"COS_MHELP_HAND_LINKS_V1\" && Array.isArray(v.links) ? v.links : null).catch(() => null)\n          ]);\n",
+      "replacement": "v?.contract === \"COS_MHELP_HAND_LINKS_V1\" && Array.isArray(v.links) ? v.links : null).catch(() => null),\n            // Camera records that no longer match VCC (moved, new, gone), for the Owner and approved IT. Others get null.\n            readJson(LEGACY_URL + \"/rest/v1/rpc/cos_vcc_moves_state_v1\", { method: \"POST\", headers: { ...context.headers, \"Content-Type\": \"application/json\" }, body: \"{}\" }, \"VCC differences could not be read.\").then((v) => v?.contract === \"COS_VCC_MOVES_V1\" ? v : null).catch(() => null)\n          ]);\n",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "            aLinksRead: Array.isArray(aLinks),\n",
+      "replacement": "            aLinksRead: Array.isArray(aLinks),\n            vccMoves: vccMoves ? { fresh: vccMoves.fresh === true, syncedAt: typeof vccMoves.syncedAt === \"string\" ? vccMoves.syncedAt : null, items: Array.isArray(vccMoves.items) ? vccMoves.items.slice(0, 200) : [] } : null,\n",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "      if (path === \"/api/unit-camera-status\" || path === \"/api/unit-camera-status/edit\" || path === \"/api/unit-camera-status/link-a\") {\n",
+      "replacement": "      if (path === \"/api/unit-camera-status\" || path === \"/api/unit-camera-status/edit\" || path === \"/api/unit-camera-status/link-a\" || path === \"/api/unit-camera-status/vcc-move\") {\n",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "        const editing = path.endsWith(\"/edit\") || path.endsWith(\"/link-a\");\n",
+      "replacement": "        const editing = path.endsWith(\"/edit\") || path.endsWith(\"/link-a\") || path.endsWith(\"/vcc-move\");\n",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "        if (path === \"/api/unit-camera-status/link-a\") {\n",
+      "replacement": "        if (path === \"/api/unit-camera-status/vcc-move\") {\n          // A camera record matched to VCC by hand from the punch list (James, 25 Nov: \"build move in VCC\"). Tech Check\n          // works the list out again, applies the one item only if it is still listed and safe, and logs who and when.\n          const vb = body && typeof body === \"object\" && !Array.isArray(body) ? body : {};\n          const vKey = typeof vb.key === \"string\" ? vb.key.trim().toLowerCase() : \"\";\n          if (!/^(moved|new|gone):[a-z0-9._-]{4,80}$/.test(vKey)) return json({ error: \"That is not a VCC change COS listed. Nothing was changed.\" }, 422);\n          const vRole = context.legacyOwner && context.actorId ? \"owner\" : \"it\";\n          const vName = (context.name || \"\").trim() || (vRole === \"owner\" ? \"Owner\" : \"IT technician\");\n          let vReply, vData = {};\n          try { vReply = await requestFetch(LEGACY_URL + \"/rest/v1/rpc/cos_vcc_move_apply_v1\", { method: \"POST\", headers: { ...context.headers, \"Content-Type\": \"application/json\" }, body: JSON.stringify({ p_key: vKey, p_actor_name: vName }) }); } catch { fail16(\"The change could not be made. Nothing was changed.\", 503); }\n          try { vData = await vReply.json(); } catch { vData = {}; }\n          if (!vReply.ok) return json({ error: vData?.code === \"PT409\" && typeof vData.message === \"string\" ? vData.message.slice(0, 300) : vData?.code === \"42501\" ? \"Only the Owner or approved IT can change camera records.\" : \"The change could not be made. Nothing was changed.\" }, vReply.status === 403 || vData?.code === \"42501\" ? 403 : 422);\n          if (vData?.contract !== \"COS_VCC_MOVE_RESULT_V1\") fail16(\"The change could not be confirmed. Tap Refresh.\", 503);\n          const vAfter = await readStatus();\n          return json({ ...vAfter, vccMoved: { key: vData.key, kind: vData.kind, unit: vData.unit, name: vData.name, state: vData.state, by: vName } });\n        }\n        if (path === \"/api/unit-camera-status/link-a\") {\n",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "var UNIT_CAMERA_STATUS_PATHS = [\"/api/unit-camera-status\", \"/api/unit-camera-status/edit\", \"/api/unit-camera-status/troubleshoot\", \"/api/unit-camera-status/link-a\"];",
+      "replacement": "var UNIT_CAMERA_STATUS_PATHS = [\"/api/unit-camera-status\", \"/api/unit-camera-status/edit\", \"/api/unit-camera-status/troubleshoot\", \"/api/unit-camera-status/link-a\", \"/api/unit-camera-status/vcc-move\"];",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "const CAMERA_STATUS_ROUTES=[\"/api/unit-camera-status\",\"/api/unit-camera-status/edit\",\"/api/unit-camera-status/troubleshoot\",\"/api/unit-camera-status/link-a\"];",
+      "replacement": "const CAMERA_STATUS_ROUTES=[\"/api/unit-camera-status\",\"/api/unit-camera-status/edit\",\"/api/unit-camera-status/troubleshoot\",\"/api/unit-camera-status/link-a\",\"/api/unit-camera-status/vcc-move\"];",
+      "occurrences": 1
+    }
+  ],
+  "expectedBefore": {
+    "index.ts": "60a851de56dd962de727dfba577c7d84c4ddf4ce0e2a7b6b639a72b7b9ad63e2",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "expectedAfter": {
+    "index.ts": "2dc0cf1dcbfc34aa2df2a8585d2ce2643b3e54c3f5614e257e03df1028809a57",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "dryRun": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/vcc-moves-v20.json --dry-run",
+  "deploy": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/vcc-moves-v20.json --deploy",
+  "rollback": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/rollback-to-v20-entry.json --deploy"
+}

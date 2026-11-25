@@ -6,7 +6,7 @@
     {
       "path": "api.ts",
       "baselineBlob": "b00323c7dc29b5e8cfb05851dcf65bf53c9108a7",
-      "candidateBlob": "9c60c825f973e1c7f8abd355b77bcde2f8f089d6",
+      "candidateBlob": "c3392665b31ff9f0d8b92be7eb2a3f09a56ff586",
       "replacements": [
         {
           "from": "const fleetSnapshots=new Map<string,{value:FleetSnapshot;at:number}>();\ntype FleetReads={health:Promise<FleetSnapshot['health']>;fieldMap:Promise<FleetSnapshot['fieldMap']>;connectionMap:Promise<FleetSnapshot['fieldMap']>;paired:Promise<FleetSnapshot>};\nconst pendingFleetSnapshots=new Map<string,FleetReads>();\n",
@@ -45,7 +45,7 @@
         },
         {
           "from": "",
-          "to": "// Unit camera status is served by its own function, so the board's own\n// function - a frozen, hash-pinned artifact - is left exactly as it is.\n// Authentication, origins and CORS are the same handler behind both. These two\n// paths are kept in step with the function's own list by a test, rather than\n// imported, so every existing harness that compiles this file keeps working.\nconst unitCameraStatusEndpoint = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-unit-camera-status';\nconst unitCameraStatusPaths = ['/api/unit-camera-status', '/api/unit-camera-status/edit', '/api/unit-camera-status/troubleshoot', '/api/unit-camera-status/link-a'];\nconst endpointFor = (path: string) => unitCameraStatusPaths.includes(path) ? unitCameraStatusEndpoint : endpoint;\n",
+          "to": "// Unit camera status is served by its own function, so the board's own\n// function - a frozen, hash-pinned artifact - is left exactly as it is.\n// Authentication, origins and CORS are the same handler behind both. These two\n// paths are kept in step with the function's own list by a test, rather than\n// imported, so every existing harness that compiles this file keeps working.\nconst unitCameraStatusEndpoint = 'https://tughscoxralhofrckvxy.supabase.co/functions/v1/cos-unit-camera-status';\nconst unitCameraStatusPaths = ['/api/unit-camera-status', '/api/unit-camera-status/edit', '/api/unit-camera-status/troubleshoot', '/api/unit-camera-status/link-a', '/api/unit-camera-status/vcc-move'];\nconst endpointFor = (path: string) => unitCameraStatusPaths.includes(path) ? unitCameraStatusEndpoint : endpoint;\n",
           "count": 1
         },
         {

@@ -59,6 +59,12 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-25** — Tech Check: Moved in VCC. `public.cos_vcc_moves_state_v1` /
+  `cos_vcc_move_apply_v1` (Owner or approved IT) list and apply camera records that
+  no longer match VCC (moved / new / gone); applies write `camera_devices` one row at
+  a time and log to `app_private.cos_vcc_move_log`. No audit row. Operations patch
+  `cos-unit-camera-status/vcc-moves-v20` is **prepared, not deployed** (starts
+  from live v20). Record in `tech-checks/docs/db-changes/20261125_vcc_moves.md`.
 - **2026-11-25** — Tech Check returns: `app_private.techcheck_ticketfree_photos_v1`
   now needs at least one photo (Service send and IT check-in), and
   `techcheck_handoff_gaps_v1` adds `returns_not_checked_in` (Manager tab). Old

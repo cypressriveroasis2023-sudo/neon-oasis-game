@@ -263,6 +263,7 @@ const PSEC = [["place","Placed differently","mHelp is official, so the board sho
   ["name","Names differ","Same number, different name in each system. Worth making the names match."],
   ["mhShop","Shop, no camera feed","In mHelp's shop list with no camera record. Normal for units on the shelf."],
   ["bdShop","Shop feed, not in mHelp","Camera records under shop with nothing in mHelp: test devices, retired units, old tracker rows. Not counted."],
+  ["vcc","Moved in VCC","Camera records in COS that no longer match VCC: a camera VCC names for another unit, a camera VCC has that COS has never recorded, or one VCC stopped listing. VCC is right about its own cameras. Fix one with its button, or fix the name in VCC when there is no button."],
   ["done","Fixed by hand","Set by hand in COS, so these are off the list and stay off. mHelp still shows them differently: make the same change there when you can."]];
 /* The answers James added for the punch list: where each unit really is, what record to fix, and who fixes it. */
 function normName(n){ return String(n||"").toUpperCase().replace(/SOLAR\s*SPOTTER/,"SS").replace(/RECON\s*(II|2)/,"RII").replace(/CAM[\s-]*V/,"CAMV").replace(/[^A-Z0-9.]/g,""); }
@@ -293,7 +294,9 @@ function drawPunch(vs){
       h("span",{class:"lb",text:"Camera units"}),h("b",{text:cam}),h("b",{text:real.length})),
     h("p",{class:"note",text:"mHelp is the official count: "+mh.meta.total+" pieces of equipment, "+mh.meta.field+" in the field and "+mh.meta.shop+" in the shop. "+mh.meta.stands+" of those are stands, poles and skids ("+mh.meta.standsField+" in the field). They count, but they have no cameras, so they are not listed on this board."}),
     h("p",{class:"note",text:"mHelp read "+when(mh.meta.at)+". Camera systems read "+when(S.meta.v)+"."}));
-  $("punchChips").replaceChildren(...PSEC.map(([k,l])=>h("button",{class:"chip",type:"button","aria-pressed":String(S.psec===k),onclick:()=>{S.psec=k;drawPunch();}},l+" · "+(cnt[k]||0))));
+  cnt.vcc = S.vcc ? S.vcc.items.length : 0;
+  $("punchChips").replaceChildren(...PSEC.filter(([k])=>k!=="vcc" || S.vcc).map(([k,l])=>h("button",{class:"chip",type:"button","aria-pressed":String(S.psec===k),onclick:()=>{S.psec=k;drawPunch();}},l+" · "+(cnt[k]||0))));
+  if(S.psec==="vcc"){ drawVcc(); return; }
   const sec=PSEC.find(p=>p[0]===S.psec), rows = S.psec==="done" ? items.filter(settled) : open.filter(i=>i.sec===S.psec);
   $("punchCount").textContent=sec[2];
   const can = S.db && S.canWrite!==false;
@@ -307,6 +310,33 @@ function drawPunch(vs){
     return h("div",{class:"prow"+(uv?" s-"+uv.status:"")},main,btn);
   }) : [h("div",{class:"empty",text:"Nothing here."})]));
 }
+/* Moved in VCC (James, 25 Nov). VCC is right about its own cameras; COS's records follow it one tap at a time.
+   Tech Check works the list out again before any change and refuses one that is no longer listed or not safe. */
+const VCC_KIND = { moved:"Moved in VCC", new:"New in VCC", gone:"Gone from VCC" };
+const VCC_BTN = { moved:"Move it", new:"Add it", gone:"Turn it off in COS" };
+function drawVcc(){
+  const vc=S.vcc, sec=PSEC.find(p=>p[0]==="vcc");
+  $("punchCount").textContent = sec[2] + (vc && !vc.fresh ? " The last VCC read is too old to act on, so nothing can be changed until the next one." : "");
+  const items = vc ? vc.items : [];
+  const go = !!(hooks && typeof hooks.onVccMove==="function") && S.can===true && vc && vc.fresh;
+  $("punchList").replaceChildren(...(items.length ? items.map(it=>{
+    const unit = it.toUnit || it.fromUnit || "", uv = Object.values(S.vmap||{}).find(v=>v.k===unit);
+    const lines = [["What: ", VCC_KIND[it.kind]||it.kind], it.vccName ? ["VCC calls it: ", it.vccName] : null, it.cosName ? ["COS calls it: ", it.cosName+(it.fromUnit ? " on "+it.fromUnit : "")] : null,
+      it.toUnit ? ["Goes to: ", it.toUnit] : null, ["Why: ", it.why||""]].filter(Boolean);
+    const main=h("button",{class:"pmain",type:"button",disabled:!uv,onclick:()=>{ if(uv) openUnit(uv.id); }},
+      h("span",{class:"name",text: it.vccName || it.cosName || it.serial}), lines.map(([a,b])=>h("span",{class:"sub"},h("b",{text:a}),b)));
+    const btn = go && it.canApply ? h("button",{class:"pdone",type:"button",disabled:S.busy,onclick:()=>vccMove(it)}, VCC_BTN[it.kind]||"Apply") : null;
+    return h("div",{class:"prow"+(uv?" s-"+uv.status:"")},main,btn);
+  }) : [h("div",{class:"empty",text: vc ? "COS and VCC agree on every camera." : "Nothing here."})]));
+}
+async function vccMove(it){
+  if(S.busy || S.can!==true || !hooks || typeof hooks.onVccMove!=="function") return;
+  S.busy=true; drawPunch();
+  try{ const said = await hooks.onVccMove(it.key); toast(said || "Done.", 9000); }
+  catch(err){ toast("Not changed. "+((err && err.message) || "COS could not confirm the change."), 14000); }
+  S.busy=false; render();
+}
+function setVcc(v){ S.vcc = v && Array.isArray(v.items) ? {fresh: v.fresh===true, syncedAt: v.syncedAt||null, items: v.items.filter(x=>x && typeof x.key==="string")} : null; if(S.meta) render(); }
 async function markPunch(it, on){
   if(!S.db || S.busy) return; S.busy=true;
   try{ if(on){ const d={by:S.uid,at:Date.now(),name:it.name,sec:it.sec}; await S.db.doc("punch/"+it.id).set(d); S.pdone[it.id]=d; } else { await S.db.doc("punch/"+it.id).delete(); delete S.pdone[it.id]; } }
@@ -1564,5 +1594,5 @@ function openByName(name){
 /* Whether this person may make a hand fix right now, and the reason when not. */
 function setEdit(state){ S.can = !!(state && state.can===true); S.canWhy = (state && state.why) || ""; if(S.meta) render(); }
 function destroy(){ for(const fn of cleanups.splice(0)){ try{ fn(); }catch(_){} } clearTimeout(toastTimer); clearTimeout(announceTimer); clearTimeout(savedTimer); cancelAnimationFrame(M.raf); root.replaceChildren(); }
-return { update, setEdit, destroy, root, setTurn: tvTurn, openByName };
+return { update, setEdit, setVcc, destroy, root, setTurn: tvTurn, openByName };
 }

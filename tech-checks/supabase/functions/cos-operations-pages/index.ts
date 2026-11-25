@@ -970,11 +970,11 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
       }
       // Camera status read and its hand edit. Kept above the GET-only section so
       // the POST edit is reachable; each path checks its own method.
-      if (path === '/api/unit-camera-status' || path === '/api/unit-camera-status/edit' || path === '/api/unit-camera-status/link-a') {
-        const editing = path.endsWith('/edit') || path.endsWith('/link-a');
+      if (path === '/api/unit-camera-status' || path === '/api/unit-camera-status/edit' || path === '/api/unit-camera-status/link-a' || path === '/api/unit-camera-status/vcc-move') {
+        const editing = path.endsWith('/edit') || path.endsWith('/link-a') || path.endsWith('/vcc-move');
         if (method !== (editing ? 'POST' : 'GET')) fail(editing ? 'Use POST to record a hand edit.' : 'Use GET for unit camera status.', 405);
         const readStatus = async () => {
-          const [cameras, integrations, handEdits, otherDevices, otherHealth, aLinks] = await Promise.all([
+          const [cameras, integrations, handEdits, otherDevices, otherHealth, aLinks, vccMoves] = await Promise.all([
             legacyAll('camera_devices?select=id,device_name,unit_key,organization,vigilant_status,activation_state,source_last_seen_at,public_ip,star_organization_id:source_metadata->>organizationId,local_ip:source_metadata->>localIp&source=eq.vigilant_control_center&order=id.asc', context.headers),
             // A missing or unreadable sync row leaves the feed unproven, which
             // reads as Unknown rather than stopping the page.
@@ -990,6 +990,9 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
             // A# links (mHelp product ids) by unit, so the card knows each unit's A#. Unreadable links hide nothing else.
             readJson(LEGACY_URL + '/rest/v1/rpc/cos_mhelp_hand_link_state_v1', {method: 'POST', headers: {...context.headers, 'Content-Type': 'application/json'}, body: '{}'}, 'A# links could not be read.')
               .then(v => v?.contract === 'COS_MHELP_HAND_LINKS_V1' && Array.isArray(v.links) ? v.links : null).catch(() => null),
+            // Camera records that no longer match VCC (moved, new, gone), for the Owner and approved IT. Others get null.
+            readJson(LEGACY_URL + '/rest/v1/rpc/cos_vcc_moves_state_v1', {method: 'POST', headers: {...context.headers, 'Content-Type': 'application/json'}, body: '{}'}, 'VCC differences could not be read.')
+              .then(v => v?.contract === 'COS_VCC_MOVES_V1' ? v : null).catch(() => null),
           ]);
           const feeds = Array.isArray(integrations) ? integrations : [];
           const feed = feeds.find(row => row?.provider === 'vigilant') || null;
@@ -1003,6 +1006,7 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
           return {
             ...applyHandEdits({...star, units: units.map(u => u.productId ? u : (l => l ? {...u, productId: String(l.productId)} : u)((aLinks || []).find(l => typeof l?.unitKey === 'string' && l.unitKey.toUpperCase() === String(u.unit).toUpperCase() && /^[1-9][0-9]{0,14}$/.test(String(l.productId))))), counts: countUnits(units)}, handEdits),
             aLinksRead: Array.isArray(aLinks),
+            vccMoves: vccMoves ? {fresh: vccMoves.fresh === true, syncedAt: typeof vccMoves.syncedAt === 'string' ? vccMoves.syncedAt : null, items: Array.isArray(vccMoves.items) ? vccMoves.items.slice(0, 200) : []} : null,
             handEditsRead: Array.isArray(handEdits),
             otherSourcesRead: otherRead,
             canEdit: true,
@@ -1012,6 +1016,22 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
         if (!editing) return json(await readStatus());
         const current = await readStatus();
         if (!current.handEditsRead) fail('Saved hand edits are unavailable, so a new one cannot be recorded safely.', 503);
+        if (path === '/api/unit-camera-status/vcc-move') {
+          // A camera record matched to VCC by hand from the punch list (James, 25 Nov: "build move in VCC"). Tech Check
+          // works the list out again, applies the one item only if it is still listed and safe, and logs who and when.
+          const vb = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
+          const vKey = typeof vb.key === 'string' ? vb.key.trim().toLowerCase() : '';
+          if (!/^(moved|new|gone):[a-z0-9._-]{4,80}$/.test(vKey)) return json({error: 'That is not a VCC change COS listed. Nothing was changed.'}, 422);
+          const vRole = context.legacyOwner && context.actorId ? 'owner' : 'it';
+          const vName = (context.name || '').trim() || (vRole === 'owner' ? 'Owner' : 'IT technician');
+          let vReply, vData = {};
+          try { vReply = await requestFetch(LEGACY_URL + '/rest/v1/rpc/cos_vcc_move_apply_v1', {method: 'POST', headers: {...context.headers, 'Content-Type': 'application/json'}, body: JSON.stringify({p_key: vKey, p_actor_name: vName})}); } catch { fail('The change could not be made. Nothing was changed.', 503); }
+          try { vData = await vReply.json(); } catch { vData = {}; }
+          if (!vReply.ok) return json({error: vData?.code === 'PT409' && typeof vData.message === 'string' ? vData.message.slice(0, 300) : vData?.code === '42501' ? 'Only the Owner or approved IT can change camera records.' : 'The change could not be made. Nothing was changed.'}, vReply.status === 403 || vData?.code === '42501' ? 403 : 422);
+          if (vData?.contract !== 'COS_VCC_MOVE_RESULT_V1') fail('The change could not be confirmed. Tap Refresh.', 503);
+          const vAfter = await readStatus();
+          return json({...vAfter, vccMoved: {key: vData.key, kind: vData.kind, unit: vData.unit, name: vData.name, state: vData.state, by: vName}});
+        }
         if (path === '/api/unit-camera-status/link-a') {
           // An A# linked by hand on the unit card (James, 25 Nov). Tech Check checks the person is the Owner or
           // approved IT, that the A# is on the mHelp list and free, and records who and when.
