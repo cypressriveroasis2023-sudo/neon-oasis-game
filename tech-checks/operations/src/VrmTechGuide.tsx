@@ -27,6 +27,8 @@ export default function VrmTechGuide() {
         <li><i className='g-low'/>Red — battery under 20%, or a Victron alarm.</li>
         <li><i className='g-stale'/>Grey — no reading in the last 45 minutes. "Last seen" shows when it last reported.</li>
         <li><i className='g-off'/>Faded, dashed — not in the latest Victron sync.</li>
+        <li><i className='g-shop'/>"Not powered", under "In the shop" — mHelp says the unit is in the shop and it is switched off. That is normal. It is not counted as down and never raises an alert. When it goes to a site and mHelp says Field, it joins the alerts by itself.</li>
+        <li><i className='g-shop'/>"⚡ Powered up" on a Shop tile — the unit is running but mHelp still says Shop. If it is at a site, move it to Field in mHelp so its alerts switch on.</li>
       </ul>
       <ul className='vrm-guide-symbols'>
         <li><b>☀ 380 W</b> — solar coming in right now.</li>

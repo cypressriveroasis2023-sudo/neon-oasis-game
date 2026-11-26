@@ -1,6 +1,6 @@
 import {canonicalCameraUnit} from './fieldCameraHealth';
 import {inventoryPlacement} from './fleetSnapshot';
-import {shortDate, unitTileSummary} from './vrmReadOnlyModel';
+import {shortDate, unitTileSummary, type TileTone} from './vrmReadOnlyModel';
 import {hadRoomYesterday, historyFlags, tonightHeadline, type HistoryPoint, type Tonight} from './vrmHistory';
 import {cloudyWarning, type OutlookDay} from './vrmWeather';
 import {mpptFlags, peerYield, type Mppt} from './vrmMppt';
@@ -22,6 +22,40 @@ export function heliosPlacement(name: string, inventory: readonly InventoryUnit[
 
 export function placementLabel(placement: VictronPlacement): string {
   return placement === 'field' ? 'Field' : placement === 'shop' ? 'Shop' : 'Placement unknown';
+}
+
+export type FleetCount = {key: string; label: string; value: number | string};
+/**
+ * The page's Field/Shop split. Shop units go last, and one that is not powered is normal, not down.
+ * Once mHelp has placed at least one unit, the numbers on top are about the units outside the shop.
+ * Until then (mHelp not read yet, or failed) every unit is counted as before.
+ */
+export function victronFleetView<U extends {installationId: number; name: string}>(units: readonly U[], placement: (unit: U) => VictronPlacement, tile: (unit: U) => {tone: TileTone; fresh: boolean}) {
+  const shop = units.filter(unit => placement(unit) === 'shop');
+  const rest = units.filter(unit => placement(unit) !== 'shop');
+  const placed = units.filter(unit => placement(unit) !== 'unknown').length;
+  const counted = placed > 0 ? rest : [...units];
+  const tally = (tones: TileTone[]) => counted.filter(unit => tones.includes(tile(unit).tone)).length;
+  const allField = counted.every(unit => placement(unit) === 'field');
+  const silent = tally(['stale', 'none', 'unavailable']);
+  const summary: FleetCount[] = placed > 0 ? [
+    {key: 'good', label: allField ? 'Field reporting' : 'Reporting', value: tally(['good', 'fair', 'low']) + ' of ' + counted.length},
+    {key: 'low', label: 'Low battery', value: tally(['low'])},
+    {key: silent ? 'fair' : 'stale', label: allField ? 'Field not reporting' : 'Not reporting', value: silent},
+    {key: 'shop', label: 'In shop', value: shop.length},
+  ] : [
+    {key: 'good', label: 'Reporting', value: tally(['good', 'fair', 'low'])},
+    {key: 'low', label: 'Low battery', value: tally(['low'])},
+    {key: 'stale', label: 'Stale / no reading', value: tally(['stale', 'none'])},
+    {key: 'unavailable', label: 'Unavailable', value: tally(['unavailable'])},
+  ];
+  return {
+    ordered: shop.length ? [...rest, ...shop] : [...units], shop, placed, summary,
+    /** In the shop with no current reading: shown as "Not powered". */
+    shopOff: new Set(shop.filter(unit => ['stale', 'none'].includes(tile(unit).tone)).map(unit => unit.installationId)),
+    /** Running, but mHelp still says Shop: no alerts until it is moved to Field. */
+    shopOn: shop.filter(unit => tile(unit).fresh),
+  };
 }
 
 /** Field units only. Shop units are never an outage. A stale or missing reading is "power unknown", never "dead". */

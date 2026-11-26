@@ -38,3 +38,10 @@ test('Shop units are listed but never counted as needing a look', () => {
   const r = nightReport(units.slice(0, 1), new Map([[1, night(30, 1.5)]]), local(25, 8), name => name === 'HELIOS 001');
   assert.equal(r.rows[0].status, 'act'); assert.equal(r.attention, 0);
 });
+
+test('a Shop unit that is not powered is not counted as not reporting', () => {
+  const r = nightReport(units, new Map([[1, night(83, 1.1)]]), local(25, 8), name => name !== 'HELIOS 001' && name !== 'HELIOS 002');
+  assert.equal(r.reporting, 1); assert.equal(r.silent, 1); assert.equal(r.shopOff, 3);
+  assert.match(r.bottom.join(' '), /1 not reporting/);
+  assert.match(r.bottom.join(' '), /3 in the shop, not powered\./);
+});
