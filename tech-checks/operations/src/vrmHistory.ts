@@ -94,6 +94,18 @@ export function dayPeak(points: HistoryPoint[], now: number): {peak: number; lab
   return {peak: Math.round(Math.max(...day.map(p => p[1] as number))), label: off === 0 ? 'today' : 'yesterday'};
 }
 
+/**
+ * Yesterday (7 AM - 5 PM) the battery sat below 90% at some point, so the panels had work to do.
+ * A unit that stayed full (on outside power, or barely used) makes little because it needed little.
+ * Needs 8+ readings; without them the answer is no.
+ */
+export function hadRoomYesterday(points: readonly HistoryPoint[] | null | undefined, now: number): boolean {
+  if (!points?.length) return false;
+  const d = new Date(now), from = at(d, -1, 7), to = at(d, -1, 17);
+  const day = points.filter(p => p[1] !== null && p[0] >= from && p[0] <= to);
+  return day.length >= 8 && Math.min(...day.map(p => p[1] as number)) < 90;
+}
+
 const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 /** Power the unit pulls from its battery when there is no sun (W, positive), from one reading. */
 const nightDraw = (p: HistoryPoint): number | null => p[3] !== null && p[3] < 0 && (p[2] ?? 0) < 5 ? -p[3] : null;

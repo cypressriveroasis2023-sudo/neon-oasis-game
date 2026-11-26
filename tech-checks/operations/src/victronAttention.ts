@@ -1,7 +1,7 @@
 import {canonicalCameraUnit} from './fieldCameraHealth';
 import {inventoryPlacement} from './fleetSnapshot';
 import {shortDate, unitTileSummary} from './vrmReadOnlyModel';
-import {historyFlags, tonightHeadline, type HistoryPoint, type Tonight} from './vrmHistory';
+import {hadRoomYesterday, historyFlags, tonightHeadline, type HistoryPoint, type Tonight} from './vrmHistory';
 import {cloudyWarning, type OutlookDay} from './vrmWeather';
 import {mpptFlags, peerYield, type Mppt} from './vrmMppt';
 import type {VrmUnit} from '../../supabase/functions/cos-operations-pages/vrm';
@@ -52,7 +52,8 @@ export function victronNeedsAttention(units: readonly VrmUnit[], rows: SafeVrmPo
     // Charger readings (best-effort): a charger error always shows; panel trouble only when nothing stronger is listed.
     if (tile.tone === 'good' || tile.tone === 'fair' || tile.tone === 'low') {
       const listed = out.filter(item => item.installationId === unit.installationId);
-      const needed = listed.some(item => item.kind === 'notfull' || item.kind === 'overnight' || item.kind === 'low' || item.kind === 'fair' || item.kind === 'tonight');
+      // "Made less than the others" only counts for a unit whose battery had room to charge yesterday.
+      const needed = hadRoomYesterday(history?.get(unit.installationId), now);
       for (const flag of mpptFlags(mppt?.get(unit.installationId), now, {needed, peerYield: peers})) {
         if (flag.kind === 'charger' || !listed.some(item => item.kind === 'alarm')) out.push({installationId: unit.installationId, name: unit.name, kind: flag.kind, line: flag.line});
       }
