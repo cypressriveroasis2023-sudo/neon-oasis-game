@@ -49,7 +49,7 @@ export type CosBoardLandingProps = {
   unitAsked?: {name: string; n: number} | null;
 };
 
-type Board = {update(data: unknown): void; setEdit(state: BoardEditState): void; setVcc(moves: unknown): void; setMorning(list: unknown): void; setSwaps(list: unknown): void; destroy(): void; root: ShadowRoot; openByName(name: string): boolean};
+type Board = {update(data: unknown): void; setEdit(state: BoardEditState): void; setVcc(moves: unknown): void; setMorning(list: unknown): void; setSwaps(list: unknown): void; setReports(list: unknown): void; destroy(): void; root: ShadowRoot; openByName(name: string): boolean};
 type Report = {
   contract?: string; units?: UnitCameraStatus[]; canEdit?: boolean; handEditsRead?: boolean;
   recorded?: {pinned?: boolean; pinNote?: string | null};
@@ -133,7 +133,7 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
     return boardData({feed, census, now: clock, routers, upload, addresses, power});
   }, [feed, recorderRows, now, fieldMap, routers, upload, addresses, power]);
   // A full reading: the units go to Fleet, and it says whether this person may make hand fixes.
-  const vccHeld = useRef<unknown>(null), morningHeld = useRef<unknown>(null), swapsHeld = useRef<unknown>(null);
+  const vccHeld = useRef<unknown>(null), morningHeld = useRef<unknown>(null), swapsHeld = useRef<unknown>(null), reportsHeld = useRef<unknown>(null);
   const take = useRef((_reading: Reading) => {});
   take.current = reading => {
     held.current = reading.units;
@@ -148,6 +148,9 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
     // Routers swapped on a unit, for the Owner and approved IT (null for anyone else).
     swapsHeld.current = (reading as {routerSwaps?: unknown}).routerSwaps ?? null;
     board.current?.setSwaps(swapsHeld.current);
+    // Send to IT reports, open and recently closed.
+    reportsHeld.current = (reading as {troubleshootReports?: unknown}).troubleshootReports ?? null;
+    board.current?.setReports(reportsHeld.current);
   };
   // A save moves this on. A read that started before a save is older than what the save returned, so it is dropped.
   const generation = useRef(0);
@@ -250,6 +253,17 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
       // works the list out again and refuses anything no longer listed; only its own confirmation is called done.
       // A unit's router link moved to its new router (James, 25 Nov: "build router swap"). Tech Check checks again
       // before the swap; only its own confirmation is called done.
+      // Close a Send to IT report as fixed or not needed, with a note (James, 26 Nov: close the loop).
+      onTroubleClose: async (id: string, outcome: 'fixed' | 'not_needed', note: string) => {
+        try {
+          const data = (await api.post('/api/unit-camera-status/troubleshoot-close', {id, outcome, note})).data as {contract?: string; id?: string; troubleshootReports?: unknown} | null;
+          if (data?.contract !== 'COS_TROUBLESHOOT_CLOSED_V1' || data.id !== id) throw new Error('COS could not confirm it. Tap Refresh.');
+          if (Array.isArray(data.troubleshootReports)) { reportsHeld.current = data.troubleshootReports; board.current?.setReports(data.troubleshootReports); }
+          return true;
+        } catch (failure: any) {
+          throw new Error(failure?.response?.data?.error || failure?.message || 'COS could not confirm it.');
+        }
+      },
       onRouterSwap: async (key: string) => {
         if (writing.current) throw new Error('A save is still in progress. Try again once it finishes.');
         writing.current = true;
@@ -346,6 +360,7 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
     if (vccHeld.current) mounted.setVcc(vccHeld.current);
     if (morningHeld.current) mounted.setMorning(morningHeld.current);
     if (swapsHeld.current) mounted.setSwaps(swapsHeld.current);
+    if (reportsHeld.current) mounted.setReports(reportsHeld.current);
     // The board's own browser test reads the screen through this handle.
     Object.defineProperty(element, 'cosBoardRoot', {value: mounted.root, configurable: true});
     // Fleet keeps only the units from its own read. Read once more to learn whether this person may make hand fixes.
