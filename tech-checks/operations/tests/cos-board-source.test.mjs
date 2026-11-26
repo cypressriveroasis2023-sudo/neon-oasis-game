@@ -56,8 +56,8 @@ test('the board is isolated from the rest of COS and sends nothing itself', () =
   // Links open outside the app's own frame.
   const links = app.match(/h\("a",\{class:"(?:lk|mgshot)[^}]*\}/g) || [];
   // On a unit's page: the system and port links, and each camera's Web and HTTPS page; on the manager view a
-  // handoff's signed report and each of its photos.
-  assert.equal(links.length, 6);
+  // handoff's signed report and each of its photos; on the Punch list, Router far from site's map link.
+  assert.equal(links.length, 7);
   for (const link of links) assert.match(link, /href:[^,}]+,target:"_blank",rel:"noopener noreferrer"/);
 });
 
