@@ -786,6 +786,45 @@ test('the other COS screens open from the board, by the names IT sees', async ({
   await expect.poll(() => host.evaluate(element => element.ownerDocument.defaultView.location.hash)).toBe('#camera-health');
 });
 
+test('Router swapped lists a unit still linked to its old router, and one tap moves it to the new one', async ({page}, info) => {
+  test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');
+  // James, 25 Nov: Spotter 265 still pointed at its old, offline router while the new one was online in InHand.
+  const record = (id, unitNumber, category, placement, customer) => ({recordId: 'mhelp_product:' + id, productId: String(id), unitNumber, category, placement, uploadLifecycle: 'UNFLAGGED', customer});
+  const value = structuredClone(field);
+  value.uploadInventory = {
+    contract: 'COS_MHELP_UPLOAD_INVENTORY_V1', source: 'mhelpdesk_api', countBasis: 'mhelp_product_records_not_unique_physical_units', sourceSha256: 'e'.repeat(64), receivedAt: fresh, lastApiReadAt: fresh,
+    records: [record(1, 'Helios 001', 'Helios Solar Tower', 'FIELD', 'Fixture Homes'), record(2, 'Spotter 002', 'Spotter', 'FIELD', 'Fixture Homes: Lot 2')],
+    summary: {totalRecords: 2, fieldRecords: 2, shopRecords: 0, unflaggedFieldRecords: 2, doNotUseRecords: 0, missingRecords: 0},
+  };
+  const swap = {key: 'swap:rf3152533023860', unit: 'SPOTTER 002', routerId: 89, oldSerial: 'RF3022434424854', oldStatus: 'offline', oldLastOnline: fresh, newSerial: 'RF3152533023860', newName: 'Spotter 002 (Solar)', why: 'InHand lists "Spotter 002 (Solar)" online, linked to nothing.'};
+  const {app, state} = await mountFleet(page, false, {cameraStatus: reportOf(units, {routerSwaps: [swap]}), field: value, skipInitialFieldCount: true});
+  const host = app.locator('.cos-board-host');
+  await expect(host).toBeVisible();
+  const sent = [];
+  await page.route('**/functions/v1/cos-unit-camera-status', async route => {
+    const request = route.request();
+    if (request.method() === 'OPTIONS') return route.fallback();
+    const envelope = JSON.parse(request.postData() || '{}');
+    if (envelope.path !== '/api/unit-camera-status/router-swap') return route.fallback();
+    sent.push(envelope.body);
+    return route.fulfill({status: 200, headers: {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+      json: {...reportOf(units, {routerSwaps: []}), routerSwapped: {key: swap.key, unit: 'SPOTTER 002', newSerial: swap.newSerial, oldSerial: swap.oldSerial, by: 'Fixture Owner'}}});
+  });
+  await inBoard(host, root => root.getElementById('tabPunch').click());
+  const chips = () => inBoard(host, root => [...root.querySelectorAll('#punchChips .chip')].map(chip => chip.textContent));
+  await expect.poll(chips).toContain('Router swapped \u00b7 1');
+  await inBoard(host, root => [...root.querySelectorAll('#punchChips .chip')].find(chip => chip.textContent.startsWith('Router swapped')).click());
+  const shown = await inBoard(host, root => root.getElementById('viewPunch').textContent);
+  expect(shown).toContain('old router, offline');
+  expect(shown).toContain('Spotter 002 (Solar)');
+  await inBoard(host, root => root.querySelector('#punchList .pdone').click());
+  await expect.poll(() => sent.length).toBe(1);
+  expect(sent[0]).toEqual({key: 'swap:rf3152533023860'});
+  await expect.poll(() => toastText(host)).toContain('SPOTTER 002 now uses its new router');
+  await expect.poll(chips).not.toContain('Router swapped \u00b7 1');
+  expect(state.errors).toEqual([]);
+});
+
 test('the morning list shows new and still-down field units with a likely cause, and leaves the shop out', async ({page}, info) => {
   test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');
   const record = (id, unitNumber, category, placement, customer) => ({recordId: 'mhelp_product:' + id, productId: String(id), unitNumber, category, placement, uploadLifecycle: 'UNFLAGGED', customer});

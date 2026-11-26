@@ -32,6 +32,9 @@ before(async () => {
   await db.exec(s); await db.exec(s);
   const s2 = readFileSync(new URL('../../database-maintenance/cos-vendor-requests-v2.sql', import.meta.url), 'utf8');
   await db.exec(s2); await db.exec(s2);
+  await db.exec("alter table public.camera_devices add column eyeforce_id text; update public.camera_devices set eyeforce_id='eye17376' where unit_key='HELIOS 003'");
+  const s3 = readFileSync(new URL('../../database-maintenance/cos-vendor-requests-v3.sql', import.meta.url), 'utf8');
+  await db.exec(s3); await db.exec(s3);
   // No vault here: the cron secret the function passes to the Operations sheet function.
   await db.exec("create or replace function public.cos_vendor_log_secret_v1() returns text language sql as $$ select 'cron-secret' $$");
 });
@@ -245,4 +248,74 @@ test('the cancellation row goes through the Operations sheet account, with formu
   const row = JSON.parse(s.seen.filter(x => x.url.includes('cos-deactivation-log')).at(-1).body).row;
   assert.equal(row[1], "'=HYPERLINK(\"x\")");
   assert.ok(!s.seen.some(x => x.url.includes('sheets.googleapis.com')));
+});
+
+// v3: the Eyeforce account number is saved on the unit, and the Manager tab lists what is still open.
+test('the Eyeforce account number is saved on the unit by the owner or IT, checked, logged, and falls back to the camera record', async () => {
+  const s = server({who: it});
+  assert.deepEqual((await s.post({action: 'account', unit: 'Spotter 268'})).body.account, {eye: null});
+  const cam = (await s.post({action: 'account', unit: 'helios-003'})).body.account;
+  assert.deepEqual([cam.eye, cam.how], ['EYE17376', 'camera_record']);
+  assert.deepEqual((await s.post({action: 'account_set', unit: 'Spotter 268', eye: '17351'})).body, {ok: false, error: 'An Eyeforce account number looks like EYE17351.'});
+  assert.equal((await s.post({action: 'account_set', unit: '', eye: 'EYE17351'})).status, 400);
+  const saved = (await s.post({action: 'account_set', unit: 'Spotter 268', eye: ' eye 17351 '})).body;
+  assert.deepEqual([saved.ok, saved.account.eye, saved.account.by, saved.account.how], [true, 'EYE17351', 'Teddy Hopper', 'hand']);
+  // the same unit written another way is the same unit
+  assert.equal((await server().post({action: 'account', unit: 'SPOTTER-268'})).body.account.eye, 'EYE17351');
+  await s.post({action: 'account_set', unit: 'Spotter 268', eye: 'EYE17351'});
+  await server().post({action: 'account_set', unit: 'Spotter 268', eye: ''});
+  assert.deepEqual((await s.post({action: 'account', unit: 'Spotter 268'})).body.account, {eye: null});
+  const log = (await db.query("select eye, how, by_name from app_private.vendor_unit_account_log where unit_key='SPOTTER268' order by id")).rows;
+  assert.deepEqual(log, [{eye: 'EYE17351', how: 'hand', by_name: 'Teddy Hopper'}, {eye: null, how: 'hand', by_name: 'James Martin'}]);
+  // a saved number wins over the camera record
+  await s.post({action: 'account_set', unit: 'Helios 003', eye: 'EYE20001'});
+  assert.equal((await s.post({action: 'account', unit: 'Helios 003'})).body.account.eye, 'EYE20001');
+  await db.exec("delete from app_private.vendor_unit_accounts where true");
+});
+
+test('a swap email moves the account number to the unit that went in', async () => {
+  const s = server({who: it});
+  await s.post({action: 'account_set', unit: 'Ranger 007', eye: 'EYE17351'});
+  const r = await s.post({action: 'send', kind: 'monitor_swap', request_id: randomUUID(),
+    values: {eye: 'EYE17351', unit: 'Ranger 007', new_unit: 'Ranger 008', site: 'Mesa Village MHP', date: '11/25/2026', cam_brand: 'ALIBI', cam1_name: 'Ranger 008 / Cam 1'}});
+  assert.equal(r.body.state, 'sent');
+  assert.deepEqual((await s.post({action: 'account', unit: 'Ranger 007'})).body.account, {eye: null});
+  const moved = (await s.post({action: 'account', unit: 'Ranger 008'})).body.account;
+  assert.deepEqual([moved.eye, moved.how, moved.by], ['EYE17351', 'swap', 'Teddy Hopper']);
+});
+
+test('waiting on vendor: the owner sees what is open, marks it done, and a new account takes the number from the reply', async () => {
+  await db.exec("update app_private.vendor_requests set closed_at=now(), closed_by_name='setup' where closed_at is null");
+  const s = server(), add = randomUUID(), cancel = randomUUID(), bad = randomUUID();
+  await s.post({action: 'send', kind: 'monitor_add', request_id: add, values: form()});
+  await s.post({action: 'send', kind: 'sim_cancel_simetry', request_id: cancel, values: {...unit, sim: SIM, reason: 'Unit removed.'}});
+  await server({gmail: {ok: false}}).post({action: 'send', kind: 'monitor_remove', request_id: bad, values: {...unit, eye: 'EYE17351', date: '11/25/2026', reason: 'Removed.'}});
+  assert.equal((await server({who: it}).post({action: 'open'})).status, 403);
+  assert.equal((await server({who: it}).post({action: 'close', id: add})).status, 403);
+  const list = (await s.post({action: 'open'})).body;
+  assert.deepEqual(list.open.map(r => [r.id, r.kind, r.unit, r.state]), [[add, 'monitor_add', 'Helios 002', 'sent'], [cancel, 'sim_cancel_simetry', 'Spotter 268', 'sent'], [bad, 'monitor_remove', 'Spotter 268', 'failed']]);
+  assert.equal(list.open[0].to, 'techops@eyeforce.com');
+  assert.doesNotMatch(JSON.stringify(list), /Pa\$\$|vals/);
+  // a wrong number is refused in plain words and nothing is closed
+  assert.deepEqual((await s.post({action: 'close', id: add, eye: '12'})).body, {ok: false, error: 'An Eyeforce account number looks like EYE17351.'});
+  const done = (await s.post({action: 'close', id: add, eye: 'eye17400', note: 'Felipe confirmed by email'})).body;
+  assert.equal(done.ok, true);
+  assert.deepEqual(done.open.map(r => r.id), [cancel, bad]);
+  assert.deepEqual([done.done[0].id, done.done[0].by, done.done[0].note], [add, 'James Martin', 'Felipe confirmed by email']);
+  const acct = (await s.post({action: 'account', unit: 'Helios 002'})).body.account;
+  assert.deepEqual([acct.eye, acct.how], ['EYE17400', 'reply']);
+  // closing again changes nothing; a failed one is cleared without touching any account
+  assert.equal((await s.post({action: 'close', id: add, eye: 'EYE99999'})).body.ok, true);
+  assert.equal((await s.post({action: 'account', unit: 'Helios 002'})).body.account.eye, 'EYE17400');
+  await s.post({action: 'account_set', unit: 'Spotter 268', eye: 'EYE17351'});
+  await s.post({action: 'close', id: bad});
+  assert.equal((await s.post({action: 'account', unit: 'Spotter 268'})).body.account.eye, 'EYE17351');
+  // a removal that was sent, once confirmed, clears the unit's number
+  const gone = randomUUID();
+  await s.post({action: 'send', kind: 'monitor_remove', request_id: gone, values: {...unit, eye: 'EYE17351', date: '11/25/2026', reason: 'Removed.'}});
+  await s.post({action: 'close', id: gone});
+  assert.deepEqual((await s.post({action: 'account', unit: 'Spotter 268'})).body.account, {eye: null});
+  assert.equal((await s.post({action: 'close', id: 'nope'})).status, 400);
+  // the unit card still shows them
+  assert.ok((await s.post({action: 'recent', unit: 'Helios 002'})).body.recent.some(r => r.subject.includes('New account')));
 });

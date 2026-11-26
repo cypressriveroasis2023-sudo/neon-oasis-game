@@ -59,6 +59,31 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-26** — Tech Check: Router swapped. `public.cos_router_swaps_state_v1` /
+  `cos_router_swap_apply_v1` (Owner or approved IT) move a unit's router link to a new
+  InHand router; writes `ADD_ROUTER_LINK` with before_state `{inhand_serial, swap}` (no
+  `id`/`public_ip`; endpoint claims stay complete, tested). Operations patch
+  `cos-unit-camera-status/router-swap-v23` is **prepared, not deployed**, rebuilt on
+  live v23 after `down-needs-two-misses-v22` deployed first. Record in `tech-checks/docs/db-changes/20261126_router_swaps.md`.
+- **2026-11-26** — Deployed `cos-unit-camera-status/down-needs-two-misses-v22` (#557,
+  05:31 UTC, James's go): live now **v23 `2efe829a`** (pins updated). A Sniper or CAM V
+  whose saved check missed once reads Not verified ("Avigilon check missed once,
+  checking again"); the second miss in a row, or a confirmed outage, is Down. Rollback
+  `rollback-to-v22-entry`. A next patch to this function must start from v23.
+- **2026-11-26** — Operations patch `cos-unit-camera-status/down-needs-two-misses-v22`
+  was **prepared** (now deployed, see above) (starts from live v22 `a306656f`). A Sniper or CAM V
+  whose saved check missed once reads Not verified ("Avigilon check missed once,
+  checking again") instead of Down; the second miss in a row, or a confirmed outage,
+  is Down. The read adds `confirmed_outage,consecutive_failures` to its
+  `camera_health_current` select; nothing is written. Source:
+  `tech-checks/operations/shared/otherUnitStatus.ts`. Rollback `rollback-to-v22-entry`.
+  If another patch to this function deploys first, this one must be rebuilt on it.
+- **2026-11-25** — Vendor follow-ups (prepared, deploy pending James): Tech Check
+  `cos-vendor-requests-v3.sql` (EYE account number per unit in `app_private.vendor_unit_accounts`,
+  `vendor_requests.closed_*`, four service_role functions; reads `camera_devices.eyeforce_id`, never
+  writes it); `cos-vendor-request` v3 actions `account` / `account_set` / `open` / `close`; Manager
+  tab "Waiting on vendor" box and the SIM-rule switch (`operations-host.js` kind `simRequire`). Record
+  in `tech-checks/docs/db-changes/20261125_vendor_followups.md`.
 - **2026-11-26** — Deployed `cos-unit-camera-status/morning-list-v21` (#549): live now
   **v22 `a306656f`** (pins updated). The camera-status read carries `overnight` (the
   morning list, Owner and approved IT; Tech Check `cos_overnight_v1`). Rollback

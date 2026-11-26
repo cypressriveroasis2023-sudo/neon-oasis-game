@@ -970,11 +970,11 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
       }
       // Camera status read and its hand edit. Kept above the GET-only section so
       // the POST edit is reachable; each path checks its own method.
-      if (path === '/api/unit-camera-status' || path === '/api/unit-camera-status/edit' || path === '/api/unit-camera-status/link-a' || path === '/api/unit-camera-status/vcc-move') {
-        const editing = path.endsWith('/edit') || path.endsWith('/link-a') || path.endsWith('/vcc-move');
+      if (path === '/api/unit-camera-status' || path === '/api/unit-camera-status/edit' || path === '/api/unit-camera-status/link-a' || path === '/api/unit-camera-status/vcc-move' || path === '/api/unit-camera-status/router-swap') {
+        const editing = path.endsWith('/edit') || path.endsWith('/link-a') || path.endsWith('/vcc-move') || path.endsWith('/router-swap');
         if (method !== (editing ? 'POST' : 'GET')) fail(editing ? 'Use POST to record a hand edit.' : 'Use GET for unit camera status.', 405);
         const readStatus = async () => {
-          const [cameras, integrations, handEdits, otherDevices, otherHealth, aLinks, vccMoves, overnight] = await Promise.all([
+          const [cameras, integrations, handEdits, otherDevices, otherHealth, aLinks, vccMoves, overnight, routerSwaps] = await Promise.all([
             legacyAll('camera_devices?select=id,device_name,unit_key,organization,vigilant_status,activation_state,source_last_seen_at,public_ip,star_organization_id:source_metadata->>organizationId,local_ip:source_metadata->>localIp&source=eq.vigilant_control_center&order=id.asc', context.headers),
             // A missing or unreadable sync row leaves the feed unproven, which
             // reads as Unknown rather than stopping the page.
@@ -986,7 +986,7 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
             // Snipers, CAMVs and Recon II: saved readings COS already collects.
             // If they cannot be read the Star4Live units still show.
             legacyAll('camera_devices?select=id,device_name,unit_key,organization,source,activation_state,source_last_seen_at,public_ip&source=in.(2026_unit_tracker,reconeyez)&activation_state=eq.active&order=id.asc', context.headers).catch(() => null),
-            legacyAll('camera_health_current?select=camera_device_id,overall_status,checked_at&order=camera_device_id.asc', context.headers).catch(() => null),
+            legacyAll('camera_health_current?select=camera_device_id,overall_status,checked_at,confirmed_outage,consecutive_failures&order=camera_device_id.asc', context.headers).catch(() => null),
             // A# links (mHelp product ids) by unit, so the card knows each unit's A#. Unreadable links hide nothing else.
             readJson(LEGACY_URL + '/rest/v1/rpc/cos_mhelp_hand_link_state_v1', {method: 'POST', headers: {...context.headers, 'Content-Type': 'application/json'}, body: '{}'}, 'A# links could not be read.')
               .then(v => v?.contract === 'COS_MHELP_HAND_LINKS_V1' && Array.isArray(v.links) ? v.links : null).catch(() => null),
@@ -996,6 +996,9 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
             // The morning list: field cameras down, new in the last 24 hours first, with a likely cause. Owner and approved IT; others get null.
             readJson(LEGACY_URL + '/rest/v1/rpc/cos_overnight_v1', {method: 'POST', headers: {...context.headers, 'Content-Type': 'application/json'}, body: '{"p_hours":24}'}, 'The morning list could not be read.')
               .then(v => v?.contract === 'COS_OVERNIGHT_V1' ? v : null).catch(() => null),
+            // Routers swapped on a unit (old one offline, an unlinked one named for the unit online). Owner and approved IT; others get null.
+            readJson(LEGACY_URL + '/rest/v1/rpc/cos_router_swaps_state_v1', {method: 'POST', headers: {...context.headers, 'Content-Type': 'application/json'}, body: '{}'}, 'Router swaps could not be read.')
+              .then(v => v?.contract === 'COS_ROUTER_SWAPS_V1' && Array.isArray(v.items) ? v.items.slice(0, 100) : null).catch(() => null),
           ]);
           const feeds = Array.isArray(integrations) ? integrations : [];
           const feed = feeds.find(row => row?.provider === 'vigilant') || null;
@@ -1009,6 +1012,7 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
           return {
             ...applyHandEdits({...star, units: units.map(u => u.productId ? u : (l => l ? {...u, productId: String(l.productId)} : u)((aLinks || []).find(l => typeof l?.unitKey === 'string' && l.unitKey.toUpperCase() === String(u.unit).toUpperCase() && /^[1-9][0-9]{0,14}$/.test(String(l.productId))))), counts: countUnits(units)}, handEdits),
             aLinksRead: Array.isArray(aLinks),
+            routerSwaps,
             overnight: overnight ? {since: typeof overnight.since === 'string' ? overnight.since : null, items: Array.isArray(overnight.items) ? overnight.items.slice(0, 300) : []} : null,
             vccMoves: vccMoves ? {fresh: vccMoves.fresh === true, syncedAt: typeof vccMoves.syncedAt === 'string' ? vccMoves.syncedAt : null, items: Array.isArray(vccMoves.items) ? vccMoves.items.slice(0, 200) : []} : null,
             handEditsRead: Array.isArray(handEdits),
@@ -1020,6 +1024,22 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
         if (!editing) return json(await readStatus());
         const current = await readStatus();
         if (!current.handEditsRead) fail('Saved hand edits are unavailable, so a new one cannot be recorded safely.', 503);
+        if (path === '/api/unit-camera-status/router-swap') {
+          // A unit's router link moved to its new router (James, 25 Nov: "build router swap"). Tech Check works the list
+          // out again, swaps only if still listed, and records it as the Link router button does.
+          const sb = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
+          const sKey = typeof sb.key === 'string' ? sb.key.trim().toLowerCase() : '';
+          if (!/^swap:[a-z0-9-]{6,40}$/.test(sKey)) return json({error: 'That is not a router swap COS listed. Nothing was changed.'}, 422);
+          const sRole = context.legacyOwner && context.actorId ? 'owner' : 'it';
+          const sName = (context.name || '').trim() || (sRole === 'owner' ? 'Owner' : 'IT technician');
+          let sReply, sData = {};
+          try { sReply = await requestFetch(LEGACY_URL + '/rest/v1/rpc/cos_router_swap_apply_v1', {method: 'POST', headers: {...context.headers, 'Content-Type': 'application/json'}, body: JSON.stringify({p_key: sKey, p_actor_name: sName})}); } catch { fail('The router could not be swapped. Nothing was changed.', 503); }
+          try { sData = await sReply.json(); } catch { sData = {}; }
+          if (!sReply.ok) return json({error: sData?.code === 'PT409' && typeof sData.message === 'string' ? sData.message.slice(0, 300) : sData?.code === '42501' ? 'Only the Owner or approved IT can swap a router.' : 'The router could not be swapped. Nothing was changed.'}, sReply.status === 403 || sData?.code === '42501' ? 403 : 422);
+          if (sData?.contract !== 'COS_ROUTER_SWAP_RESULT_V1') fail('The swap could not be confirmed. Tap Refresh.', 503);
+          const sAfter = await readStatus();
+          return json({...sAfter, routerSwapped: {key: sData.key, unit: sData.unit, newSerial: sData.newSerial, oldSerial: sData.oldSerial, by: sName}});
+        }
         if (path === '/api/unit-camera-status/vcc-move') {
           // A camera record matched to VCC by hand from the punch list (James, 25 Nov: "build move in VCC"). Tech Check
           // works the list out again, applies the one item only if it is still listed and safe, and logs who and when.

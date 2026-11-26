@@ -17,8 +17,8 @@ import {readRouterDetails} from './routerDetails';
 import {boardEditState, handFixRequest, type BoardEditFlags, type BoardEditState, type BoardFixStep} from './cosBoard/boardEdit';
 import {mountCosBoard} from './cosBoard/boardApp';
 import {loadBoardFonts} from './cosBoard/boardFonts';
-import {vendorCameras, vendorCheck, vendorForm, vendorPreview, vendorRecent, vendorSend, vendorTemplates} from './vendorRequest';
-import {addSims, managerHost, managerKnown, managerPhoto, markSim, readManager, rememberManager, removeTruckExtra, saveTruck, setTruckStandard, takeBoardView, type TruckKit, type TruckType} from './managerBridge';
+import {vendorAccount, vendorAccountSet, vendorCameras, vendorCheck, vendorClose, vendorForm, vendorOpen, vendorPreview, vendorRecent, vendorSend, vendorTemplates} from './vendorRequest';
+import {addSims, managerHost, managerKnown, managerPhoto, markSim, requireSims, readManager, rememberManager, removeTruckExtra, saveTruck, setTruckStandard, takeBoardView, type TruckKit, type TruckType} from './managerBridge';
 
 /**
  * Tells the page around the frame that the board is, or is no longer, the TV display, so it gives the frame the
@@ -49,7 +49,7 @@ export type CosBoardLandingProps = {
   unitAsked?: {name: string; n: number} | null;
 };
 
-type Board = {update(data: unknown): void; setEdit(state: BoardEditState): void; setVcc(moves: unknown): void; setMorning(list: unknown): void; destroy(): void; root: ShadowRoot; openByName(name: string): boolean};
+type Board = {update(data: unknown): void; setEdit(state: BoardEditState): void; setVcc(moves: unknown): void; setMorning(list: unknown): void; setSwaps(list: unknown): void; destroy(): void; root: ShadowRoot; openByName(name: string): boolean};
 type Report = {
   contract?: string; units?: UnitCameraStatus[]; canEdit?: boolean; handEditsRead?: boolean;
   recorded?: {pinned?: boolean; pinNote?: string | null};
@@ -133,7 +133,7 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
     return boardData({feed, census, now: clock, routers, upload, addresses, power});
   }, [feed, recorderRows, now, fieldMap, routers, upload, addresses, power]);
   // A full reading: the units go to Fleet, and it says whether this person may make hand fixes.
-  const vccHeld = useRef<unknown>(null), morningHeld = useRef<unknown>(null);
+  const vccHeld = useRef<unknown>(null), morningHeld = useRef<unknown>(null), swapsHeld = useRef<unknown>(null);
   const take = useRef((_reading: Reading) => {});
   take.current = reading => {
     held.current = reading.units;
@@ -145,6 +145,9 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
     // The morning list: field cameras down, for the Owner and approved IT (null for anyone else).
     morningHeld.current = (reading as {overnight?: unknown}).overnight ?? null;
     board.current?.setMorning(morningHeld.current);
+    // Routers swapped on a unit, for the Owner and approved IT (null for anyone else).
+    swapsHeld.current = (reading as {routerSwaps?: unknown}).routerSwaps ?? null;
+    board.current?.setSwaps(swapsHeld.current);
   };
   // A save moves this on. A read that started before a save is older than what the save returned, so it is dropped.
   const generation = useRef(0);
@@ -245,6 +248,23 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
       },
       // A camera record matched to VCC by hand from the punch list (James, 25 Nov: "build move in VCC"). Tech Check
       // works the list out again and refuses anything no longer listed; only its own confirmation is called done.
+      // A unit's router link moved to its new router (James, 25 Nov: "build router swap"). Tech Check checks again
+      // before the swap; only its own confirmation is called done.
+      onRouterSwap: async (key: string) => {
+        if (writing.current) throw new Error('A save is still in progress. Try again once it finishes.');
+        writing.current = true;
+        try {
+          generation.current += 1;
+          const data = (await api.post('/api/unit-camera-status/router-swap', {key})).data as {routerSwapped?: {key?: string; unit?: string}} | null;
+          const result = checked(data);
+          generation.current += 1;
+          if (data?.routerSwapped?.key !== key) throw new Error('COS could not confirm the swap. Tap Refresh.');
+          take.current(result);
+          return (data.routerSwapped.unit || 'The unit') + ' now uses its new router. Its reading shows after the next InHand pull, within 30 minutes.';
+        } catch (failure: any) {
+          throw new Error(failure?.response?.data?.error || failure?.message || 'COS could not confirm the swap.');
+        } finally { writing.current = false; }
+      },
       onVccMove: async (key: string) => {
         if (writing.current) throw new Error('A save is still in progress. Try again once it finishes.');
         writing.current = true;
@@ -290,6 +310,10 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
         check: () => vendorCheck(),
         cameras: (unit: string) => vendorCameras(unit),
         form: (kind: string, values: Record<string, string>) => vendorForm(kind, values),
+        account: (unit: string) => vendorAccount(unit),
+        accountSet: (unit: string, eye: string) => vendorAccountSet(unit, eye),
+        open: () => vendorOpen(),
+        close: (id: string, note: string, eye: string) => vendorClose(id, note, eye),
       } : undefined,
       onScreen: (workspace: string) => { window.location.hash = workspaceHash({workspace, jobId: '', detail: false}); },
       // The owner's manager view. The signed-in Tech Check app around this frame reads the trucks, inspections and
@@ -300,6 +324,7 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
         photo: (path: string) => managerPhoto(path),
         simAdd: (numbers: string[], carrier: string, note: string) => addSims(numbers, carrier, note),
         simMark: (sim: string, status: 'in_drawer' | 'bad' | 'deactivated' | 'removed', note: string) => markSim(sim, status, note),
+        simRequire: (on: boolean) => requireSims(on),
         truckStandard: (type: TruckType, required: number) => setTruckStandard(type, required),
         truckExtraRemove: (extraId: string, reason: string) => removeTruckExtra(extraId, reason),
         open: (route: string) => openLegacy(route),
@@ -320,6 +345,7 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
     board.current = mounted;
     if (vccHeld.current) mounted.setVcc(vccHeld.current);
     if (morningHeld.current) mounted.setMorning(morningHeld.current);
+    if (swapsHeld.current) mounted.setSwaps(swapsHeld.current);
     // The board's own browser test reads the screen through this handle.
     Object.defineProperty(element, 'cosBoardRoot', {value: mounted.root, configurable: true});
     // Fleet keeps only the units from its own read. Read once more to learn whether this person may make hand fixes.
