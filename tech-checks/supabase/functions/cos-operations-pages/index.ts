@@ -948,6 +948,24 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
       // A record of what a tech found, for the next daily IT sheet. It schedules
       // nothing and changes no unit, camera, mHelp, Star4Live or InHand data. The
       // person is the verified session; the database checks Owner-or-IT again.
+      // Close a Send to IT report as fixed or not needed, with a note (James, 26 Nov: close the loop). The report itself
+      // is never changed; Operations adds a closing row with who and when.
+      if (path === '/api/unit-camera-status/troubleshoot-close') {
+        if (method !== 'POST') fail('Use POST to close a troubleshoot report.', 405);
+        if (body === null) body = await requestBody(request);
+        const cb = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
+        const cId = typeof cb.id === 'string' && UUID.test(cb.id) ? cb.id : null;
+        const cNote = typeof cb.note === 'string' && cb.note.trim() !== '' && cb.note.length <= 1000 ? cb.note.trim() : null;
+        if (!cId || !cNote || (cb.outcome !== 'fixed' && cb.outcome !== 'not_needed')) return json({error: 'Say what was done before closing it. Nothing was changed.'}, 422);
+        if (/(\d{1,3}\.){3}\d{1,3}/.test(cNote)) return json({error: 'Notes carry last octets only, not a whole IP address. Nothing was changed.'}, 422);
+        const cRole = context.legacyOwner && context.actorId ? 'owner' : 'it';
+        const cName = (context.name || '').trim() || (cRole === 'owner' ? 'Owner' : 'IT technician');
+        const cReceipt = await rpc('cos_troubleshoot_close_v1', {...actorPayload, p_report_id: cId, p_payload: {outcome: cb.outcome, note: cNote, actorName: cName}}, request.signal);
+        if (cReceipt?.contract !== 'COS_TROUBLESHOOT_CLOSE_RESULT_V1') fail('The report could not be closed. Nothing was changed.', 503);
+        const cList = await rpc('cos_troubleshoot_open_v1', {...actorPayload}, request.signal).catch(() => null);
+        return json({contract: 'COS_TROUBLESHOOT_CLOSED_V1', id: cReceipt.id, closedAt: cReceipt.closedAt, by: cReceipt.closedBy, duplicate: cReceipt.repeat === true,
+          troubleshootReports: cList?.contract === 'COS_TROUBLESHOOT_OPEN_V1' && Array.isArray(cList.items) ? cList.items.slice(0, 300) : null});
+      }
       if (path === '/api/unit-camera-status/troubleshoot') {
         if (method !== 'POST') fail('Use POST to send a troubleshoot result.', 405);
         if (body === null) body = await requestBody(request);
@@ -974,7 +992,7 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
         const editing = path.endsWith('/edit') || path.endsWith('/link-a') || path.endsWith('/vcc-move') || path.endsWith('/router-swap');
         if (method !== (editing ? 'POST' : 'GET')) fail(editing ? 'Use POST to record a hand edit.' : 'Use GET for unit camera status.', 405);
         const readStatus = async () => {
-          const [cameras, integrations, handEdits, otherDevices, otherHealth, aLinks, vccMoves, overnight, routerSwaps] = await Promise.all([
+          const [cameras, integrations, handEdits, otherDevices, otherHealth, aLinks, vccMoves, overnight, routerSwaps, tsOpen] = await Promise.all([
             legacyAll('camera_devices?select=id,device_name,unit_key,organization,vigilant_status,activation_state,source_last_seen_at,public_ip,star_organization_id:source_metadata->>organizationId,local_ip:source_metadata->>localIp&source=eq.vigilant_control_center&order=id.asc', context.headers),
             // A missing or unreadable sync row leaves the feed unproven, which
             // reads as Unknown rather than stopping the page.
@@ -999,6 +1017,9 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
             // Routers swapped on a unit (old one offline, an unlinked one named for the unit online). Owner and approved IT; others get null.
             readJson(LEGACY_URL + '/rest/v1/rpc/cos_router_swaps_state_v1', {method: 'POST', headers: {...context.headers, 'Content-Type': 'application/json'}, body: '{}'}, 'Router swaps could not be read.')
               .then(v => v?.contract === 'COS_ROUTER_SWAPS_V1' && Array.isArray(v.items) ? v.items.slice(0, 100) : null).catch(() => null),
+            // Send to IT reports: open ones, and ones closed in the last 7 days, so the card shows Open or Fixed.
+            rpc('cos_troubleshoot_open_v1', {...actorPayload}, request.signal)
+              .then(v => v?.contract === 'COS_TROUBLESHOOT_OPEN_V1' && Array.isArray(v.items) ? v.items.slice(0, 300) : null).catch(() => null),
           ]);
           const feeds = Array.isArray(integrations) ? integrations : [];
           const feed = feeds.find(row => row?.provider === 'vigilant') || null;
@@ -1013,6 +1034,7 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
             ...applyHandEdits({...star, units: units.map(u => u.productId ? u : (l => l ? {...u, productId: String(l.productId)} : u)((aLinks || []).find(l => typeof l?.unitKey === 'string' && l.unitKey.toUpperCase() === String(u.unit).toUpperCase() && /^[1-9][0-9]{0,14}$/.test(String(l.productId))))), counts: countUnits(units)}, handEdits),
             aLinksRead: Array.isArray(aLinks),
             routerSwaps,
+            troubleshootReports: tsOpen,
             overnight: overnight ? {since: typeof overnight.since === 'string' ? overnight.since : null, items: Array.isArray(overnight.items) ? overnight.items.slice(0, 300) : []} : null,
             vccMoves: vccMoves ? {fresh: vccMoves.fresh === true, syncedAt: typeof vccMoves.syncedAt === 'string' ? vccMoves.syncedAt : null, items: Array.isArray(vccMoves.items) ? vccMoves.items.slice(0, 200) : []} : null,
             handEditsRead: Array.isArray(handEdits),

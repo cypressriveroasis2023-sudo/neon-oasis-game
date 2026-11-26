@@ -11,8 +11,8 @@ const response=(data,status=200)=>new Response(JSON.stringify(data),{status,head
 const census=(matches)=>({result:{addressMatches:matches}});
 const katy={matchedAddress:'9500 KATY FWY, HOUSTON, TX, 77024',coordinates:{x:-95.534,y:29.7838}};
 
-function fixture({geocode=census([katy]),geocodeStatus=200,edits=[],role='owner',repeat=false,remoteResult=null,reconAgeMs=120000,aLinks=[],linkReply=null,vcc={contract:'COS_VCC_MOVES_V1',fresh:true,syncedAt:'2026-11-25T20:33:09Z',items:[]},vccReply=null,overnight={contract:'COS_OVERNIGHT_V1',since:'2026-11-25T04:56:17Z',items:[]},swaps={contract:'COS_ROUTER_SWAPS_V1',items:[]},swapReply=null}={}){
- const calls=[],unexpected=[],recorded=[],asked=[],linked=[],moved=[],swapped=[],fixtureNow=Date.now();
+function fixture({geocode=census([katy]),geocodeStatus=200,edits=[],role='owner',repeat=false,remoteResult=null,reconAgeMs=120000,aLinks=[],linkReply=null,vcc={contract:'COS_VCC_MOVES_V1',fresh:true,syncedAt:'2026-11-25T20:33:09Z',items:[]},vccReply=null,overnight={contract:'COS_OVERNIGHT_V1',since:'2026-11-25T04:56:17Z',items:[]},swaps={contract:'COS_ROUTER_SWAPS_V1',items:[]},swapReply=null,reports=[],closeReply=null}={}){
+ const calls=[],unexpected=[],recorded=[],asked=[],linked=[],moved=[],swapped=[],closed=[],fixtureNow=Date.now();
  const transport=async(url,init={})=>{
   const parsed=new URL(url),name=parsed.pathname.split('/').at(-1),body=init.body?JSON.parse(init.body):null,headers=new Headers(init.headers);
   calls.push({url,method:init.method||'GET',body});
@@ -31,6 +31,8 @@ function fixture({geocode=census([katy]),geocodeStatus=200,edits=[],role='owner'
   if(name==='cos_camera_unit_hand_edit_state_v1')return response({contract:'COS_UNIT_STATUS_HAND_EDITS_V1',edits});
   if(name==='cos_camera_unit_hand_edit_v1'){recorded.push(body);return response({contract:'COS_UNIT_STATUS_HAND_EDIT_RESULT_V1',id:body.p_request_id,applied:!repeat,repeat,latitude:repeat?null:undefined});}
   if(name==='cos_mhelp_hand_link_state_v1')return aLinks===null?response({message:'no'},500):response({contract:'COS_MHELP_HAND_LINKS_V1',links:aLinks});
+  if(name==='cos_troubleshoot_open_v1'){assert.equal(headers.get('authorization'),'Bearer '+serviceKey,'Operations reads use the service key with the verified person');return reports===null?response({message:'no'},500):response({contract:'COS_TROUBLESHOOT_OPEN_V1',items:reports});}
+  if(name==='cos_troubleshoot_close_v1'){closed.push(body);return closeReply?response(closeReply.data,closeReply.status):response({contract:'COS_TROUBLESHOOT_CLOSE_RESULT_V1',id:body.p_report_id,repeat:false,closedAt:'2026-11-26T15:00:00Z',closedBy:'Synthetic Owner'});}
   if(name==='cos_router_swaps_state_v1')return swaps===null?response({code:'42501',message:'no'},403):response(swaps);
   if(name==='cos_router_swap_apply_v1'){swapped.push({body,auth:headers.get('authorization')});return swapReply?response(swapReply.data,swapReply.status):response({contract:'COS_ROUTER_SWAP_RESULT_V1',key:body.p_key,unit:'SPOTTER 265',oldSerial:'RF3022434424854',newSerial:'RF3152533023860'});}
   if(name==='cos_overnight_v1')return overnight===null?response({code:'42501',message:'no'},403):(assert.deepEqual(body,{p_hours:24}),response(overnight));
@@ -50,7 +52,7 @@ function fixture({geocode=census([katy]),geocodeStatus=200,edits=[],role='owner'
  const handler=createOperationsHandler({platformUrl:nativeOrigin,serviceKey,fetch:transport});
  const send=(path,method,body)=>handler(new Request('https://synthetic-bridge.invalid/functions/v1/cos-operations-pages',{method:'POST',
   headers:{Authorization:'Bearer '+callerToken,'Content-Type':'application/json'},body:JSON.stringify({path,method,body})}));
- return {calls,unexpected,recorded,asked,linked,moved,swapped,send};
+ return {calls,unexpected,recorded,asked,linked,moved,swapped,closed,send};
 }
 const geocodeCalls=f=>f.calls.filter(c=>c.url.includes('geocoding.geo.census.gov'));
 
@@ -332,4 +334,27 @@ test('a router swap is applied as the signed-in person; a key COS never listed o
  const g=fixture({swapReply:{status:409,data:{code:'PT409',message:'This is no longer listed. The router may already be linked; tap Refresh.'}}});
  const r2=await g.send('/api/unit-camera-status/router-swap','POST',{key:'swap:rf3152533023860'});
  assert.equal(r2.status,422);assert.match((await r2.json()).error,/no longer listed/);
+});
+
+// Send to IT, closed loop (James, 26 Nov).
+test('the read carries Send to IT reports, and a failed report read never stops the board',async()=>{
+ const rep={id:'11111111-1111-4111-8111-111111111111',unitKey:'SPOTTER 306',result:'Router offline',note:'Router dark',closed:false};
+ const f=fixture({reports:[rep]});
+ assert.deepEqual((await (await f.send('/api/unit-camera-status','GET')).json()).troubleshootReports,[rep]);
+ const g=fixture({reports:null});
+ const r=await g.send('/api/unit-camera-status','GET');
+ assert.equal(r.status,200);assert.equal((await r.json()).troubleshootReports,null);
+});
+test('a report is closed with a note as the verified person; a missing note or full IP closes nothing',async()=>{
+ const id='11111111-1111-4111-8111-111111111111';
+ const f=fixture({reports:[{id,unitKey:'SPOTTER 306',closed:true}]});
+ const r=await f.send('/api/unit-camera-status/troubleshoot-close','POST',{id,outcome:'fixed',note:'Rebooted, all 4 up'});
+ assert.equal(r.status,200,await r.clone().text());
+ const data=await r.json();
+ assert.equal(data.contract,'COS_TROUBLESHOOT_CLOSED_V1');assert.equal(data.id,id);assert.equal(data.troubleshootReports[0].closed,true);
+ assert.equal(f.closed[0].p_report_id,id);assert.deepEqual(f.closed[0].p_payload,{outcome:'fixed',note:'Rebooted, all 4 up',actorName:'Synthetic Owner'});
+ assert.equal((await f.send('/api/unit-camera-status/troubleshoot-close','POST',{id,outcome:'fixed',note:''})).status,422);
+ assert.equal((await f.send('/api/unit-camera-status/troubleshoot-close','POST',{id,outcome:'fixed',note:'reset 192.168.10.14'})).status,422);
+ assert.equal((await f.send('/api/unit-camera-status/troubleshoot-close','POST',{id,outcome:'maybe',note:'x'})).status,422);
+ assert.equal(f.closed.length,1);
 });

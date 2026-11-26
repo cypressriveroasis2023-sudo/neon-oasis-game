@@ -296,6 +296,7 @@ const PSEC = [["place","Placed differently","mHelp is official, so the board sho
   ["mhShop","Shop, no camera feed","In mHelp's shop list with no camera record. Normal for units on the shelf."],
   ["bdShop","Shop feed, not in mHelp","Camera records under shop with nothing in mHelp: test devices, retired units, old tracker rows. Not counted."],
   ["morning","Morning list","Field units with cameras down. New ones (last 24 hours) first, then the ones still down, each with a likely cause from the router. Copy the lines straight onto the IT sheet. Units in the shop are left out."],
+  ["sent","Sent to IT","Troubleshoot results sent to IT that nobody has closed yet, oldest first. Open the unit to read the note and close it as Fixed or Not needed once something is done; the card keeps it for 7 days after."],
   ["swap","Router swapped","A unit still linked to its old router, which is offline, while InHand has a newer router named for that unit online and linked to nothing. Use the new router moves the unit's link, so the card and the morning list read the router that is really there. Its reading shows after the next InHand pull, within 30 minutes."],
   ["vcc","Moved in VCC","Camera records in COS that no longer match VCC: a camera VCC names for another unit, a camera VCC has that COS has never recorded, or one VCC stopped listing. VCC is right about its own cameras. Fix one with its button, or fix the name in VCC when there is no button."],
   ["routers","Router problems","Field units whose InHand router is offline, has poor signal, or reports a different IP than COS. A router reading is a hint only: it never proves the cameras work. Tap a unit to see its Router box, or copy the list for the IT sheet."],
@@ -333,11 +334,13 @@ function drawPunch(vs){
   cnt.routers = routerProblems(vs).length;
   cnt.morning = S.morning ? morningItems().length : 0;
   cnt.swap = S.swaps ? S.swaps.length : 0;
-  $("punchChips").replaceChildren(...PSEC.filter(([k])=>(k!=="vcc" || S.vcc) && (k!=="morning" || S.morning) && (k!=="swap" || (S.swaps && S.swaps.length))).map(([k,l])=>h("button",{class:"chip",type:"button","aria-pressed":String(S.psec===k),onclick:()=>{S.psec=k;drawPunch();}},l+" · "+(cnt[k]||0))));
+  cnt.sent = S.tsr ? S.tsr.filter(r=>!r.closed).length : 0;
+  $("punchChips").replaceChildren(...PSEC.filter(([k])=>(k!=="vcc" || S.vcc) && (k!=="morning" || S.morning) && (k!=="swap" || (S.swaps && S.swaps.length)) && (k!=="sent" || S.tsr)).map(([k,l])=>h("button",{class:"chip",type:"button","aria-pressed":String(S.psec===k),onclick:()=>{S.psec=k;drawPunch();}},l+" · "+(cnt[k]||0))));
   if(S.psec==="vcc"){ drawVcc(); return; }
   if(S.psec==="morning"){ drawMorning(); return; }
   if(S.psec==="routers"){ drawRouterProblems(vs); return; }
   if(S.psec==="swap"){ drawSwaps(); return; }
+  if(S.psec==="sent"){ drawSent(); return; }
   const sec=PSEC.find(p=>p[0]===S.psec), rows = S.psec==="done" ? items.filter(settled) : open.filter(i=>i.sec===S.psec);
   $("punchCount").textContent=sec[2];
   const can = S.db && S.canWrite!==false;
@@ -463,6 +466,44 @@ async function routerSwap(it){
   catch(err){ toast("Not swapped. "+((err && err.message) || "COS could not confirm the swap."), 14000); }
   S.busy=false; render();
 }
+/* Send to IT, closed loop (James, 26 Nov). A report stays Open until someone closes it with a note. */
+function sentFor(v){ const k=String(v.k||"").toUpperCase(); return (S.tsr||[]).filter(r=>String(r.unitKey||"").toUpperCase()===k); }
+function drawSent(){
+  const sec=PSEC.find(p=>p[0]==="sent"), items=(S.tsr||[]).filter(r=>!r.closed).slice().sort((a,b)=>String(a.at).localeCompare(String(b.at)));
+  $("punchCount").textContent = sec[2];
+  const byKey={}; for(const v of Object.values(S.vmap||{})) byKey[String(v.k).toUpperCase()]=v;
+  $("punchList").replaceChildren(...(items.length ? items.map(r=>{
+    const uv=byKey[String(r.unitKey||"").toUpperCase()];
+    return h("div",{class:"prow"+(uv?" s-"+uv.status:"")},h("button",{class:"pmain",type:"button",disabled:!uv,onclick:()=>{ if(uv) openUnit(uv.id); }},
+      h("span",{class:"name",text:(uv && uv.name) || r.unitName || r.unitKey}),
+      h("span",{class:"sub"},h("b",{text:"Sent: "}),morningWhen(r.at)+" by "+(r.by||"someone")+(r.managerHelp ? " · manager help asked" : "")),
+      h("span",{class:"sub"},h("b",{text:"Found: "}),r.result||""),
+      h("span",{class:"sub"},h("b",{text:"Note: "}),r.note||"")));
+  }) : [h("div",{class:"empty",text:"Nothing sent to IT is waiting."})]));
+}
+function sentBox(v){
+  const list=sentFor(v); if(!list.length) return null;
+  const can = S.can===true && !!(hooks && typeof hooks.onTroubleClose==="function");
+  const rows=list.map(r=>{
+    const head=h("p",{class:"note"},h("b",{text:r.closed ? (r.outcome==="not_needed" ? "Not needed" : "Fixed")+" · " : "Open · "}),"sent "+morningWhen(r.at)+" by "+(r.by||"someone")+": "+(r.result||""));
+    const note=h("p",{class:"note",text:r.note||""});
+    if(r.closed) return h("div",{class:"tsr done"},head,note,h("p",{class:"note"},h("b",{text:"Closed: "}),morningWhen(r.closedAt)+" by "+(r.closedBy||"someone")+": "+(r.closedNote||"")));
+    if(!can) return h("div",{class:"tsr open"},head,note);
+    const inp=h("input",{type:"text",maxlength:"1000",placeholder:"What was done (last octet only, no full IP)","aria-label":"What was done"});
+    const close=async(outcome)=>{
+      const said=inp.value.trim(); if(!said){ toast("Say what was done before closing it.", 6000); inp.focus(); return; }
+      if(S.busy) return; S.busy=true; drawPanel();
+      try{ await hooks.onTroubleClose(r.id, outcome, said); toast(outcome==="fixed" ? "Closed as fixed." : "Closed as not needed.", 6000); }
+      catch(err){ toast("Not closed. "+((err && err.message) || "COS could not confirm it."), 12000); }
+      S.busy=false; render();
+    };
+    return h("div",{class:"tsr open"},head,note,inp,h("div",{class:"btns"},
+      h("button",{class:"fixbtn",type:"button",disabled:S.busy,onclick:()=>close("fixed")},"Fixed"),
+      h("button",{class:"fixbtn alt",type:"button",disabled:S.busy,onclick:()=>close("not_needed")},"Not needed")));
+  });
+  return h("div",{class:"box",id:"sentBox"},h("h3",{text:"Sent to IT · "+list.filter(r=>!r.closed).length+" open"}),rows);
+}
+function setReports(v){ S.tsr = Array.isArray(v) ? v.filter(x=>x && typeof x.id==="string") : null; if(S.meta) render(); }
 function setSwaps(v){ S.swaps = Array.isArray(v) ? v.filter(x=>x && typeof x.key==="string" && /^swap:/.test(x.key)) : null; if(S.meta) render(); }
 function setMorning(v){ S.morning = v && Array.isArray(v.items) ? {since: v.since||null, items: v.items.filter(x=>x && typeof x.unitKey==="string")} : null; if(S.meta) render(); }
 function setVcc(v){ S.vcc = v && Array.isArray(v.items) ? {fresh: v.fresh===true, syncedAt: v.syncedAt||null, items: v.items.filter(x=>x && typeof x.key==="string")} : null; if(S.meta) render(); }
@@ -1103,6 +1144,8 @@ function drawPanel(){
      so nobody has to scroll or search for them. Each one jumps to its box or runs straight away. */
   const tools = toolsBar(v, tb);
   if(tools) body.splice(body.indexOf(dg)+1,0,tools);
+  /* Anything sent to IT for this unit shows right under the tools, Open until someone closes it. */
+  const sbx = sentBox(v); if(sbx) body.splice(body.indexOf(tools || dg)+1,0,sbx);
   body.push(histBox(v));
 
   P.className="panel s-"+v.status;
@@ -2059,5 +2102,5 @@ function openByName(name){
 /* Whether this person may make a hand fix right now, and the reason when not. */
 function setEdit(state){ S.can = !!(state && state.can===true); S.canWhy = (state && state.why) || ""; if(S.meta) render(); }
 function destroy(){ for(const fn of cleanups.splice(0)){ try{ fn(); }catch(_){} } clearTimeout(toastTimer); clearTimeout(announceTimer); clearTimeout(savedTimer); cancelAnimationFrame(M.raf); root.replaceChildren(); }
-return { update, setEdit, setVcc, setMorning, setSwaps, destroy, root, setTurn: tvTurn, openByName };
+return { update, setEdit, setVcc, setMorning, setSwaps, setReports, destroy, root, setTurn: tvTurn, openByName };
 }

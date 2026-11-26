@@ -786,6 +786,37 @@ test('the other COS screens open from the board, by the names IT sees', async ({
   await expect.poll(() => host.evaluate(element => element.ownerDocument.defaultView.location.hash)).toBe('#camera-health');
 });
 
+test('Send to IT stays Open on the card until someone closes it with a note', async ({page}, info) => {
+  test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');
+  // James, 26 Nov: close the loop on Send to IT, so he can see IT acted on it.
+  const id = '11111111-1111-4111-8111-111111111111';
+  const open = {id, unitKey: 'SPOTTER 002', unitName: 'Spotter 002', result: 'Router offline', next: null, managerHelp: false, note: 'Router dark since morning', by: 'Fixture IT', at: fresh, closed: false};
+  const {host, state} = await phoneBoard(page, units, {troubleshootReports: [open]});
+  const sent = [];
+  await page.route('**/functions/v1/cos-unit-camera-status', async route => {
+    const request = route.request();
+    if (request.method() === 'OPTIONS') return route.fallback();
+    const envelope = JSON.parse(request.postData() || '{}');
+    if (envelope.path !== '/api/unit-camera-status/troubleshoot-close') return route.fallback();
+    sent.push(envelope.body);
+    return route.fulfill({status: 200, headers: {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+      json: {contract: 'COS_TROUBLESHOOT_CLOSED_V1', id, closedAt: fresh, by: 'Fixture Owner', duplicate: false, troubleshootReports: [{...open, closed: true, outcome: 'fixed', closedNote: 'Power cycled the router', closedBy: 'Fixture Owner', closedAt: fresh}]}});
+  });
+  await openUnit(host, 'Spotter 002');
+  await expect.poll(() => panel(host)).toContain('Sent to IT · 1 open');
+  // A note is required before it can be closed.
+  await inBoard(host, root => [...root.querySelectorAll('#sentBox button')].find(b => b.textContent === 'Fixed').click());
+  await expect.poll(() => toastText(host)).toContain('Say what was done');
+  expect(sent).toEqual([]);
+  await inBoard(host, root => { const i = root.querySelector('#sentBox input'); i.value = 'Power cycled the router'; i.dispatchEvent(new Event('input', {bubbles: true})); });
+  await inBoard(host, root => [...root.querySelectorAll('#sentBox button')].find(b => b.textContent === 'Fixed').click());
+  await expect.poll(() => sent.length).toBe(1);
+  expect(sent[0]).toEqual({id, outcome: 'fixed', note: 'Power cycled the router'});
+  await expect.poll(() => panel(host)).toContain('Sent to IT · 0 open');
+  expect(await panel(host)).toContain('Power cycled the router');
+  expect(state.errors).toEqual([]);
+});
+
 test('Router swapped lists a unit still linked to its old router, and one tap moves it to the new one', async ({page}, info) => {
   test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');
   // James, 25 Nov: Spotter 265 still pointed at its old, offline router while the new one was online in InHand.
