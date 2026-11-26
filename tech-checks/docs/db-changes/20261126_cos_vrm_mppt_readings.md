@@ -20,6 +20,13 @@ The SQL is `tech-checks/operations/db/20261125_cos_vrm_mppt_readings.sql`, appli
 - 154 rows saved for 14 units, 11 readings each. Victron sends, per charger: `/Pv/V`, `/Dc/0/Voltage`, `/Dc/0/Current`, `/State`, `/ErrorCode`, `/MppOperationMode`, `/History/Daily/0/Yield`, `/History/Daily/0/MaxPower`, `/History/Daily/1/Yield`, `/History/Daily/1/MaxPower`, `/Yield/User`. It does not send `/Pv/I`.
 - 22 charger path names recorded in `mppt_paths_seen`.
 
+## Stage 2, same day (about 09:47 CST): the read for the app
+
+- `public.cos_vrm_mppt_read()` (`tech-checks/operations/db/20261126_cos_vrm_mppt_read.sql`, migration `cos_vrm_mppt_read`): one row per Helios, execute granted to `service_role` only.
+- Edge function `cos-vrm-mppt-read` (v1, `verify_jwt=false`): read-only, the same gate as `cos-vrm-history` (the caller's token is forwarded to Operations `GET /api/vrm-fleet`; readings are served only on a 200). It deploys with `cos-vrm-history/history.ts` as a relative dependency. Main = deployed.
+- Checked: `anon` and `authenticated` cannot execute the read; it returns 14 units; a plain GET to the function answers 405 "Use POST.".
+- Rollback for this stage: `drop function if exists public.cos_vrm_mppt_read();` and delete the `cos-vrm-mppt-read` edge function. The app shows no Panels line when it is unreachable.
+
 ## Rollback
 
 ```sql
