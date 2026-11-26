@@ -288,6 +288,7 @@ const PSEC = [["place","Placed differently","mHelp is official, so the board sho
   ["mhShop","Shop, no camera feed","In mHelp's shop list with no camera record. Normal for units on the shelf."],
   ["bdShop","Shop feed, not in mHelp","Camera records under shop with nothing in mHelp: test devices, retired units, old tracker rows. Not counted."],
   ["vcc","Moved in VCC","Camera records in COS that no longer match VCC: a camera VCC names for another unit, a camera VCC has that COS has never recorded, or one VCC stopped listing. VCC is right about its own cameras. Fix one with its button, or fix the name in VCC when there is no button."],
+  ["routers","Router problems","Field units whose InHand router is offline, has poor signal, or reports a different IP than COS. A router reading is a hint only: it never proves the cameras work. Tap a unit to see its Router box, or copy the list for the IT sheet."],
   ["done","Fixed by hand","Set by hand in COS, so these are off the list and stay off. mHelp still shows them differently: make the same change there when you can."]];
 /* The answers James added for the punch list: where each unit really is, what record to fix, and who fixes it. */
 function normName(n){ return String(n||"").toUpperCase().replace(/SOLAR\s*SPOTTER/,"SS").replace(/RECON\s*(II|2)/,"RII").replace(/CAM[\s-]*V/,"CAMV").replace(/[^A-Z0-9.]/g,""); }
@@ -319,8 +320,10 @@ function drawPunch(vs){
     h("p",{class:"note",text:"mHelp is the official count: "+mh.meta.total+" pieces of equipment, "+mh.meta.field+" in the field and "+mh.meta.shop+" in the shop. "+mh.meta.stands+" of those are stands, poles and skids ("+mh.meta.standsField+" in the field). They count, but they have no cameras, so they are not listed on this board."}),
     h("p",{class:"note",text:"mHelp read "+when(mh.meta.at)+". Camera systems read "+when(S.meta.v)+"."}));
   cnt.vcc = S.vcc ? S.vcc.items.length : 0;
+  cnt.routers = routerProblems(vs).length;
   $("punchChips").replaceChildren(...PSEC.filter(([k])=>k!=="vcc" || S.vcc).map(([k,l])=>h("button",{class:"chip",type:"button","aria-pressed":String(S.psec===k),onclick:()=>{S.psec=k;drawPunch();}},l+" · "+(cnt[k]||0))));
   if(S.psec==="vcc"){ drawVcc(); return; }
+  if(S.psec==="routers"){ drawRouterProblems(vs); return; }
   const sec=PSEC.find(p=>p[0]===S.psec), rows = S.psec==="done" ? items.filter(settled) : open.filter(i=>i.sec===S.psec);
   $("punchCount").textContent=sec[2];
   const can = S.db && S.canWrite!==false;
@@ -333,6 +336,40 @@ function drawPunch(vs){
     const uv = it.unit && S.vmap ? S.vmap[it.unit] : null;
     return h("div",{class:"prow"+(uv?" s-"+uv.status:"")},main,btn);
   }) : [h("div",{class:"empty",text:"Nothing here."})]));
+}
+/* Router problems (James, 25 Nov: "make it better"). Field units only, from the 30-minute InHand reading (fresh
+   readings only, never a guess). Worst first: a down unit whose router is also off, then any router off, then poor
+   signal, then an IP that differs from the COS record. Each line says what to check first. */
+function routerProblems(vs){
+  if(!S.rd) return [];
+  const out=[];
+  for(const v of (vs||allViews())){
+    if(v.mhOnly || v.place!=="field") continue;
+    const ih=inhandNow(v.u); if(!ih.r || !ih.st) continue;
+    const r=ih.r, word=signalWord(r.sig), why=[];
+    let rank=9, first="";
+    if(ih.st==="of"){ rank = v.status==="down" ? 0 : 1; why.push("Router offline (InHand read "+when(secOf(r.at))+")"); first="Check power at the unit first, then the SIM and antenna."; }
+    if(ih.st==="on" && word==="Poor"){ rank=Math.min(rank,2); why.push("Poor signal"+(r.sig && typeof r.sig.rsrp==="number" ? " ("+r.sig.rsrp+" dBm)" : "")); first = first || "Check the antenna and its cable; a higher mount or a different carrier SIM may help."; }
+    if(r.cosDiffers){ rank=Math.min(rank,3); why.push("InHand IP "+r.ip+" differs from the COS record"); first = first || "Check which address the cameras answer on before changing the COS record."; }
+    if(rank<9) out.push({v, r, rank, why, first});
+  }
+  return out.sort((a,b)=>a.rank-b.rank || String(a.v.name).localeCompare(String(b.v.name)));
+}
+function drawRouterProblems(vs){
+  const sec=PSEC.find(p=>p[0]==="routers"), list=routerProblems(vs);
+  $("punchCount").textContent = sec[2] + (S.rd ? "" : " Router readings have not loaded yet.");
+  const lineOf = p => p.v.name+(p.v.site ? " ("+p.v.site+")" : "")+": "+p.why.join("; ")+". "+p.first;
+  const copy = list.length ? h("div",{class:"prow"},h("button",{class:"pdone",type:"button",onclick:()=>{
+    const text="Router problems, "+new Date().toLocaleDateString()+"\n"+list.map(p=>"- "+lineOf(p)).join("\n");
+    try{ navigator.clipboard.writeText(text).then(()=>toast("Router list copied."),()=>toast("Couldn't copy in this view.")); }catch(_){ toast("Couldn't copy in this view."); } }},"Copy list for the IT sheet")) : null;
+  $("punchList").replaceChildren(...(list.length ? [copy, ...list.map(p=>{
+    const main=h("button",{class:"pmain",type:"button",onclick:()=>openUnit(p.v.id)},
+      h("span",{class:"name"},p.v.name, p.v.status==="down" ? h("span",{class:"tag",text:"Down"}) : null),
+      p.v.site ? h("span",{class:"sub"},h("b",{text:"Site: "}),p.v.site) : null,
+      h("span",{class:"sub"},h("b",{text:"What: "}),p.why.join("; ")),
+      h("span",{class:"sub ans"},h("b",{text:"Check first: "}),p.first));
+    return h("div",{class:"prow s-"+p.v.status},main);
+  })] : [h("div",{class:"empty",text: S.rd ? "No field router problems in the latest InHand reading." : "Router readings have not loaded yet."})]));
 }
 /* Moved in VCC (James, 25 Nov). VCC is right about its own cameras; COS's records follow it one tap at a time.
    Tech Check works the list out again before any change and refuses one that is no longer listed or not safe. */
@@ -551,6 +588,7 @@ async function loadRouters(){
     if(!res || res.ok!==true || !res.data) return;
     S.rd = new Map(res.data.routers.map(r=>[unitKeyOf(r.unit), r]));
     if(S.meta) render(); else if(S.openId) drawPanel();
+    if(S.view==="punch" && S.meta) drawPunch();
   }catch(_){ /* the card simply has no router box */ }
 }
 /* The cameras COS has as off right now, by name, with when each was last online. The camera list first; the unit's own list as a fallback. */
