@@ -258,7 +258,7 @@ test('what is fixed by hand is off the punch list and stays off', async ({page},
   await inBoard(host, root => root.getElementById('tabPunch').click());
   const chips = () => inBoard(host, root => [...root.querySelectorAll('#punchChips .chip')].map(chip => chip.textContent));
   // Only the unit nobody has settled is open. The one set by hand is under its own heading, with what mHelp still says.
-  await expect.poll(chips).toEqual(['Placed differently · 1', 'Field, no IP in COS · 0', 'Field, no camera feed · 0', 'Field feed, not in mHelp · 0', 'Names differ · 0', 'Shop, no camera feed · 0', 'Shop feed, not in mHelp · 0', 'Fixed by hand · 1']);
+  await expect.poll(chips).toEqual(['Placed differently · 1', 'Field, no IP in COS · 0', 'Field, no camera feed · 0', 'Field feed, not in mHelp · 0', 'Names differ · 0', 'Shop, no camera feed · 0', 'Shop feed, not in mHelp · 0', 'Router problems · 0', 'Fixed by hand · 1']);
   expect(await inBoard(host, root => [root.querySelector('#punchTop .big').textContent, ...[...root.querySelectorAll('#punchList .prow .name')].map(name => name.textContent)])).toEqual(['1 place where the camera systems disagree with mHelp', 'Spotter 002']);
   await inBoard(host, root => [...root.querySelectorAll('#punchChips .chip')].find(chip => chip.textContent.startsWith('Fixed by hand')).click());
   expect(await inBoard(host, root => [root.getElementById('punchCount').textContent, ...[...root.querySelectorAll('#punchList .prow')].map(row => row.textContent)])).toEqual([

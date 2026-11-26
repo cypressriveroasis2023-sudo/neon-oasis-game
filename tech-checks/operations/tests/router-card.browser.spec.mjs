@@ -1,5 +1,5 @@
 import {test, expect} from '@playwright/test';
-import {mountFleet, fresh} from './fleet-dashboard-fixtures.mjs';
+import {mountFleet, fresh, field} from './fleet-dashboard-fixtures.mjs';
 import {countUnits} from '../shared/starUnitStatus.ts';
 import {mountRouterFixture} from './fixtures/routers.mjs';
 
@@ -131,4 +131,34 @@ test('an offline router reads Offline everywhere on the card, and its button is 
   expect(card.panel).not.toContain('Router readings have not loaded yet');
   expect(card.panel).toContain('The router is offline, so its page will not open');
   expect(card.panel).toContain('Last signal');
+});
+
+test('Punch list: Router problems lists field units with an offline router, down units first, and copies for the IT sheet', async ({page}, info) => {
+  test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');
+  const record = (id, unitNumber, category) => ({recordId: 'mhelp_product:' + id, productId: String(id), unitNumber, category, placement: 'FIELD', uploadLifecycle: 'UNFLAGGED', customer: 'Fixture Homes'});
+  const value = structuredClone(field);
+  value.uploadInventory = {
+    contract: 'COS_MHELP_UPLOAD_INVENTORY_V1', source: 'mhelpdesk_api', countBasis: 'mhelp_product_records_not_unique_physical_units', sourceSha256: 'a'.repeat(64), receivedAt: fresh, lastApiReadAt: fresh,
+    records: [record(1, 'Helios 001', 'Helios Solar Tower'), record(2, 'Spotter 002', 'Spotter'), record(3, 'Spotter 003', 'Spotter')],
+    summary: {totalRecords: 3, fieldRecords: 3, shopRecords: 0, unflaggedFieldRecords: 3, doNotUseRecords: 0, missingRecords: 0},
+  };
+  const {app} = await mountFleet(page, false, {cameraStatus: report, field: value});
+  const host = app.locator('.cos-board-host');
+  await expect.poll(() => inBoard(host, root => root.querySelectorAll('.tile').length)).toBe(4);
+  await detailsServer(page, {routers: [
+    {unit: 'SPOTTER 002', serial: 'RF3022412359403', status: 'offline', at: fresh, port: 8080},
+    {unit: 'HELIOS 001', serial: 'RF3022412359404', status: 'online', at: fresh, ip: '203.0.113.9', port: 8080, sig: {level: 1, rsrp: -112}}], unmatched: [], units: []});
+  await page.route('**/functions/v1/cos-unit-camera-status', route => route.request().method() === 'OPTIONS'
+    ? route.fulfill({status: 204, headers: {'access-control-allow-origin': '*', 'access-control-allow-headers': '*'}})
+    : route.fulfill({status: 200, headers: {'access-control-allow-origin': '*'}, json: report}));
+  await inBoard(host, root => root.getElementById('refresh').click());
+  await refreshed(host);
+  await inBoard(host, root => root.getElementById('tabPunch').click());
+  await expect.poll(() => inBoard(host, root => [...root.querySelectorAll('#punchChips .chip')].map(c => c.textContent).find(t => t.startsWith('Router problems')) || '')).toBe('Router problems · 2');
+  await inBoard(host, root => [...root.querySelectorAll('#punchChips .chip')].find(c => c.textContent.startsWith('Router problems')).click());
+  const rows = await inBoard(host, root => [...root.querySelectorAll('#punchList .prow .pmain')].map(r => r.textContent));
+  expect(rows.length).toBe(2);
+  expect(rows[0]).toContain('Spotter 002'); expect(rows[0]).toContain('Router offline'); expect(rows[0]).toContain('Check power at the unit first');
+  expect(rows[1]).toContain('Helios 001'); expect(rows[1]).toContain('Poor signal (-112 dBm)');
+  expect(await inBoard(host, root => root.querySelector('#punchList .pdone')?.textContent)).toBe('Copy list for the IT sheet');
 });

@@ -59,6 +59,11 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-26** — Tech Check: `cos_router_details_v1` trusts InHand's public IP only
+  while the router is online (fresh) and no other online router shares it; else the COS
+  record. Offline routers keep stale, reassigned IPs in InHand. "IP differs" 6 → 2; no
+  COS IP changed. Record in
+  `tech-checks/docs/db-changes/20261126_router_details_trust_inhand_ip_only_when_online.md`.
 - **2026-11-26** — Operations patch `cos-unit-camera-status/down-needs-two-misses-v22`
   is **prepared, not deployed** (starts from live v22 `a306656f`). A Sniper or CAM V
   whose saved check missed once reads Not verified ("Avigilon check missed once,
