@@ -2,6 +2,7 @@ import {readVrmFleetConfig} from '../../../supabase/functions/cos-operations-pag
 import {canonicalCameraUnit} from '../fieldCameraHealth';
 import {readDashboardPower, unitTileSummary, type TileTone} from '../vrmReadOnlyModel';
 import {cloudyWarning, outlookLine, type OutlookDay} from '../vrmWeather';
+import {mpptFlags, mpptLine, type Mppt} from '../vrmMppt';
 import {historyFlags, overnightLow, tonightBasis, tonightForecast, tonightHeadline, tonightSteps, type HistoryPoint} from '../vrmHistory';
 
 /** One Helios unit's Victron reading as the COS Board draws it.
@@ -15,7 +16,9 @@ export type BoardPower = {b: number | null; w: number | null; v: number | null; 
   /** Tonight's estimate (5 PM to 7 AM): verdict, one-line headline, why, and steps for a tech. */
   tn?: {v: 'ok' | 'tight' | 'low' | 'charging'; h: string; b: string; s: string[]};
   /** Sun for the next two days at this unit's site ("☀ Today · ☁ Tomorrow"), and a warning when gray days meet a low battery. */
-  sk?: {o: string; w?: string}};
+  sk?: {o: string; w?: string};
+  /** Solar charger (MPPT): what the panels made, and any charger or panel trouble. Only while the charger is reporting. */
+  mp?: {l: string; w?: string[]}};
 
 const seconds = (value?: string) => {
   const time = value ? Date.parse(value) : NaN;
@@ -27,7 +30,7 @@ const seconds = (value?: string) => {
  * Only HELIOS names are matched. Two installations with the same number match nothing rather than a guess.
  * Separate batteries are never averaged: the system reading wins, otherwise the lowest single monitor.
  */
-export function boardPowerByUnit(fleetData: unknown, now: number, history?: ReadonlyMap<number, HistoryPoint[]> | null, weather?: ReadonlyMap<string, OutlookDay[]> | null): Map<string, BoardPower> {
+export function boardPowerByUnit(fleetData: unknown, now: number, history?: ReadonlyMap<number, HistoryPoint[]> | null, weather?: ReadonlyMap<string, OutlookDay[]> | null, mppt?: ReadonlyMap<number, Mppt> | null): Map<string, BoardPower> {
   const out = new Map<string, BoardPower>();
   let items: ReturnType<typeof readVrmFleetConfig>['items'];
   try { items = readVrmFleetConfig(fleetData).items; } catch { return out; }
@@ -65,6 +68,12 @@ export function boardPowerByUnit(fleetData: unknown, now: number, history?: Read
         const w = tile.fresh && tile.soc ? cloudyWarning(o, tile.soc.value) : null;
         return {sk: {o: outlookLine(o), ...(w ? {w} : {})}};
       })(weather?.get(key))),
+      ...((m => {
+        const l = mpptLine(m, now);
+        if (!l) return {};
+        const w = mpptFlags(m, now).map(f => f.line);
+        return {mp: {l, ...(w.length ? {w} : {})}};
+      })(mppt?.get(item.installationId))),
     });
   }
   return out;

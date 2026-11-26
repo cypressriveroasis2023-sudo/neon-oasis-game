@@ -3,11 +3,12 @@ import {inventoryPlacement} from './fleetSnapshot';
 import {shortDate, unitTileSummary} from './vrmReadOnlyModel';
 import {historyFlags, tonightHeadline, type HistoryPoint, type Tonight} from './vrmHistory';
 import {cloudyWarning, type OutlookDay} from './vrmWeather';
+import {mpptFlags, peerYield, type Mppt} from './vrmMppt';
 import type {VrmUnit} from '../../supabase/functions/cos-operations-pages/vrm';
 import type {SafeVrmPower} from '../../supabase/functions/cos-operations-pages/vrmSafePower';
 
 export type VictronPlacement = 'field' | 'shop' | 'unknown';
-export type VictronAttention = {installationId: number; name: string; kind: 'alarm' | 'low' | 'tonight' | 'fair' | 'overnight' | 'notfull' | 'load' | 'cloudy' | 'solar' | 'tight' | 'unknown' | 'off'; line: string};
+export type VictronAttention = {installationId: number; name: string; kind: 'alarm' | 'low' | 'tonight' | 'fair' | 'overnight' | 'charger' | 'panel' | 'notfull' | 'load' | 'cloudy' | 'solar' | 'tight' | 'unknown' | 'off'; line: string};
 type InventoryUnit = {unitNumber?: string; placement?: string; currentLocationType?: string; effectivePlacement?: {contract?: string; state?: string}};
 
 /** Field or Shop from the one mHelp unit with the same Helios number. None or two matches stay unknown. */
@@ -24,8 +25,10 @@ export function placementLabel(placement: VictronPlacement): string {
 }
 
 /** Field units only. Shop units are never an outage. A stale or missing reading is "power unknown", never "dead". */
-export function victronNeedsAttention(units: readonly VrmUnit[], rows: SafeVrmPower[], inventory: readonly InventoryUnit[] | null, now: number, history?: ReadonlyMap<number, HistoryPoint[]> | null, tonight?: ReadonlyMap<number, Tonight> | null, weather?: ReadonlyMap<string, OutlookDay[]> | null): VictronAttention[] {
+export function victronNeedsAttention(units: readonly VrmUnit[], rows: SafeVrmPower[], inventory: readonly InventoryUnit[] | null, now: number, history?: ReadonlyMap<number, HistoryPoint[]> | null, tonight?: ReadonlyMap<number, Tonight> | null, weather?: ReadonlyMap<string, OutlookDay[]> | null, mppt?: ReadonlyMap<number, Mppt> | null): VictronAttention[] {
   const out: VictronAttention[] = [];
+  const fieldIds = units.filter(unit => heliosPlacement(unit.name, inventory) === 'field').map(unit => unit.installationId);
+  const peers = peerYield(mppt, fieldIds, now);
   for (const unit of units) {
     if (heliosPlacement(unit.name, inventory) !== 'field') continue;
     const tile = unitTileSummary(unit, rows, now);
@@ -46,12 +49,20 @@ export function victronNeedsAttention(units: readonly VrmUnit[], rows: SafeVrmPo
     if ((tile.tone === 'good' || tile.tone === 'fair') && !out.some(item => item.installationId === unit.installationId)) {
       for (const flag of historyFlags(history?.get(unit.installationId) ?? [], now)) out.push({installationId: unit.installationId, name: unit.name, kind: flag.kind, line: flag.line});
     }
+    // Charger readings (best-effort): a charger error always shows; panel trouble only when nothing stronger is listed.
+    if (tile.tone === 'good' || tile.tone === 'fair' || tile.tone === 'low') {
+      const listed = out.filter(item => item.installationId === unit.installationId);
+      const needed = listed.some(item => item.kind === 'notfull' || item.kind === 'overnight' || item.kind === 'low' || item.kind === 'fair' || item.kind === 'tonight');
+      for (const flag of mpptFlags(mppt?.get(unit.installationId), now, {needed, peerYield: peers})) {
+        if (flag.kind === 'charger' || !listed.some(item => item.kind === 'alarm')) out.push({installationId: unit.installationId, name: unit.name, kind: flag.kind, line: flag.line});
+      }
+    }
     // Weather (best-effort): gray days ahead with the battery already down.
     if ((tile.tone === 'good' || tile.tone === 'fair') && tile.soc && !out.some(item => item.installationId === unit.installationId)) {
       const key = canonicalCameraUnit(unit.name), line = key ? cloudyWarning(weather?.get(key) ?? [], tile.soc.value) : null;
       if (line) out.push({installationId: unit.installationId, name: unit.name, kind: 'cloudy', line});
     }
   }
-  const rank = {alarm: 0, low: 1, tonight: 2, fair: 3, overnight: 4, notfull: 5, load: 6, cloudy: 7, solar: 8, tight: 9, off: 10, unknown: 11};
+  const rank = {alarm: 0, charger: 1, low: 2, tonight: 3, panel: 4, fair: 5, overnight: 6, notfull: 7, load: 8, cloudy: 9, solar: 10, tight: 11, off: 12, unknown: 13};
   return out.sort((a, b) => rank[a.kind] - rank[b.kind] || a.name.localeCompare(b.name, undefined, {numeric: true}));
 }

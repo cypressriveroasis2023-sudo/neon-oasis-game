@@ -185,3 +185,4 @@ html[data-theme='light'] .vrm-fleet-summary li,html[data-theme='light'] .vrm-wor
 .vrm-sky span{text-transform:uppercase;letter-spacing:.06em;font-size:11px;font-weight:700;opacity:.7}
 .vrm-sky b{font-weight:650}
 .vrm-sky em{flex-basis:100%;font-style:normal;color:#f5b942;font-weight:650}
+.vrm-attention .vrm-attn-charger span{color:#ff6b7a;font-weight:700}.vrm-attention .vrm-attn-panel span{color:#f5b942;font-weight:650}
