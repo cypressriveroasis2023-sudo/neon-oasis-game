@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {projectIpCheckUnits, projectReconUnits, mergeUnitSources} from '../shared/otherUnitStatus.ts';
+import {projectIpCheckUnits, projectReconUnits, mergeUnitSources, unconfirmedMiss, DOWN_AFTER_MISSES} from '../shared/otherUnitStatus.ts';
 import {applyHandEdits, countUnits} from '../shared/starUnitStatus.ts';
 
 const NOW = Date.parse('2026-11-13T21:40:00Z');
@@ -17,6 +17,45 @@ test('an Avigilon unit is one line: up on a fresh answer, down on a fresh failur
   assert.deepEqual(up.down, []);
   const [down] = projectIpCheckUnits([sniper()], [check({overall_status: 'offline'})], NOW);
   assert.equal(down.state, 'RED');
+});
+
+// 25 Nov 2026, 4:30pm: eight field Snipers failed one sweep together and the board
+// read all eight as Down. Fifteen minutes later seven were back. Over that week 55%
+// of "offline" answers were gone by the next sweep.
+test('one missed check is Not verified with the reason on the card; the second miss is Down', () => {
+  const miss = failures => projectIpCheckUnits([sniper()],
+    [check({overall_status: 'offline', consecutive_failures: failures, confirmed_outage: failures >= 3})], NOW)[0];
+  const once = miss(1);
+  assert.deepEqual([once.state, once.online, once.offline, once.unknown], ['UNKNOWN', 0, 0, 1]);
+  assert.deepEqual(once.down, [{name: 'Avigilon check missed once, checking again', status: 'unknown'}]);
+  for (const failures of [2, 3]) {
+    const unit = miss(failures);
+    assert.deepEqual([unit.state, unit.offline], ['RED', 1], 'failures=' + failures);
+    assert.deepEqual(unit.down, [{name: 'Avigilon check', status: 'offline'}]);
+  }
+  assert.equal(DOWN_AFTER_MISSES, 2);
+});
+
+test('an outage is never hidden because the count was not read', () => {
+  // A row with no count, a null count or a junk count is NOT a first miss: it stays Down.
+  for (const over of [{}, {consecutive_failures: null}, {consecutive_failures: undefined}, {consecutive_failures: '1'}, {consecutive_failures: 1.5}]) {
+    const [unit] = projectIpCheckUnits([sniper()], [check({overall_status: 'offline', ...over})], NOW);
+    assert.equal(unit.state, 'RED', JSON.stringify(over));
+  }
+  // A confirmed outage is Down whatever the count says.
+  const [confirmed] = projectIpCheckUnits([sniper()], [check({overall_status: 'offline', consecutive_failures: 1, confirmed_outage: true})], NOW);
+  assert.equal(confirmed.state, 'RED');
+  assert.equal(unconfirmedMiss({consecutive_failures: 1}), true);
+  assert.equal(unconfirmedMiss({consecutive_failures: 2}), false);
+  assert.equal(unconfirmedMiss(null), false);
+});
+
+test('a missed check changes nothing about an answer that came back', () => {
+  // Up stays Up with a zero count, and a stale miss is still just stale.
+  const [up] = projectIpCheckUnits([sniper()], [check({consecutive_failures: 0, confirmed_outage: false})], NOW);
+  assert.deepEqual([up.state, up.down], ['GREEN', []]);
+  const [stale] = projectIpCheckUnits([sniper()], [check({overall_status: 'offline', consecutive_failures: 1, checked_at: '2026-11-12T19:00:00Z'})], NOW);
+  assert.deepEqual(stale.down, [{name: 'Avigilon check', status: 'unknown'}]);
 });
 
 test('an old, missing or half-finished check is Not verified, never down and never up', () => {

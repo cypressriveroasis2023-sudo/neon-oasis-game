@@ -59,6 +59,14 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-26** — Operations patch `cos-unit-camera-status/down-needs-two-misses-v22`
+  is **prepared, not deployed** (starts from live v22 `a306656f`). A Sniper or CAM V
+  whose saved check missed once reads Not verified ("Avigilon check missed once,
+  checking again") instead of Down; the second miss in a row, or a confirmed outage,
+  is Down. The read adds `confirmed_outage,consecutive_failures` to its
+  `camera_health_current` select; nothing is written. Source:
+  `tech-checks/operations/shared/otherUnitStatus.ts`. Rollback `rollback-to-v22-entry`.
+  If another patch to this function deploys first, this one must be rebuilt on it.
 - **2026-11-25** — Vendor follow-ups (prepared, deploy pending James): Tech Check
   `cos-vendor-requests-v3.sql` (EYE account number per unit in `app_private.vendor_unit_accounts`,
   `vendor_requests.closed_*`, four service_role functions; reads `camera_devices.eyeforce_id`, never
