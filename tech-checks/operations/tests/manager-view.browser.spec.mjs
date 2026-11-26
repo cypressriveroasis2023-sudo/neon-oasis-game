@@ -305,3 +305,80 @@ test('the Manager tab shows every truck against the standard; the owner changes 
   const calls = (await page.evaluate(() => window.fixture.rpc)).map(c => c.name).filter(n => n.startsWith('owner_truck_') && n !== 'owner_truck_board_v1');
   expect(calls).toEqual(['owner_truck_standard_set_v1', 'owner_truck_extra_remove_v1']);
 });
+
+test('the owner turns "SIMs must come from the drawer" on after a warning, and off again', async ({page}) => {
+  const fixture = {manager: manager()};
+  fixture.manager.sims = {require_listed: false,
+    cards: [{sim: '89012600000000000001', carrier: 'Simetry', status: 'in_drawer', location: null, note: null, updated_by: 'Owner Fixture', updated_at: '2026-11-25T15:00:00Z'}],
+    not_in_drawer: [{sim: '89012600000000000077', detail: 'Handed over in Sniper 332 to Riley Fixture', by: 'Jordan Fixture', at: '2026-11-25T16:00:00Z'}]};
+  const {frame, host} = await mount(page, fixture);
+  await openManager(frame, host);
+  await expect.poll(() => textOf(host, 'mgSim')).toContain('SIMs must come from the drawer: Off');
+  expect(await textOf(host, 'mgSim')).toContain('Any SIM can be handed over.');
+  await press(host, '#mgSim', 'Turn on');
+  const warn = await textOf(host, 'mgSim');
+  for (const part of ['IT cannot hand over a unit with a SIM that is not on the drawer list', '1 SIM handed out lately was not on the list, so add every card on hand first.']) expect(warn).toContain(part);
+  // Cancel changes nothing.
+  await press(host, '#mgSim', 'Cancel');
+  expect((await page.evaluate(() => window.fixture.rpc)).some(c => c.name === 'sim_drawer_require_v1')).toBe(false);
+  await press(host, '#mgSim', 'Turn on');
+  await press(host, '#mgSim', 'Yes, turn it on');
+  await expect.poll(() => textOf(host, 'mgSim')).toContain('SIMs must come from the drawer: On');
+  expect(await textOf(host, 'mgSim')).toContain('A handoff with a SIM that is not free in the drawer is refused.');
+  await press(host, '#mgSim', 'Turn off');
+  await expect.poll(() => textOf(host, 'mgSim')).toContain('SIMs must come from the drawer: Off');
+  expect((await page.evaluate(() => window.fixture.rpc)).filter(c => c.name === 'sim_drawer_require_v1').map(c => c.args)).toEqual([{p_on: true}, {p_on: false}]);
+});
+
+test('Waiting on vendor lists every open email, flags old and failed ones, and a new account is marked done with its number', async ({page}) => {
+  const day = 864e5, ago = n => new Date(new Date(now).getTime() - n * day).toISOString();
+  let open = [
+    {id: '00000000-0000-4000-8000-00000000a001', kind: 'monitor_add', unit: 'Helios 002', state: 'sent', by: 'Teddy Hopper', at: ago(4), to: 'techops@eyeforce.com', subject: 'Mesa Village MHP | New account | Helios 002', error: null},
+    {id: '00000000-0000-4000-8000-00000000a002', kind: 'sim_cancel_simetry', unit: 'Spotter 268', state: 'sent', by: 'James Martin', at: ago(0.1), to: 'support@simetry.com', subject: 'SIM cancellation request', error: null},
+    {id: '00000000-0000-4000-8000-00000000a003', kind: 'monitor_remove', unit: 'Ranger 007', state: 'failed', by: 'James Martin', at: ago(0.2), to: 'techops@eyeforce.com', subject: 'x', error: 'Gmail did not accept the email (403).'}];
+  const done = [], seen = [];
+  // The fixture's own routes are set at mount, so this one goes on after it.
+  const {frame, host} = await mount(page, {manager: manager()});
+  await page.route('**/functions/v1/cos-vendor-request', async route => {
+    const headers = {'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, content-type', 'access-control-allow-methods': 'POST, OPTIONS'};
+    if (route.request().method() === 'OPTIONS') return route.fulfill({status: 204, headers});
+    const req = route.request().postDataJSON(); seen.push(req);
+    if (req.action === 'close') { const r = open.find(x => x.id === req.id); open = open.filter(x => x !== r); done.unshift({...r, by: 'James Martin', at: ago(0), note: req.note}); }
+    if (req.action === 'open' || req.action === 'close') return route.fulfill({headers, json: {ok: true, open, done}});
+    return route.fulfill({status: 403, headers, json: {error: 'no'}});
+  });
+  await openManager(frame, host);
+  await expect.poll(() => textOf(host, 'mgVen')).toContain('2 emails waiting on a vendor.');
+  let text = await textOf(host, 'mgVen');
+  for (const part of ['1 email sent 3 or more days ago with no answer marked. Follow up with the vendor.', '1 email did not go out cleanly.', 'Add account · Helios 002', 'Sent to techops@eyeforce.com by Teddy Hopper',
+    'no answer marked in 4 days', 'Cancel SIM (Simetry) · Spotter 268', 'Remove account · Ranger 007', 'Not sent: Gmail did not accept the email (403).']) expect(text).toContain(part);
+  const inRow = (id, label) => inBoard(host, (root, [wanted, name]) => { const b = [...root.querySelectorAll('#mgVen [data-vq="' + wanted + '"] button')].find(x => x.textContent.trim() === name && !x.disabled); b?.click(); return Boolean(b); }, [id, label]);
+  // A new account: the number from Eyeforce's reply is checked, then saved with the note.
+  expect(await inRow('00000000-0000-4000-8000-00000000a001', 'Mark done')).toBe(true);
+  expect(await textOf(host, 'mgVen')).toContain('COS saves it on Helios 002');
+  await typeIn(host, '#mgVen input[aria-label="Eyeforce account number"]', '174');
+  expect(await inRow('00000000-0000-4000-8000-00000000a001', 'Mark done')).toBe(true);
+  await expect.poll(() => textOf(host, 'mgVen')).toContain('An Eyeforce account number looks like EYE17351.');
+  expect(seen.some(r => r.action === 'close')).toBe(false);
+  await typeIn(host, '#mgVen input[aria-label="Eyeforce account number"]', 'eye17400');
+  await typeIn(host, '#mgVen input[aria-label="Note"]', 'Felipe confirmed');
+  expect(await inRow('00000000-0000-4000-8000-00000000a001', 'Mark done')).toBe(true);
+  await expect.poll(() => textOf(host, 'mgVen')).toContain('1 email waiting on a vendor.');
+  expect(seen.filter(r => r.action === 'close')).toEqual([{action: 'close', id: '00000000-0000-4000-8000-00000000a001', note: 'Felipe confirmed', eye: 'EYE17400'}]);
+  // A failed one is cleared; a SIM cancellation asks for no account number.
+  expect(await inRow('00000000-0000-4000-8000-00000000a003', 'Clear')).toBe(true);
+  expect(await textOf(host, 'mgVen')).not.toContain('Eyeforce account number from their reply');
+  expect(await inRow('00000000-0000-4000-8000-00000000a003', 'Clear it')).toBe(true);
+  await expect.poll(() => textOf(host, 'mgVen')).not.toContain('did not go out cleanly');
+  await press(host, '#mgVen', 'Show the last done (2)');
+  text = await textOf(host, 'mgVen');
+  for (const part of ['Add account · Helios 002 · done by James Martin', 'Felipe confirmed']) expect(text).toContain(part);
+});
+
+test('when the vendor list cannot be read the rest of the Manager tab still shows', async ({page}) => {
+  const {frame, host} = await mount(page, {manager: manager()});
+  await page.route('**/functions/v1/cos-vendor-request', route => route.fulfill({status: 500, headers: {'access-control-allow-origin': '*'}, json: {}}));
+  await openManager(frame, host);
+  await expect.poll(() => textOf(host, 'mgVen')).toContain('The vendor list could not be read just now.');
+  expect(await textOf(host, 'mgChecks')).not.toBe('');
+});

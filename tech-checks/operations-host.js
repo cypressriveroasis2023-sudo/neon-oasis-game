@@ -293,6 +293,7 @@ const MANAGER_SIM_STATUS = ['in_drawer','in_unit','on_truck','bad','deactivated'
 function managerSims(data) {
   const rows = (value, max) => Array.isArray(value) ? value.slice(0, max).filter(row => row && typeof row === 'object') : [];
   return {
+    requireListed:data.require_listed === true,
     cards:rows(data.cards, 2000).map(row => ({ sim:managerText(row.sim, 24), carrier:managerText(row.carrier, 40),
       status:MANAGER_SIM_STATUS.includes(row.status) ? row.status : 'removed', location:managerText(row.location, 120), note:managerText(row.note, 300),
       by:managerText(row.updated_by || row.added_by, 80), at:managerTime(row.updated_at || row.added_at) })).filter(row => /^[0-9A-Z]{8,24}$/.test(row.sim)),
@@ -397,6 +398,13 @@ async function managerAnswer(data) {
   if (data.kind === 'simMark') {
     if (typeof data.sim !== 'string' || !['in_drawer','bad','deactivated','removed'].includes(data.status)) return { error:'invalid' };
     const saved = await context().db.rpc('sim_drawer_mark_v1', { p_number:data.sim.slice(0, 40), p_status:data.status, p_note:managerText(data.note, 300) || null });
+    if (saved?.error) return { error:'rejected', message:managerText(saved.error.message, 200) };
+    return {};
+  }
+  if (data.kind === 'simRequire') {
+    // The owner's switch: when on, a handoff only takes SIMs that are free in the drawer.
+    if (typeof data.on !== 'boolean') return { error:'invalid' };
+    const saved = await context().db.rpc('sim_drawer_require_v1', { p_on:data.on });
     if (saved?.error) return { error:'rejected', message:managerText(saved.error.message, 200) };
     return {};
   }

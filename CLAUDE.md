@@ -59,6 +59,12 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-25** — Vendor follow-ups (prepared, deploy pending James): Tech Check
+  `cos-vendor-requests-v3.sql` (EYE account number per unit in `app_private.vendor_unit_accounts`,
+  `vendor_requests.closed_*`, four service_role functions; reads `camera_devices.eyeforce_id`, never
+  writes it); `cos-vendor-request` v3 actions `account` / `account_set` / `open` / `close`; Manager
+  tab "Waiting on vendor" box and the SIM-rule switch (`operations-host.js` kind `simRequire`). Record
+  in `tech-checks/docs/db-changes/20261125_vendor_followups.md`.
 - **2026-11-25** — Tech Check: BEFORE INSERT trigger `sim_drawer_require_v1` on
   `app_private.techcheck_transfer_events` and `public.sim_drawer_require_v1(boolean)` (Owner).
   Applied with the rule **off** (`sim_drawer_settings.require_listed=false`); when on, a checkout

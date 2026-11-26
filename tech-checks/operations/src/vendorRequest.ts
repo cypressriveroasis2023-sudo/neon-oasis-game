@@ -59,3 +59,33 @@ export async function vendorCheck(): Promise<VendorCheck> {
   const {status, json} = await call({action: 'check'});
   return status === 200 && json ? json : {account_ok: false, error: said(json, 'The Google connection could not be checked.')};
 }
+
+// The unit's saved Eyeforce account number (EYE...). Set once; Remove account and Swap unit fill it in.
+export type VendorAccount = {eye: string | null; by?: string | null; at?: string | null; how?: string | null};
+const account = (v: any): VendorAccount => ({eye: v && typeof v.eye === 'string' && /^EYE\d{3,8}$/.test(v.eye) ? v.eye : null,
+  by: v && typeof v.by === 'string' ? v.by.slice(0, 80) : null, at: v && typeof v.at === 'string' ? v.at : null, how: v && typeof v.how === 'string' ? v.how : null});
+export async function vendorAccount(unit: string): Promise<VendorAccount> {
+  const {status, json} = await call({action: 'account', unit});
+  return status === 200 ? account(json?.account) : {eye: null};
+}
+export async function vendorAccountSet(unit: string, eye: string): Promise<VendorAccount> {
+  const {status, json} = await call({action: 'account_set', unit, eye});
+  if (status !== 200 || json?.ok !== true) throw new Error(said(json, 'The account number could not be saved.'));
+  return account(json.account);
+}
+// Waiting on vendor (Manager tab, owner): every email still open, and the last ones marked done.
+export type VendorOpenRow = {id: string; kind: string; unit: string; state: string; by: string; at: string | null; to: string; subject: string; error: string; note: string};
+export type VendorOpen = {open: VendorOpenRow[]; done: VendorOpenRow[]};
+const openRows = (v: unknown, max: number): VendorOpenRow[] => (Array.isArray(v) ? v : []).slice(0, max).filter(r => r && typeof r === 'object' && typeof r.id === 'string')
+  .map((r: any) => ({id: r.id, kind: String(r.kind || ''), unit: String(r.unit || '').slice(0, 120), state: String(r.state || ''), by: String(r.by || '').slice(0, 80),
+    at: typeof r.at === 'string' ? r.at : null, to: String(r.to || '').slice(0, 120), subject: String(r.subject || '').slice(0, 200), error: String(r.error || '').slice(0, 300), note: String(r.note || '').slice(0, 300)}));
+export async function vendorOpen(): Promise<VendorOpen> {
+  const {status, json} = await call({action: 'open'});
+  if (status !== 200) throw new Error(said(json, 'The vendor list could not be read just now.'));
+  return {open: openRows(json?.open, 200), done: openRows(json?.done, 10)};
+}
+export async function vendorClose(id: string, note: string, eye: string): Promise<VendorOpen> {
+  const {status, json} = await call({action: 'close', id, note, eye});
+  if (status !== 200 || json?.ok !== true) throw new Error(said(json, 'That could not be saved.'));
+  return {open: openRows(json?.open, 200), done: openRows(json?.done, 10)};
+}
