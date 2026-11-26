@@ -287,6 +287,7 @@ const PSEC = [["place","Placed differently","mHelp is official, so the board sho
   ["name","Names differ","Same number, different name in each system. Worth making the names match."],
   ["mhShop","Shop, no camera feed","In mHelp's shop list with no camera record. Normal for units on the shelf."],
   ["bdShop","Shop feed, not in mHelp","Camera records under shop with nothing in mHelp: test devices, retired units, old tracker rows. Not counted."],
+  ["morning","Morning list","Field units with cameras down. New ones (last 24 hours) first, then the ones still down, each with a likely cause from the router. Copy the lines straight onto the IT sheet. Units in the shop are left out."],
   ["vcc","Moved in VCC","Camera records in COS that no longer match VCC: a camera VCC names for another unit, a camera VCC has that COS has never recorded, or one VCC stopped listing. VCC is right about its own cameras. Fix one with its button, or fix the name in VCC when there is no button."],
   ["done","Fixed by hand","Set by hand in COS, so these are off the list and stay off. mHelp still shows them differently: make the same change there when you can."]];
 /* The answers James added for the punch list: where each unit really is, what record to fix, and who fixes it. */
@@ -319,8 +320,10 @@ function drawPunch(vs){
     h("p",{class:"note",text:"mHelp is the official count: "+mh.meta.total+" pieces of equipment, "+mh.meta.field+" in the field and "+mh.meta.shop+" in the shop. "+mh.meta.stands+" of those are stands, poles and skids ("+mh.meta.standsField+" in the field). They count, but they have no cameras, so they are not listed on this board."}),
     h("p",{class:"note",text:"mHelp read "+when(mh.meta.at)+". Camera systems read "+when(S.meta.v)+"."}));
   cnt.vcc = S.vcc ? S.vcc.items.length : 0;
-  $("punchChips").replaceChildren(...PSEC.filter(([k])=>k!=="vcc" || S.vcc).map(([k,l])=>h("button",{class:"chip",type:"button","aria-pressed":String(S.psec===k),onclick:()=>{S.psec=k;drawPunch();}},l+" · "+(cnt[k]||0))));
+  cnt.morning = S.morning ? morningItems().length : 0;
+  $("punchChips").replaceChildren(...PSEC.filter(([k])=>(k!=="vcc" || S.vcc) && (k!=="morning" || S.morning)).map(([k,l])=>h("button",{class:"chip",type:"button","aria-pressed":String(S.psec===k),onclick:()=>{S.psec=k;drawPunch();}},l+" · "+(cnt[k]||0))));
   if(S.psec==="vcc"){ drawVcc(); return; }
+  if(S.psec==="morning"){ drawMorning(); return; }
   const sec=PSEC.find(p=>p[0]===S.psec), rows = S.psec==="done" ? items.filter(settled) : open.filter(i=>i.sec===S.psec);
   $("punchCount").textContent=sec[2];
   const can = S.db && S.canWrite!==false;
@@ -360,6 +363,37 @@ async function vccMove(it){
   catch(err){ toast("Not changed. "+((err && err.message) || "COS could not confirm the change."), 14000); }
   S.busy=false; render();
 }
+/* The morning list (James, 25 Nov: "build the morning list"). Tech Check lists field cameras that are down;
+   the board drops units it knows are in the shop and adds nothing of its own. It only reads. */
+function morningItems(){
+  const byKey={}; for(const v of Object.values(S.vmap||{})) byKey[String(v.k).toUpperCase()]=v;
+  return (S.morning ? S.morning.items : []).filter(it=>{ const v=byKey[String(it.unitKey||"").toUpperCase()]; return !v || (v.place!=="shop" && v.status!=="excl" && v.status!=="notin"); });
+}
+function morningWhen(t){ if(!t) return ""; const d=new Date(t); return isNaN(d) ? "" : d.toLocaleString([], {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"}); }
+function drawMorning(){
+  const sec=PSEC.find(p=>p[0]==="morning"), items=morningItems(), fresh=items.filter(it=>it.new), old=items.filter(it=>!it.new);
+  $("punchCount").textContent = sec[2];
+  const byKey={}; for(const v of Object.values(S.vmap||{})) byKey[String(v.k).toUpperCase()]=v;
+  const row = it => {
+    const uv=byKey[String(it.unitKey||"").toUpperCase()], r=it.router||{};
+    const cams=(it.cameras||[]).map(c=>c.name).join(", ");
+    const lines=[["Down: ", it.down+" of "+it.total+" camera"+(it.total===1?"":"s")+(it.downSince ? " since "+morningWhen(it.downSince) : "")], cams ? ["Cameras: ", cams] : null,
+      ["Router: ", r.status ? r.status+(r.carrier ? " · "+r.carrier : "")+(r.bars ? " · "+r.bars+" bars" : "") : "none linked"], ["Likely: ", it.cause||""]].filter(Boolean);
+    return h("div",{class:"prow"+(uv?" s-"+uv.status:"")},h("button",{class:"pmain",type:"button",disabled:!uv,onclick:()=>{ if(uv) openUnit(uv.id); }},
+      h("span",{class:"name",text:(uv && uv.name) || it.unitKey}), lines.map(([a,b])=>h("span",{class:"sub"},h("b",{text:a}),b))));
+  };
+  const copy = h("button",{class:"fixbtn",type:"button",disabled:!items.length,onclick:async()=>{
+    const text=["New since yesterday:",...(fresh.length?fresh.map(it=>"- "+it.sheetLine):["- none"]),"","Still down:",...(old.length?old.map(it=>"- "+it.sheetLine):["- none"])].join("\n");
+    try{ await navigator.clipboard.writeText(text); toast("Copied "+items.length+" line"+(items.length===1?"":"s")+" for the IT sheet.", 6000); }
+    catch(_){ toast("Copy did not work here. Long-press a line to copy it instead.", 8000); }
+  }},"Copy for the IT sheet");
+  $("punchList").replaceChildren(...(items.length ? [
+    h("div",{class:"btns"},copy),
+    h("h3",{class:"mhead",text:"New since yesterday · "+fresh.length}), ...(fresh.length ? fresh.map(row) : [h("div",{class:"empty",text:"Nothing new went down in the last 24 hours."})]),
+    h("h3",{class:"mhead",text:"Still down · "+old.length}), ...old.map(row)
+  ] : [h("div",{class:"empty",text:"Every field camera COS can see is up."})]));
+}
+function setMorning(v){ S.morning = v && Array.isArray(v.items) ? {since: v.since||null, items: v.items.filter(x=>x && typeof x.unitKey==="string")} : null; if(S.meta) render(); }
 function setVcc(v){ S.vcc = v && Array.isArray(v.items) ? {fresh: v.fresh===true, syncedAt: v.syncedAt||null, items: v.items.filter(x=>x && typeof x.key==="string")} : null; if(S.meta) render(); }
 async function markPunch(it, on){
   if(!S.db || S.busy) return; S.busy=true;
@@ -1815,5 +1849,5 @@ function openByName(name){
 /* Whether this person may make a hand fix right now, and the reason when not. */
 function setEdit(state){ S.can = !!(state && state.can===true); S.canWhy = (state && state.why) || ""; if(S.meta) render(); }
 function destroy(){ for(const fn of cleanups.splice(0)){ try{ fn(); }catch(_){} } clearTimeout(toastTimer); clearTimeout(announceTimer); clearTimeout(savedTimer); cancelAnimationFrame(M.raf); root.replaceChildren(); }
-return { update, setEdit, setVcc, destroy, root, setTurn: tvTurn, openByName };
+return { update, setEdit, setVcc, setMorning, destroy, root, setTurn: tvTurn, openByName };
 }

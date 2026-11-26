@@ -1,0 +1,53 @@
+{
+  "slug": "cos-unit-camera-status",
+  "projectRef": "tughscoxralhofrckvxy",
+  "sourceCommit": "95e3e5a4f81f0f823e7e646a01a8235da7c5f425",
+  "deployedFileNames": {
+    "index.ts": "cos-unit-camera-status/index.ts",
+    "deno.json": "cos-unit-camera-status/deno.json"
+  },
+  "entrypointPath": "cos-unit-camera-status/index.ts",
+  "importMapPath": "cos-unit-camera-status/deno.json",
+  "verifyJwt": false,
+  "sourceDir": "tech-checks/docs/cos-unit-camera-status-v21-entry",
+  "description": "The morning list. The camera-status read also reads, for the Owner and approved IT, the field cameras that are down (Tech Check public.cos_overnight_v1: new in the last 24 hours and still down, with the router reading, a likely cause and a draft IT-sheet line). Three exact edits to live v21; read only; nothing else changes.",
+  "authorization": "James, 2026-11-25: 'build the morning list'. Running the deploy still needs his explicit go for that run.",
+  "releaseStatus": "PREPARED",
+  "sourceRecord": "tech-checks/docs/cos-unit-camera-status-v21-entry/index.ts",
+  "requireLiveBeforeDeploy": {
+    "status": "ACTIVE",
+    "version": 21,
+    "ezbr_sha256": "ac4a0ff3cbfb9d605ed1ac6ce51b555467d0ae93a4c30a22865e48debb54e407"
+  },
+  "edits": [
+    {
+      "file": "index.ts",
+      "needle": "          const [cameras, integrations, handEdits, otherDevices, otherHealth, aLinks, vccMoves] = await Promise.all([\n",
+      "replacement": "          const [cameras, integrations, handEdits, otherDevices, otherHealth, aLinks, vccMoves, overnight] = await Promise.all([\n",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "v?.contract === \"COS_VCC_MOVES_V1\" ? v : null).catch(() => null)\n          ]);\n",
+      "replacement": "v?.contract === \"COS_VCC_MOVES_V1\" ? v : null).catch(() => null),\n            // The morning list: field cameras down, new in the last 24 hours first, with a likely cause. Owner and approved IT; others get null.\n            readJson(LEGACY_URL + \"/rest/v1/rpc/cos_overnight_v1\", { method: \"POST\", headers: { ...context.headers, \"Content-Type\": \"application/json\" }, body: \"{\\\"p_hours\\\":24}\" }, \"The morning list could not be read.\").then((v) => v?.contract === \"COS_OVERNIGHT_V1\" ? v : null).catch(() => null)\n          ]);\n",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "            vccMoves: vccMoves ? {",
+      "replacement": "            overnight: overnight ? { since: typeof overnight.since === \"string\" ? overnight.since : null, items: Array.isArray(overnight.items) ? overnight.items.slice(0, 300) : [] } : null,\n            vccMoves: vccMoves ? {",
+      "occurrences": 1
+    }
+  ],
+  "expectedBefore": {
+    "index.ts": "2dc0cf1dcbfc34aa2df2a8585d2ce2643b3e54c3f5614e257e03df1028809a57",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "expectedAfter": {
+    "index.ts": "5b9ed4b666ab15d19057fc6abef3c6cc1fb6ba73d12d2f36cfa98168c0feeeb1",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "dryRun": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/morning-list-v21.json --dry-run",
+  "deploy": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/morning-list-v21.json --deploy",
+  "rollback": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/rollback-to-v21-entry.json --deploy"
+}
