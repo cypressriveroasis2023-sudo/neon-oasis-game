@@ -59,6 +59,11 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-26** — Deployed `cos-unit-camera-status/send-to-it-loop-v24` (#564): live now
+  **v25 `2927fdeb`** (pins updated). The camera-status read carries `troubleshootReports`,
+  and `POST /api/unit-camera-status/troubleshoot-close` closes one (Operations
+  `cos_troubleshoot_close_v1`). Rollback `rollback-to-v24-entry`. A next patch to
+  this function must start from v25.
 - **2026-11-26** — Operations: Send to IT loop. `cos_troubleshoot_private.report_closures`,
   `public.cos_troubleshoot_open_v1` / `cos_troubleshoot_close_v1` (service_role only).
   Operations patch `cos-unit-camera-status/send-to-it-loop-v24` is **prepared, not
