@@ -157,6 +157,7 @@ export function troubleNote(unit: string, known: string[], walk: TroubleWalk, st
 
 /* Troubleshoot's own look, in the board's colors. Answers are big enough to hit with a thumb. */
 export const TROUBLE_CSS = `
+.mhead{margin:16px 2px 6px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#9aa4b2)}
 .box.trb{border:2px solid var(--warn);background:linear-gradient(180deg,rgba(251,191,36,.10),rgba(251,191,36,0) 120px),var(--s1)}
 .box.trb>h3,.box.chkb>h3{font-size:15px;letter-spacing:.02em;color:var(--warn)}
 .box.chkb{border:2px solid var(--shop);background:linear-gradient(180deg,rgba(96,165,250,.10),rgba(96,165,250,0) 120px),var(--s1)}

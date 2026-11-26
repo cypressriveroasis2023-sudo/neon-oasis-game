@@ -35,7 +35,7 @@ export type ManagerSnapshot = {
 };
 export type ManagerSimStatus = 'in_drawer' | 'in_unit' | 'on_truck' | 'bad' | 'deactivated' | 'removed';
 export type ManagerSimCard = {sim: string; carrier: string; status: ManagerSimStatus; location: string; note: string; by: string; at: string | null};
-export type ManagerSims = {cards: ManagerSimCard[]; notListed: {sim: string; detail: string; by: string; at: string | null}[]};
+export type ManagerSims = {requireListed: boolean; cards: ManagerSimCard[]; notListed: {sim: string; detail: string; by: string; at: string | null}[]};
 export type SimAddResult = {added: string[]; already: string[]; bad: string[]};
 export type ManagerGapKind = 'owner_override' | 'owner_edit_no_reason' | 'system' | 'log_mode' | 'other';
 export type ManagerGaps = {
@@ -166,6 +166,7 @@ const simStatuses: ManagerSimStatus[] = ['in_drawer', 'in_unit', 'on_truck', 'ba
 function parseSims(value: unknown): ManagerSims | null {
   if (!record(value)) return null;
   return {
+    requireListed: value.requireListed === true,
     cards: list(value.cards, 2000).filter(record).map(row => ({sim: text(row.sim, 24), carrier: text(row.carrier, 40),
       status: simStatuses.includes(row.status as ManagerSimStatus) ? row.status as ManagerSimStatus : 'removed' as ManagerSimStatus,
       location: text(row.location, 120), note: text(row.note, 300), by: text(row.by, 80), at: time(row.at)})).filter(row => /^[0-9A-Z]{8,24}$/.test(row.sim)),
@@ -271,6 +272,14 @@ export async function addSims(numbers: string[], carrier: string, note: string):
 export async function markSim(sim: string, status: 'in_drawer' | 'bad' | 'deactivated' | 'removed', note: string): Promise<ManagerSnapshot> {
   await managerHello();
   await ask('simMark', {sim, status, note: note.slice(0, 300)}, SAVE_MS);
+  held0 = null;
+  return readManager(true);
+}
+
+/** Turns "SIMs must come from the drawer" on or off, then reads everything again. */
+export async function requireSims(on: boolean): Promise<ManagerSnapshot> {
+  await managerHello();
+  await ask('simRequire', {on}, SAVE_MS);
   held0 = null;
   return readManager(true);
 }
