@@ -62,7 +62,8 @@ export function mpptFlags(m: Mppt | null | undefined, now: number, context: {nee
   const hour = new Date(now).getHours();
   if (hour >= 9 && hour < 16 && m.panelVolts !== null && m.panelVolts < PANEL_DEAD_VOLTS)
     flags.push({kind: 'panel', line: 'Panels not producing · ' + Math.round(m.panelVolts) + ' V at the charger in daylight'});
-  // A unit that stayed full makes little because it needed little, so this only counts when it needed the sun.
+  // A unit that stayed full (outside power, light use) makes little because it needed little, so this only
+  // counts when its battery had room to charge yesterday (`needed`).
   else if (context.needed && m.yieldYesterday !== null && context.peerYield && context.peerYield >= 0.3 && m.yieldYesterday < context.peerYield * LOW_YIELD_SHARE)
     flags.push({kind: 'panel', line: 'Panels made ' + kwh(m.yieldYesterday) + ' yesterday · the others made about ' + kwh(context.peerYield)});
   return flags;

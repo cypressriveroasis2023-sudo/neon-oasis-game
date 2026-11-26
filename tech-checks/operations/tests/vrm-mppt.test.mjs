@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {PGlite} from '@electric-sql/pglite';
 import {parseMppt, readVrmMppt, mpptFresh, mpptFlags, mpptLine, peerYield} from '../src/vrmMppt.ts';
 import {victronNeedsAttention} from '../src/victronAttention.ts';
+import {hadRoomYesterday} from '../src/vrmHistory.ts';
 import {safeVrmMppt} from '../../supabase/functions/cos-vrm-mppt-read/read.ts';
 
 const local = (day, hour, min = 0) => new Date(2026, 10, day, hour, min).getTime();
@@ -94,4 +95,21 @@ test('database read: one row per Helios, chargers added together, service role o
     yieldToday: 0.52, yieldYesterday: 0.88, peakToday: 350, peakYesterday: null, panelVolts: 32.4, errorCode: 0}]});
   assert.equal(safeVrmMppt(out, Date.parse('2026-11-26T17:05:00Z')).units.length, 1);
   for (const role of ['anon', 'authenticated']) { await db.exec('begin; set local role ' + role); await assert.rejects(db.query('select public.cos_vrm_mppt_read()'), /permission denied/); await db.exec('rollback'); }
+});
+
+test('"made less than the others" needs a battery that had room yesterday, not one that sat full', () => {
+  const sec = ms => Math.round(ms / 1000);
+  const yesterday = soc => { const pts = []; for (let t = local(25, 7); t <= local(25, 17); t += 1800000) pts.push([sec(t), soc(t), 100, 50]); return pts; };
+  const drained = yesterday(t => 70 + (t - local(25, 7)) / 3600000 * 2), full = yesterday(() => 100);
+  assert.equal(hadRoomYesterday(drained, NOW), true); assert.equal(hadRoomYesterday(full, NOW), false);
+  assert.equal(hadRoomYesterday(drained.slice(0, 3), NOW), false); assert.equal(hadRoomYesterday(null, NOW), false);
+  const m = v => ({metric: 'battery_soc', value: v, unit: '%', source: 'system', instance: 0, observedAt: new Date(NOW - 60000).toISOString()});
+  const units = [1, 2, 3, 4, 5].map(id => ({installationId: id, name: 'HELIOS 00' + id, portalUrl: 'https://vrm.victronenergy.com/installation/' + id + '/dashboard', embedUrl: null}));
+  const rows = units.map(u => ({installationId: u.installationId, name: u.name, lastAttemptAt: null, errorCode: null, measurements: [m(96)]}));
+  const inventory = units.map(u => ({unitNumber: u.name, placement: 'FIELD'}));
+  const mppt = parseMppt({units: [unit(1, {yieldYesterday: 0.14}), unit(2, {yieldYesterday: 0.14}), unit(3), unit(4), unit(5)]}, NOW);
+  const history = new Map([[1, drained], [2, full]]);   // unit 2 was on outside power yesterday
+  const list = victronNeedsAttention(units, rows, inventory, NOW, history, null, null, mppt);
+  assert.deepEqual(list.map(i => [i.name, i.kind]), [['HELIOS 001', 'panel']]);
+  assert.match(list[0].line, /Panels made 0.14 kWh yesterday · the others made about 0.88 kWh/);
 });
