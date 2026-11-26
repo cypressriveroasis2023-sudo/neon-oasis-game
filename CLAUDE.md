@@ -59,6 +59,11 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-25** — Tech Check: morning list. `public.cos_overnight_v1` (Owner or
+  approved IT, read only) lists field cameras down, new in 24 h first, with router
+  reading, likely cause and IT-sheet line. Operations patch
+  `cos-unit-camera-status/morning-list-v21` is **prepared, not deployed** (starts
+  from live v21). Record in `tech-checks/docs/db-changes/20261125_morning_list.md`.
 - **2026-11-25** — Tech Check: BEFORE INSERT trigger `sim_drawer_require_v1` on
   `app_private.techcheck_transfer_events` and `public.sim_drawer_require_v1(boolean)` (Owner).
   Applied with the rule **off** (`sim_drawer_settings.require_listed=false`); when on, a checkout

@@ -974,7 +974,7 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
         const editing = path.endsWith('/edit') || path.endsWith('/link-a') || path.endsWith('/vcc-move');
         if (method !== (editing ? 'POST' : 'GET')) fail(editing ? 'Use POST to record a hand edit.' : 'Use GET for unit camera status.', 405);
         const readStatus = async () => {
-          const [cameras, integrations, handEdits, otherDevices, otherHealth, aLinks, vccMoves] = await Promise.all([
+          const [cameras, integrations, handEdits, otherDevices, otherHealth, aLinks, vccMoves, overnight] = await Promise.all([
             legacyAll('camera_devices?select=id,device_name,unit_key,organization,vigilant_status,activation_state,source_last_seen_at,public_ip,star_organization_id:source_metadata->>organizationId,local_ip:source_metadata->>localIp&source=eq.vigilant_control_center&order=id.asc', context.headers),
             // A missing or unreadable sync row leaves the feed unproven, which
             // reads as Unknown rather than stopping the page.
@@ -993,6 +993,9 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
             // Camera records that no longer match VCC (moved, new, gone), for the Owner and approved IT. Others get null.
             readJson(LEGACY_URL + '/rest/v1/rpc/cos_vcc_moves_state_v1', {method: 'POST', headers: {...context.headers, 'Content-Type': 'application/json'}, body: '{}'}, 'VCC differences could not be read.')
               .then(v => v?.contract === 'COS_VCC_MOVES_V1' ? v : null).catch(() => null),
+            // The morning list: field cameras down, new in the last 24 hours first, with a likely cause. Owner and approved IT; others get null.
+            readJson(LEGACY_URL + '/rest/v1/rpc/cos_overnight_v1', {method: 'POST', headers: {...context.headers, 'Content-Type': 'application/json'}, body: '{"p_hours":24}'}, 'The morning list could not be read.')
+              .then(v => v?.contract === 'COS_OVERNIGHT_V1' ? v : null).catch(() => null),
           ]);
           const feeds = Array.isArray(integrations) ? integrations : [];
           const feed = feeds.find(row => row?.provider === 'vigilant') || null;
@@ -1006,6 +1009,7 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
           return {
             ...applyHandEdits({...star, units: units.map(u => u.productId ? u : (l => l ? {...u, productId: String(l.productId)} : u)((aLinks || []).find(l => typeof l?.unitKey === 'string' && l.unitKey.toUpperCase() === String(u.unit).toUpperCase() && /^[1-9][0-9]{0,14}$/.test(String(l.productId))))), counts: countUnits(units)}, handEdits),
             aLinksRead: Array.isArray(aLinks),
+            overnight: overnight ? {since: typeof overnight.since === 'string' ? overnight.since : null, items: Array.isArray(overnight.items) ? overnight.items.slice(0, 300) : []} : null,
             vccMoves: vccMoves ? {fresh: vccMoves.fresh === true, syncedAt: typeof vccMoves.syncedAt === 'string' ? vccMoves.syncedAt : null, items: Array.isArray(vccMoves.items) ? vccMoves.items.slice(0, 200) : []} : null,
             handEditsRead: Array.isArray(handEdits),
             otherSourcesRead: otherRead,

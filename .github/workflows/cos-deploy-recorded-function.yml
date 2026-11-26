@@ -36,6 +36,8 @@ on:
           - rollback-to-v19-entry
           - vcc-moves-v20
           - rollback-to-v20-entry
+          - morning-list-v21
+          - rollback-to-v21-entry
       confirm:
         description: 'Type the patch name again to confirm. Deploying changes production immediately.'
         required: true
@@ -99,6 +101,12 @@ jobs:
       - name: Pin the Moved in VCC rollback file
         if: inputs.patch == 'rollback-to-v20-entry'
         run: printf '%s  %s\n' '11df4e96b174a977e2aad611a9e96b4ffd85e07bc7669a25077e930a251a47d8' '.github/function-patches/cos-unit-camera-status/rollback-to-v20-entry.json' | sha256sum -c -
+      - name: Pin the morning list patch file
+        if: inputs.patch == 'morning-list-v21'
+        run: printf '%s  %s\n' 'fe78f4b105f495737ccfb0f1bc5377290925131b7435656033bf9695845752bd' '.github/function-patches/cos-unit-camera-status/morning-list-v21.json' | sha256sum -c -
+      - name: Pin the morning list rollback file
+        if: inputs.patch == 'rollback-to-v21-entry'
+        run: printf '%s  %s\n' 'd67ab47071364f4e6bb7d6551a1e92c291f361afbbc5719d52208f5e74280556' '.github/function-patches/cos-unit-camera-status/rollback-to-v21-entry.json' | sha256sum -c -
       - name: Pin the read-only live archive preflight
         run: printf '%s  %s\n' 'cb634d16da255c900ab1e9193cbca3977e97516774a01dbbe2c821b61a78fb16' '.github/scripts/preflight-live-function-pins.mjs' | sha256sum -c -
       - name: Choose the recorded patch path
@@ -106,7 +114,7 @@ jobs:
         run: |
           name="${{ inputs.patch }}"
           case "$name" in
-            camera-routes-only-v16|rollback-to-v16-entry|troubleshoot-route-v17|rollback-to-v17-entry|camera-ports-v18|rollback-to-v18-entry|a-links-v19|rollback-to-v19-entry|vcc-moves-v20|rollback-to-v20-entry)
+            camera-routes-only-v16|rollback-to-v16-entry|troubleshoot-route-v17|rollback-to-v17-entry|camera-ports-v18|rollback-to-v18-entry|a-links-v19|rollback-to-v19-entry|vcc-moves-v20|rollback-to-v20-entry|morning-list-v21|rollback-to-v21-entry)
               echo "file=.github/function-patches/cos-unit-camera-status/${name}.json" >> "$GITHUB_OUTPUT"
               ;;
             *)

@@ -49,7 +49,7 @@ export type CosBoardLandingProps = {
   unitAsked?: {name: string; n: number} | null;
 };
 
-type Board = {update(data: unknown): void; setEdit(state: BoardEditState): void; setVcc(moves: unknown): void; destroy(): void; root: ShadowRoot; openByName(name: string): boolean};
+type Board = {update(data: unknown): void; setEdit(state: BoardEditState): void; setVcc(moves: unknown): void; setMorning(list: unknown): void; destroy(): void; root: ShadowRoot; openByName(name: string): boolean};
 type Report = {
   contract?: string; units?: UnitCameraStatus[]; canEdit?: boolean; handEditsRead?: boolean;
   recorded?: {pinned?: boolean; pinNote?: string | null};
@@ -133,7 +133,7 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
     return boardData({feed, census, now: clock, routers, upload, addresses, power});
   }, [feed, recorderRows, now, fieldMap, routers, upload, addresses, power]);
   // A full reading: the units go to Fleet, and it says whether this person may make hand fixes.
-  const vccHeld = useRef<unknown>(null);
+  const vccHeld = useRef<unknown>(null), morningHeld = useRef<unknown>(null);
   const take = useRef((_reading: Reading) => {});
   take.current = reading => {
     held.current = reading.units;
@@ -142,6 +142,9 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
     // Camera records that no longer match VCC, for the Owner and approved IT (null for anyone else).
     vccHeld.current = (reading as {vccMoves?: unknown}).vccMoves ?? null;
     board.current?.setVcc(vccHeld.current);
+    // The morning list: field cameras down, for the Owner and approved IT (null for anyone else).
+    morningHeld.current = (reading as {overnight?: unknown}).overnight ?? null;
+    board.current?.setMorning(morningHeld.current);
   };
   // A save moves this on. A read that started before a save is older than what the save returned, so it is dropped.
   const generation = useRef(0);
@@ -316,6 +319,7 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
     });
     board.current = mounted;
     if (vccHeld.current) mounted.setVcc(vccHeld.current);
+    if (morningHeld.current) mounted.setMorning(morningHeld.current);
     // The board's own browser test reads the screen through this handle.
     Object.defineProperty(element, 'cosBoardRoot', {value: mounted.root, configurable: true});
     // Fleet keeps only the units from its own read. Read once more to learn whether this person may make hand fixes.
