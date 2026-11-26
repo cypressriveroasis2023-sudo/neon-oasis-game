@@ -1,11 +1,16 @@
 // Sun forecast for Field Helios units: "cloudy days ahead" with the battery already down.
 // One batched, keyless Open-Meteo read (the same service the header weather uses). Coordinates are rounded to
 // 2 decimals (~1 km) before they leave the browser. Display only: nothing is stored.
+// A unit with no map point is aimed at the middle of its mHelp address's 3-digit ZIP area instead: the right
+// town is all a two-day sun forecast needs, and that lookup is a table in the app (no extra request).
 import {canonicalCameraUnit} from './fieldCameraHealth';
 import {inventoryPlacement} from './fleetSnapshot';
+import {ZIP3_POINTS} from './zip3Points';
 
-export const GRAY_SUN_MJ = 5;          // a day under 5 MJ/m² of sunlight barely charges a Helios
-export const GRAY_CLOUD_PERCENT = 85;  // ... or a day that is mostly overcast
+// A gray day is judged by the sunlight that reaches the ground, not by cloud cover: thin high cloud can read 96%
+// "cloudy" while the panels still get a full day's sun (seen in the live Houston forecast, 14.8 MJ at 96% cloud).
+export const GRAY_SUN_MJ = 7;          // under 7 MJ/m² (about 2 hours of full sun) barely charges a Helios
+export const GRAY_CLOUD_PERCENT = 85;  // used only when the forecast has no sunlight figure for that day
 export const CLOUDY_TWO_DAYS_BELOW = 80; // two gray days ahead and battery under 80% now -> warn
 export const CLOUDY_ONE_DAY_BELOW = 60;  // the next day gray and battery under 60% now -> warn
 
@@ -13,23 +18,41 @@ export type Spot = {lat: number; lon: number};
 export type SunDay = {date: string; mj: number | null; cloud: number | null};
 export type OutlookDay = {date: string; label: string; gray: boolean; mj: number | null; cloud: number | null};
 
+let zip3: Map<string, Spot> | null = null;
+/** Middle of the 3-digit ZIP area at the end of a US address ("…, Houston, TX, 77078"), or null. */
+export function zipAreaSpot(address: unknown): Spot | null {
+  if (typeof address !== 'string') return null;
+  const m = /\b[A-Za-z]{2}[\s,]+(\d{5})(?:-\d{4})?\s*$/.exec(address.trim());
+  if (!m) return null;
+  if (!zip3) {
+    zip3 = new Map();
+    for (const part of ZIP3_POINTS.split(';')) { const [lat, lon] = part.slice(3).split(',').map(Number); if (Number.isFinite(lat) && Number.isFinite(lon)) zip3.set(part.slice(0, 3), {lat, lon}); }
+  }
+  return zip3.get(m[1].slice(0, 3)) ?? null;
+}
+
 const num = (v: unknown) => { const n = typeof v === 'string' && v.trim() ? Number(v) : v; return typeof n === 'number' && Number.isFinite(n) ? n : null; };
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
-/** Field Helios units with usable coordinates, keyed by canonical Helios number. Shop units have no weather worry. */
+/**
+ * Field Helios units and where to aim their forecast, keyed by canonical Helios number: the saved map point, or
+ * failing that the ZIP area of the mHelp service address. Shop units have no weather worry.
+ */
 export function heliosSpots(inventory: readonly unknown[] | null | undefined): Map<string, Spot> {
   const out = new Map<string, Spot>(), dupes = new Set<string>();
   for (const raw of inventory ?? []) {
-    const unit = raw as {unitNumber?: unknown; latitude?: unknown; longitude?: unknown} | null;
+    const unit = raw as {unitNumber?: unknown; latitude?: unknown; longitude?: unknown; address?: unknown; mhelpLocation?: {address?: unknown} | null} | null;
     if (!unit || typeof unit.unitNumber !== 'string') continue;
     const key = canonicalCameraUnit(unit.unitNumber);
     if (!key?.startsWith('HELIOS|')) continue;
     if (out.has(key) || dupes.has(key)) { out.delete(key); dupes.add(key); continue; }
     let placement: string;
     try { placement = inventoryPlacement(unit as Parameters<typeof inventoryPlacement>[0]); } catch { continue; }
+    if (placement !== 'field') continue;
     const lat = num(unit.latitude), lon = num(unit.longitude);
-    if (placement !== 'field' || lat === null || lon === null || Math.abs(lat) > 90 || Math.abs(lon) > 180 || (lat === 0 && lon === 0)) continue;
-    out.set(key, {lat: r2(lat), lon: r2(lon)});
+    const pinned = lat !== null && lon !== null && Math.abs(lat) <= 90 && Math.abs(lon) <= 180 && !(lat === 0 && lon === 0);
+    const spot = pinned ? {lat: r2(lat), lon: r2(lon)} : zipAreaSpot(unit.address) ?? zipAreaSpot(unit.mhelpLocation?.address);
+    if (spot) out.set(key, spot);
   }
   return out;
 }
@@ -74,7 +97,7 @@ export function parseDaily(item: unknown): SunDay[] | null {
 }
 
 const ymd = (d: Date) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-export const isGray = (d: SunDay) => (d.mj !== null && d.mj < GRAY_SUN_MJ) || (d.cloud !== null && d.cloud >= GRAY_CLOUD_PERCENT);
+export const isGray = (d: SunDay) => d.mj !== null ? d.mj < GRAY_SUN_MJ : d.cloud !== null && d.cloud >= GRAY_CLOUD_PERCENT;
 
 /** The next two days that still have sun to give: today (before 3 PM) and tomorrow, or tomorrow and the day after. */
 export function sunOutlook(days: readonly SunDay[] | null | undefined, now: number): OutlookDay[] {
