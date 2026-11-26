@@ -59,6 +59,13 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-26** — `camera-health-sweep` (Tech Check) fix **prepared, not deployed**:
+  `tech-checks/docs/camera-health-sweep-checker-refused-20261126/` (recipe against the live
+  v103 source). When three or more endpoints in one run answer "Connection refused" on every
+  saved port, the collector writes nothing for them (hold reason `checker_connection_refused`,
+  previous result kept): that is the worker's own path to the AT&T range, not the units, and
+  was 235 of last week's 313 Sniper/CAM V "offline" rows. Timeouts are written as before.
+  No audit action, schedule or table changes. Deploying needs James's go.
 - **2026-11-26** — Deployed `cos-unit-camera-status/send-to-it-loop-v24` (#564): live now
   **v25 `2927fdeb`** (pins updated). The camera-status read carries `troubleshootReports`,
   and `POST /api/unit-camera-status/troubleshoot-close` closes one (Operations
