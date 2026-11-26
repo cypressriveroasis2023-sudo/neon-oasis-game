@@ -7,6 +7,7 @@ import VrmReadOnlyDashboard from './VrmReadOnlyDashboard';
 import { readDashboardPower, shortDate, unitTileSummary } from './vrmReadOnlyModel';
 import { heliosPlacement, placementLabel, victronNeedsAttention } from './victronAttention';
 import { canonicalCameraUnit } from './fieldCameraHealth';
+import { mpptLine, readVrmMppt, type Mppt } from './vrmMppt';
 import { cloudyWarning, heliosSpots, outlookLine, readSunForecast, sunOutlook, type SunDay } from './vrmWeather';
 import { dayPeak, historyFlags, isNightForecastTime, nightLoad, last24h, overnightLow, readVrmHistory, solarVsYesterday, tonightBasis, tonightForecast, tonightHeadline, tonightSteps, type HistoryPoint, type Tonight } from './vrmHistory';
 import VrmTechGuide from './VrmTechGuide';
@@ -80,6 +81,7 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
   }, [spotsKey]);
   // Saved Victron history by installation, read separately and best-effort. Absent = no history shown.
   const [history, setHistory] = useState<Map<number, HistoryPoint[]> | null>(null);
+  const [mppt, setMppt] = useState<Map<number, Mppt> | null>(null);
   const mounted = useRef(false);
   const running = useRef(false);
   const request = useRef(0);
@@ -139,9 +141,10 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
       setInventory(items ? items.filter((item): item is {unitNumber?: string} => Boolean(item) && typeof item === 'object') : null);
     }).catch(() => { if (active) setInventory(null); });
     const readHistory = () => { void readVrmHistory().then(units => { if (active && units) setHistory(new Map(units.map(u => [u.installationId, u.points]))); }); };
-    readHistory();
-    const historyTimer = window.setInterval(() => { if (workspaceVisible()) readHistory(); }, 15 * 60_000);
-    const dropHistory = () => setHistory(null);
+    const readMppt = () => { void readVrmMppt().then(map => { if (active && map) setMppt(map); }); };
+    readHistory(); readMppt();
+    const historyTimer = window.setInterval(() => { if (workspaceVisible()) { readHistory(); readMppt(); } }, 15 * 60_000);
+    const dropHistory = () => { setHistory(null); setMppt(null); };
     window.addEventListener('cos-private-data-invalidated', dropHistory);
     const timer = window.setInterval(() => {
       setNow(Date.now());
@@ -169,7 +172,7 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
   if (sky) for (const [key, days] of sky) { const o = sunOutlook(days, now); if (o.length) weather.set(key, o); }
   const night = units.length > 0 && history ? nightReport(units, history, now, name => heliosPlacement(name, inventory) === 'shop') : null;
   const nightRows = new Map((night?.rows ?? []).map(r => [r.installationId, r]));
-  const attention = victronNeedsAttention(units, power.rows, inventory, now, history, tonight, weather);
+  const attention = victronNeedsAttention(units, power.rows, inventory, now, history, tonight, weather, mppt);
   // Only speak about Field power once at least one unit's Field/Shop is known from mHelp.
   const placed = units.filter(item => heliosPlacement(item.name, inventory) !== 'unknown').length;
   const tiles = new Map(units.map(item => [item.installationId, unitTileSummary(item, power.rows, now)]));
@@ -265,6 +268,7 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
           const tile = unitTileSummary(unit, power.rows, now), warn = cloudyWarning(o, tile.soc?.value);
           return <p className={'vrm-sky' + (warn ? ' vrm-sky-warn' : '')}><span>Sun ahead</span><b>{outlookLine(o)}</b>{warn && <em>{warn}</em>}</p>;
         })()}
+        {(line => line && <p className='vrm-sky vrm-mppt'><span>Panels</span><b>{line}</b></p>)(mpptLine(mppt?.get(unit.installationId), now))}
         {flags.length > 0 && <p className='vrm-history-flag'>{flags.map(f => f.line).join(' · ')}</p>}
       </section>;
     })()}

@@ -7,6 +7,9 @@ const ALERTS: [string, string, string][] = [
   ['Dropped to N% overnight', 'Last night it went under 30% before sunrise.', 'The battery is not lasting the night. Check panels, the load and battery age.'],
   ["Didn't fill up today · best was N%", 'The sun is done and the battery never got to 95% today.', 'It will start the night short. Check for dirty or shaded panels, a loose solar cable, or a cloudy day. Two days in a row = tell the manager.'],
   ['Using more power than usual', 'At night it is pulling much more than its normal (1.5x and 10 W or more).', 'Something new is drawing power: a camera rebooting over and over, a heater, or extra gear plugged in. Check its cameras on the COS Board.'],
+  ['Solar charger error', 'The Victron solar charger (MPPT) is reporting a fault, named in the alert.', 'Tell the manager. The unit may not be charging at all, so watch its battery and plan a visit.'],
+  ['Panels not producing', 'It is daytime and the charger sees almost no voltage from the panels.', 'A panel cable is unplugged or broken, a breaker is off, or the panels are covered. This needs a site visit: tell the manager.'],
+  ['Panels made N kWh yesterday · the others made about M', 'This unit needed the sun and its panels made less than half of what the other Field units made.', 'Look for dirt, shade, a panel facing the wrong way or a loose solar cable. One bad day can be shade; two in a row, tell the manager.'],
   ['Cloudy days ahead', 'The weather for this unit\'s job site shows gray days coming, and the battery is already down (under 80% with two gray days, or under 60% with one). The forecast is for the unit\'s map point, or the area of its mHelp ZIP code.', 'The sun will not refill it. Watch it each evening, and if it also says Tight or Will run low, plan a battery swap or visit before the gray days.'],
   ['Solar N% of yesterday', 'Today it is making much less solar than yesterday by this time.', 'If it was cloudy, ignore it. If it was sunny, check for dirty or shaded panels or a charger problem.'],
   ['Tight tonight', 'Should make it, but only about 20–29% at 7 AM.', 'Check again before end of shift.'],
@@ -32,6 +35,7 @@ export default function VrmTechGuide() {
         <li><b>🌙 20% by 3:40 AM</b> — will run low tonight (shown from 5 PM to 7 AM).</li>
         <li><b>🌙 Low 72%</b> — lowest battery last night (5 PM–7 AM). Green 50%+, yellow 20–49%, red under 20%.</li>
         <li><b>🔌 Plugged in</b> — stayed full all night on outside power. Nothing to do.</li>
+        <li><b>Panels line</b> (on a unit's chart) — what the panels made today and yesterday in kWh, today's peak watts, and panel voltage. A healthy sunny day is about 0.8–1.1 kWh.</li>
         <li><b>FIELD / SHOP</b> — where mHelp says the unit is.</li>
       </ul>
       <h5>2. Needs attention</h5>

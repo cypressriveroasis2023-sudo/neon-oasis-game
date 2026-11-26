@@ -69,6 +69,16 @@ Newest first. One line: date, what changed, what to watch.
   `POST /api/unit-camera-status/router-swap` applies one (Tech Check
   `cos_router_swap_apply_v1`). Rollback `rollback-to-v23-entry`. A next patch to
   this function must start from v24.
+- **2026-11-26** — Operations: Victron MPPT readings. New `cos_vrm_private.mppt_latest` /
+  `mppt_history` / `mppt_paths_seen`, `public.cos_vrm_mppt_targets` / `cos_vrm_mppt_save`
+  (service_role only), edge function `cos-vrm-mppt-sync` v1 (main = deployed) and Operations
+  cron job 3 at `7,22,37,52`. The fleet sync, `cos_vrm_fleet_finish` and its cron job are
+  unchanged; the new reader stands back whenever the fleet sync is busy or failing. Note:
+  deployed `cos-vrm-fleet-sync` v11 is **not** what is on `main` (its `vrmPower.ts` is from
+  open PR #419, and its `vrmDiscovery.ts` is older than main's). Also `public.cos_vrm_mppt_read`
+  (service_role only) and edge function `cos-vrm-mppt-read` v1 (read-only, gated like
+  `cos-vrm-history`, which it imports `history.ts` from). Record in
+  `tech-checks/docs/db-changes/20261126_cos_vrm_mppt_readings.md`.
 - **2026-11-26** — Tech Check: Router swapped. `public.cos_router_swaps_state_v1` /
   `cos_router_swap_apply_v1` (Owner or approved IT) move a unit's router link to a new
   InHand router; writes `ADD_ROUTER_LINK` with before_state `{inhand_serial, swap}` (no
