@@ -17,8 +17,8 @@ import {readRouterDetails} from './routerDetails';
 import {boardEditState, handFixRequest, type BoardEditFlags, type BoardEditState, type BoardFixStep} from './cosBoard/boardEdit';
 import {mountCosBoard} from './cosBoard/boardApp';
 import {loadBoardFonts} from './cosBoard/boardFonts';
-import {vendorCameras, vendorCheck, vendorForm, vendorPreview, vendorRecent, vendorSend, vendorTemplates} from './vendorRequest';
-import {addSims, managerHost, managerKnown, managerPhoto, markSim, readManager, rememberManager, removeTruckExtra, saveTruck, setTruckStandard, takeBoardView, type TruckKit, type TruckType} from './managerBridge';
+import {vendorAccount, vendorAccountSet, vendorCameras, vendorCheck, vendorClose, vendorForm, vendorOpen, vendorPreview, vendorRecent, vendorSend, vendorTemplates} from './vendorRequest';
+import {addSims, managerHost, managerKnown, managerPhoto, markSim, requireSims, readManager, rememberManager, removeTruckExtra, saveTruck, setTruckStandard, takeBoardView, type TruckKit, type TruckType} from './managerBridge';
 
 /**
  * Tells the page around the frame that the board is, or is no longer, the TV display, so it gives the frame the
@@ -290,6 +290,10 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
         check: () => vendorCheck(),
         cameras: (unit: string) => vendorCameras(unit),
         form: (kind: string, values: Record<string, string>) => vendorForm(kind, values),
+        account: (unit: string) => vendorAccount(unit),
+        accountSet: (unit: string, eye: string) => vendorAccountSet(unit, eye),
+        open: () => vendorOpen(),
+        close: (id: string, note: string, eye: string) => vendorClose(id, note, eye),
       } : undefined,
       onScreen: (workspace: string) => { window.location.hash = workspaceHash({workspace, jobId: '', detail: false}); },
       // The owner's manager view. The signed-in Tech Check app around this frame reads the trucks, inspections and
@@ -300,6 +304,7 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
         photo: (path: string) => managerPhoto(path),
         simAdd: (numbers: string[], carrier: string, note: string) => addSims(numbers, carrier, note),
         simMark: (sim: string, status: 'in_drawer' | 'bad' | 'deactivated' | 'removed', note: string) => markSim(sim, status, note),
+        simRequire: (on: boolean) => requireSims(on),
         truckStandard: (type: TruckType, required: number) => setTruckStandard(type, required),
         truckExtraRemove: (extraId: string, reason: string) => removeTruckExtra(extraId, reason),
         open: (route: string) => openLegacy(route),

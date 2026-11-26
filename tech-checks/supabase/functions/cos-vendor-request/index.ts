@@ -1,6 +1,7 @@
 // COS unit card: vendor emails (SIM cancellations, Eyeforce account changes).
 // POST {action:'preview'|'send', kind, values, request_id}. The Owner sends anything; approved IT may send the
 // Eyeforce account add and unit swap (James, 25 Nov), which go with Eyeforce's own form filled in and attached.
+// account / account_set: the unit's saved Eyeforce account number. open / close: the Manager tab's "Waiting on vendor".
 // preview: checks the blanks and returns the exact email. send: sends it once from James's Gmail
 // with IT@ in CC, records it, and adds a row to the deactivation sheet when the kind is logged there.
 import {TEMPLATES, DEFAULTS, SENDER, check, render, sheetRow, rawEmail, type Kind} from './templates.ts';
@@ -77,6 +78,25 @@ export function createVendorHandler({admin, userClient, env, fetch: request = fe
       } catch (e) { return reply({account_ok: false, error: (e as Error).message}); }
     }
     if (action === 'recent') return reply({recent: await call('cos_vendor_recent_v1', {p_unit: String(body.unit || '').slice(0, 120)})});
+    // The unit's Eyeforce account number (EYE...), saved once so Remove account and Swap unit fill it in.
+    const eyeOf = (v: unknown) => String(v ?? '').toUpperCase().replace(/\s/g, '').slice(0, 20);
+    if (action === 'account') return reply({account: await call('cos_vendor_account_v1', {p_unit: String(body.unit || '').slice(0, 120)})});
+    if (action === 'account_set') {
+      const unit = String(body.unit || '').trim().slice(0, 120), eye = eyeOf(body.eye);
+      if (unit.replace(/[^A-Za-z0-9]/g, '').length < 2) return reply({error: 'Name the unit.'}, 400);
+      if (eye && !/^EYE\d{3,8}$/.test(eye)) return reply({ok: false, error: 'An Eyeforce account number looks like EYE17351.'});
+      return reply({ok: true, account: await call('cos_vendor_account_set_v1', {p_unit: unit, p_eye: eye, p_actor: user.user.id, p_how: 'hand'})});
+    }
+    // Waiting on vendor (Manager tab): every email still open, and marking one done. Owner only.
+    if (action === 'open' || action === 'close') {
+      if (!actor.owner) return reply({error: 'Only the owner can see this list.'}, 403);
+      if (action === 'open') return reply(await call('cos_vendor_open_v1', {}));
+      const eye = eyeOf(body.eye);
+      if (typeof body.id !== 'string' || !UUID.test(body.id)) return reply({error: 'Request ID required.'}, 400);
+      if (eye && !/^EYE\d{3,8}$/.test(eye)) return reply({ok: false, error: 'An Eyeforce account number looks like EYE17351.'});
+      const done = await call('cos_vendor_close_v1', {p_id: body.id, p_actor: user.user.id, p_note: String(body.note || '').slice(0, 300) || null, p_eye: eye || null});
+      return reply({ok: true, done, ...(await call('cos_vendor_open_v1', {}))});
+    }
     const kind = body?.kind as Kind;
     if (!TEMPLATES[kind]) return reply({error: 'Unknown request.'}, 400);
     if (!may(kind)) return reply({error: 'Only the owner can send this one.'}, 403);
@@ -128,6 +148,13 @@ export function createVendorHandler({admin, userClient, env, fetch: request = fe
       } catch { sheet = 'failed (no answer)'; }
     }
     await call('cos_vendor_finish_v1', {p_id: body.request_id, p_state: 'sent', p_gmail: gmail, p_sheet: sheet, p_error: null});
+    // A swap moves the account to the unit that went in. A hiccup here never changes that the email was sent.
+    if (kind === 'monitor_swap') {
+      try {
+        await call('cos_vendor_account_set_v1', {p_unit: values.new_unit, p_eye: values.eye, p_actor: user.user.id, p_how: 'swap'});
+        await call('cos_vendor_account_set_v1', {p_unit: values.unit, p_eye: '', p_actor: user.user.id, p_how: 'swap'});
+      } catch { /* the number can still be saved by hand on the card */ }
+    }
     return reply({ok: true, state: 'sent', sheet, by: actor.name, to: mail.to});
   };
 }

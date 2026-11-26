@@ -29,7 +29,7 @@ const ROUTER_CSS = `
 .rtr dd a{color:inherit}
 `;
 
-const SHELL = "<div class=\"cosb\" id=\"cosb\"><header class=\"top\"><div class=\"wrap\">\n  <div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div>\n  <span class=\"topbtns\"><button class=\"tvgo\" id=\"tvGo\" type=\"button\">TV board</button><button class=\"refresh\" id=\"refresh\" type=\"button\">Refresh</button></span>\n</div></header>\n<div class=\"asof\" id=\"asof\"><div class=\"wrap\"><span id=\"asofMain\">Loading the camera reading…</span><span id=\"asofSub\"></span></div></div>\n\n<main class=\"wrap\">\n  <div class=\"tabs\" role=\"tablist\">\n    <button class=\"tab\" role=\"tab\" id=\"tabBoard\" aria-selected=\"true\" type=\"button\">Board</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabMap\" aria-selected=\"false\" type=\"button\">Map</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabTech\" aria-selected=\"false\" type=\"button\">Tech check</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabManager\" aria-selected=\"false\" type=\"button\" hidden>Manager</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabPunch\" aria-selected=\"false\" type=\"button\">Punch list</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabActivity\" aria-selected=\"false\" type=\"button\">Changes</button>\n  </div>\n\n  <section id=\"viewBoard\">\n    <div id=\"boardMain\">\n    <div class=\"mode\" id=\"modeRow\"></div>\n    <div class=\"kpi\" id=\"kpi\">\n    <p class=\"provnote\" id=\"provNote\" hidden></p>\n    <div class=\"tiles\" id=\"tiles\"></div>\n    <div class=\"shoprow\" id=\"shoprow\"></div>\n    </div>\n    <div id=\"boardList\">\n    <div class=\"controls\">\n      <input class=\"search\" id=\"q\" type=\"search\" placeholder=\"Find a unit, site, A# or IP\" autocomplete=\"off\" aria-label=\"Find a unit, site, A number or IP\">\n      <div class=\"chips\" id=\"fam\"></div>\n    </div>\n    <div class=\"count\" id=\"count\"></div>\n    <div class=\"list\" id=\"list\"></div>\n    <div class=\"screens\" id=\"screensRow\"><h3>Other COS screens</h3><div class=\"links\" id=\"screensLinks\"></div></div><ul class=\"foot\"><li>One unit counts once, however many cameras it has.</li><li>One count here, and it is mHelp’s camera units. mHelp’s own field total is higher because it counts stands and poles as well. The camera systems see fewer, because some units in mHelp have no camera record in COS yet; those show Unknown.</li><li>A unit in the shop never counts as down.</li><li>A reading that is missing or too old shows Unknown, never Down.</li><li>Router checks are a reference only. A router online does not prove the cameras work.</li><li>Hand fixes made here are saved in COS with your name and the time. Nothing here changes mHelp, Star4Live or InHand.</li></ul>\n    </div>\n    </div>\n    <aside id=\"boardSide\" aria-label=\"Map of field units\" hidden></aside>\n  </section>\n\n  <section id=\"viewMap\" hidden>\n    <div id=\"mapBlock\">\n    <div class=\"chips\" id=\"mapChips\"></div>\n    <div class=\"chips\" id=\"mapGo\" style=\"margin-top:8px\"></div>\n    <div class=\"mapwrap\" id=\"mapWrap\">\n      <svg id=\"mapSvg\" role=\"img\" aria-label=\"Map of field units\"><g id=\"mapBase\"></g><g id=\"mapLabels\"></g><g id=\"mapPins\"></g></svg>\n      <div class=\"mapbtns\"><button type=\"button\" id=\"zin\" aria-label=\"Zoom in\">+</button><button type=\"button\" id=\"zout\" aria-label=\"Zoom out\">&minus;</button></div>\n      <div class=\"mapmsg\" id=\"mapMsg\" hidden></div>\n      <div class=\"mapsel\" id=\"mapSel\" hidden></div>\n    </div>\n    <p class=\"note\" id=\"mapNote\" style=\"margin-top:10px\"></p>\n    <div class=\"list\" id=\"mapList\"></div>\n    </div>\n  </section>\n\n  <section id=\"viewTech\" hidden>\n    <div id=\"techForm\"></div>\n    <div id=\"techList\"></div>\n  </section>\n\n  <section id=\"viewManager\" hidden>\n    <div id=\"mgNow\"></div>\n    <div id=\"mgChecks\"></div>\n    <div id=\"mgTrucks\"></div>\n    <div id=\"mgStd\"></div>\n    <div id=\"mgGap\"></div>\n    <div id=\"mgSim\"></div>\n    <div id=\"mgX\"></div>\n    <div id=\"mgTools\"></div>\n  </section>\n\n  <section id=\"viewPunch\" hidden>\n    <div class=\"box\" id=\"punchTop\"><p class=\"note\">Loading the mHelp list…</p></div>\n    <div class=\"chips\" id=\"punchChips\" style=\"margin-top:12px\"></div>\n    <div class=\"count\" id=\"punchCount\"></div>\n    <div class=\"list\" id=\"punchList\"></div>\n  </section>\n\n  <section id=\"viewActivity\" hidden>\n    <p class=\"note\" id=\"actNote\">Every change made by hand on this board, newest first.</p>\n    <ul class=\"hist\" id=\"activity\"></ul>\n  </section>\n</main>\n\n<section id=\"viewTv\" hidden><header class=\"tvtop\"><div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div><div class=\"tvread\" id=\"tvRead\" role=\"status\">Loading the camera reading…</div><div class=\"tvclock\"><b id=\"tvClock\"></b><span id=\"tvDate\"></span></div><button type=\"button\" class=\"tvx\" id=\"tvExitTop\">Exit TV</button></header><div class=\"tvgrid\" id=\"tvGrid\"><div class=\"tvleft\" id=\"tvKpi\"><div class=\"tvtiles\" id=\"tvTiles\"></div><div class=\"tvminis\" id=\"tvMinis\"></div><div class=\"tvhead\" id=\"tvHead\"></div><div class=\"tvlist\" id=\"tvList\"></div></div><div class=\"tvright\" id=\"tvRight\"><div class=\"tvmaptitle\" id=\"tvMapTitle\"></div><div class=\"tvmap\" id=\"tvMap\"></div></div></div><footer class=\"tvfoot\"><span id=\"tvNote\"></span><span class=\"tvbtns\"><button type=\"button\" id=\"tvRefresh\">Refresh</button><button type=\"button\" id=\"tvFull\">Full screen</button><button type=\"button\" id=\"tvExit\">Exit TV</button></span></footer></section><div class=\"sheet\" id=\"sheet\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"pname\"><div class=\"panel\" id=\"panel\"></div></div>\n<div class=\"toast\" id=\"toast\" role=\"status\" aria-live=\"polite\"></div></div>";
+const SHELL = "<div class=\"cosb\" id=\"cosb\"><header class=\"top\"><div class=\"wrap\">\n  <div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div>\n  <span class=\"topbtns\"><button class=\"tvgo\" id=\"tvGo\" type=\"button\">TV board</button><button class=\"refresh\" id=\"refresh\" type=\"button\">Refresh</button></span>\n</div></header>\n<div class=\"asof\" id=\"asof\"><div class=\"wrap\"><span id=\"asofMain\">Loading the camera reading…</span><span id=\"asofSub\"></span></div></div>\n\n<main class=\"wrap\">\n  <div class=\"tabs\" role=\"tablist\">\n    <button class=\"tab\" role=\"tab\" id=\"tabBoard\" aria-selected=\"true\" type=\"button\">Board</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabMap\" aria-selected=\"false\" type=\"button\">Map</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabTech\" aria-selected=\"false\" type=\"button\">Tech check</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabManager\" aria-selected=\"false\" type=\"button\" hidden>Manager</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabPunch\" aria-selected=\"false\" type=\"button\">Punch list</button>\n    <button class=\"tab\" role=\"tab\" id=\"tabActivity\" aria-selected=\"false\" type=\"button\">Changes</button>\n  </div>\n\n  <section id=\"viewBoard\">\n    <div id=\"boardMain\">\n    <div class=\"mode\" id=\"modeRow\"></div>\n    <div class=\"kpi\" id=\"kpi\">\n    <p class=\"provnote\" id=\"provNote\" hidden></p>\n    <div class=\"tiles\" id=\"tiles\"></div>\n    <div class=\"shoprow\" id=\"shoprow\"></div>\n    </div>\n    <div id=\"boardList\">\n    <div class=\"controls\">\n      <input class=\"search\" id=\"q\" type=\"search\" placeholder=\"Find a unit, site, A# or IP\" autocomplete=\"off\" aria-label=\"Find a unit, site, A number or IP\">\n      <div class=\"chips\" id=\"fam\"></div>\n    </div>\n    <div class=\"count\" id=\"count\"></div>\n    <div class=\"list\" id=\"list\"></div>\n    <div class=\"screens\" id=\"screensRow\"><h3>Other COS screens</h3><div class=\"links\" id=\"screensLinks\"></div></div><ul class=\"foot\"><li>One unit counts once, however many cameras it has.</li><li>One count here, and it is mHelp’s camera units. mHelp’s own field total is higher because it counts stands and poles as well. The camera systems see fewer, because some units in mHelp have no camera record in COS yet; those show Unknown.</li><li>A unit in the shop never counts as down.</li><li>A reading that is missing or too old shows Unknown, never Down.</li><li>Router checks are a reference only. A router online does not prove the cameras work.</li><li>Hand fixes made here are saved in COS with your name and the time. Nothing here changes mHelp, Star4Live or InHand.</li></ul>\n    </div>\n    </div>\n    <aside id=\"boardSide\" aria-label=\"Map of field units\" hidden></aside>\n  </section>\n\n  <section id=\"viewMap\" hidden>\n    <div id=\"mapBlock\">\n    <div class=\"chips\" id=\"mapChips\"></div>\n    <div class=\"chips\" id=\"mapGo\" style=\"margin-top:8px\"></div>\n    <div class=\"mapwrap\" id=\"mapWrap\">\n      <svg id=\"mapSvg\" role=\"img\" aria-label=\"Map of field units\"><g id=\"mapBase\"></g><g id=\"mapLabels\"></g><g id=\"mapPins\"></g></svg>\n      <div class=\"mapbtns\"><button type=\"button\" id=\"zin\" aria-label=\"Zoom in\">+</button><button type=\"button\" id=\"zout\" aria-label=\"Zoom out\">&minus;</button></div>\n      <div class=\"mapmsg\" id=\"mapMsg\" hidden></div>\n      <div class=\"mapsel\" id=\"mapSel\" hidden></div>\n    </div>\n    <p class=\"note\" id=\"mapNote\" style=\"margin-top:10px\"></p>\n    <div class=\"list\" id=\"mapList\"></div>\n    </div>\n  </section>\n\n  <section id=\"viewTech\" hidden>\n    <div id=\"techForm\"></div>\n    <div id=\"techList\"></div>\n  </section>\n\n  <section id=\"viewManager\" hidden>\n    <div id=\"mgNow\"></div>\n    <div id=\"mgChecks\"></div>\n    <div id=\"mgTrucks\"></div>\n    <div id=\"mgStd\"></div>\n    <div id=\"mgGap\"></div>\n    <div id=\"mgVen\"></div>\n    <div id=\"mgSim\"></div>\n    <div id=\"mgX\"></div>\n    <div id=\"mgTools\"></div>\n  </section>\n\n  <section id=\"viewPunch\" hidden>\n    <div class=\"box\" id=\"punchTop\"><p class=\"note\">Loading the mHelp list…</p></div>\n    <div class=\"chips\" id=\"punchChips\" style=\"margin-top:12px\"></div>\n    <div class=\"count\" id=\"punchCount\"></div>\n    <div class=\"list\" id=\"punchList\"></div>\n  </section>\n\n  <section id=\"viewActivity\" hidden>\n    <p class=\"note\" id=\"actNote\">Every change made by hand on this board, newest first.</p>\n    <ul class=\"hist\" id=\"activity\"></ul>\n  </section>\n</main>\n\n<section id=\"viewTv\" hidden><header class=\"tvtop\"><div class=\"logo\"><span class=\"mk\" aria-hidden=\"true\"><i></i></span><div><h1>COS Board</h1><div class=\"eyebrow\">Cameras Onsite</div></div></div><div class=\"tvread\" id=\"tvRead\" role=\"status\">Loading the camera reading…</div><div class=\"tvclock\"><b id=\"tvClock\"></b><span id=\"tvDate\"></span></div><button type=\"button\" class=\"tvx\" id=\"tvExitTop\">Exit TV</button></header><div class=\"tvgrid\" id=\"tvGrid\"><div class=\"tvleft\" id=\"tvKpi\"><div class=\"tvtiles\" id=\"tvTiles\"></div><div class=\"tvminis\" id=\"tvMinis\"></div><div class=\"tvhead\" id=\"tvHead\"></div><div class=\"tvlist\" id=\"tvList\"></div></div><div class=\"tvright\" id=\"tvRight\"><div class=\"tvmaptitle\" id=\"tvMapTitle\"></div><div class=\"tvmap\" id=\"tvMap\"></div></div></div><footer class=\"tvfoot\"><span id=\"tvNote\"></span><span class=\"tvbtns\"><button type=\"button\" id=\"tvRefresh\">Refresh</button><button type=\"button\" id=\"tvFull\">Full screen</button><button type=\"button\" id=\"tvExit\">Exit TV</button></span></footer></section><div class=\"sheet\" id=\"sheet\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"pname\"><div class=\"panel\" id=\"panel\"></div></div>\n<div class=\"toast\" id=\"toast\" role=\"status\" aria-live=\"polite\"></div></div>";
 /* A shadow root can be attached to an element only once, so a host that is mounted again gets its first root back. */
 const ROOTS = new WeakMap();
 
@@ -700,16 +700,17 @@ function logBox(){ return null; }
 /* Email a vendor (James, 25 Nov): cancel a SIM with Vendera or Simetry, or add / remove / swap a unit at an Eyeforce
    account (Stages and Watchful). The server keeps one template per request, the same every time; the card fills the
    blanks it knows, shows the exact email, and sends it with one tap. Owner only: it goes out from James's Gmail. */
-const VEN = { conn:null, denied:false, unit:null, tpls:null, err:"", kind:null, vals:{}, mail:null, missing:[], busy:false, result:null, id:null, recent:null, open:{}, cams:0, camMsg:"", form:null };
+const VEN = { conn:null, denied:false, unit:null, tpls:null, err:"", kind:null, vals:{}, mail:null, missing:[], busy:false, result:null, id:null, recent:null, open:{}, cams:0, camMsg:"", form:null, account:null, acct:null };
 function vendorBox(v, mm){
   if(!hooks || !hooks.vendor || VEN.denied) return null;
-  if(VEN.unit!==v.name){ Object.assign(VEN,{unit:v.name,kind:null,vals:{},mail:null,missing:[],result:null,id:null,recent:null}); vendorRecentLoad(v.name); }
+  if(VEN.unit!==v.name){ Object.assign(VEN,{unit:v.name,kind:null,vals:{},mail:null,missing:[],result:null,id:null,recent:null,account:null,acct:null}); vendorRecentLoad(v.name); vendorAccountLoad(v.name); }
   const box=h("div",{class:"box ven",id:"venBox"},h("h3",{text:"Email a vendor"}));
   if(!VEN.tpls){
     if(!VEN.err && !VEN.busy){ VEN.busy=true; hooks.vendor.templates().then(t=>{ VEN.tpls=t; VEN.err=""; if(typeof hooks.vendor.check==="function") hooks.vendor.check().then(c=>{ VEN.conn=c; drawPanel(); },()=>{}); },e=>{ if(e&&e.denied) VEN.denied=true; else VEN.err=(e&&e.message)||"Vendor emails are not available right now."; }).finally(()=>{ VEN.busy=false; drawPanel(); }); }
     box.append(h("p",{class:"note",text: VEN.err || "Loading…"})); return box;
   }
   const known={unit:v.name, customer:(mm&&mm.rec.cust)||"", site:v.site||"", address:(mm&&mm.rec.addr)||""};
+  if(VEN.account && VEN.account.eye) known.eye=VEN.account.eye;
   const start=kind=>{ const t=VEN.tpls[kind]; VEN.kind=kind; VEN.mail=null; VEN.missing=[]; VEN.result=null; VEN.id=crypto.randomUUID();
     VEN.vals=Object.assign({}, t.defaults||{}, Object.fromEntries(t.fields.map(f=>[f.key, known[f.key]!==undefined ? known[f.key] : (t.defaults||{})[f.key]||""])));
     VEN.open={}; VEN.cams=0; VEN.camMsg=""; VEN.form=null;
@@ -726,6 +727,7 @@ function vendorBox(v, mm){
     box.append(h("p",{class:"note",text: owner ? "Pick what you need. COS fills in what it knows, shows you the exact email, and sends it from your Gmail with IT@ in copy."
       : "Fill in Eyeforce's form here. COS emails it to Eyeforce TechOps from James's Gmail, with IT@ in copy and the filled form attached."}));
     for(const [label,kinds] of groups) box.append(h("p",{class:"vlabel",text:label}),h("div",{class:"vbtns"},...kinds.filter(k=>VEN.tpls[k]).map(k=>h("button",{class:"vbtn",type:"button",onclick:()=>start(k)},VEN.tpls[k].button))));
+    const acct=vendorAccountRow(v); if(acct) box.append(acct);
   } else {
     const t=VEN.tpls[VEN.kind];
     box.append(h("div",{class:"vhead"},h("b",{text:t.title}),h("button",{class:"lk",type:"button",disabled:VEN.busy,onclick:()=>{ VEN.kind=null; drawPanel(); }},"Back")));
@@ -832,6 +834,33 @@ async function vendorOpenForm(){
   try{ await hooks.vendor.form(VEN.kind, VEN.vals); }catch(e){ toast((e&&e.message)||"The form could not be opened."); }
   VEN.busy=false; drawPanel();
 }
+/* The unit's Eyeforce account number: saved once, then Remove account and Swap unit fill it in. */
+function vendorAccountRow(v){
+  if(typeof hooks.vendor.account!=="function" || !VEN.account) return null;
+  const a=VEN.account, e=VEN.acct, wrap=h("div",{id:"venAcct"},h("p",{class:"vlabel",text:"Eyeforce account number"}));
+  if(e){
+    wrap.append(h("label",{class:"mgfield"},"Account number for "+v.name,h("input",{class:"tin",type:"text",maxlength:"12",placeholder:"EYE17351","aria-label":"Eyeforce account number",value:e.text,oninput:x=>{ e.text=x.target.value; }}),
+        h("span",{class:"note",text:"Leave it empty and save to clear it."})),
+      e.err ? h("p",{class:"note s-down",role:"alert",text:e.err}) : null,
+      h("div",{class:"vbtns"},h("button",{class:"vbtn vsend",type:"button",disabled:e.busy,onclick:()=>vendorAccountSave(v.name)},e.busy?"Saving…":"Save number"),
+        h("button",{class:"vbtn alt",type:"button",disabled:e.busy,onclick:()=>{ VEN.acct=null; drawPanel(); }},"Cancel")));
+    return wrap;
+  }
+  wrap.append(h("p",{class:"note"},a.eye ? h("b",{text:a.eye}) : "None saved for this unit yet.",
+    a.eye ? (a.how==="camera_record" ? " · from the camera record" : a.by ? " · saved by "+a.by : "") : "", " ",
+    h("button",{class:"lk",type:"button",onclick:()=>{ VEN.acct={text:a.eye||"",err:"",busy:false}; drawPanel(); }},a.eye?"Change":"Add it")));
+  return wrap;
+}
+async function vendorAccountLoad(unit){ if(typeof hooks.vendor.account!=="function") return; try{ const a=await hooks.vendor.account(unit); if(VEN.unit===unit){ VEN.account=a; drawPanel(); } }catch(_){} }
+async function vendorAccountSave(unit){
+  const e=VEN.acct; if(!e || e.busy) return;
+  const eye=String(e.text||"").toUpperCase().replace(/\s/g,"");
+  if(eye && !/^EYE\d{3,8}$/.test(eye)){ e.err="An Eyeforce account number looks like EYE17351."; drawPanel(); return; }
+  e.busy=true; e.err=""; drawPanel();
+  try{ const a=await hooks.vendor.accountSet(unit, eye); if(VEN.unit===unit){ VEN.account=a; VEN.acct=null; } toast(eye ? eye+" is saved on "+unit+"." : "The account number is cleared.", 6000); }
+  catch(x){ e.busy=false; e.err=(x&&x.message)||"The account number could not be saved."; }
+  drawPanel();
+}
 async function vendorRecentLoad(unit){ try{ const r=await hooks.vendor.recent(unit); if(VEN.unit===unit){ VEN.recent=r; drawPanel(); } }catch(_){} }
 async function vendorPreview(){
   VEN.busy=true; VEN.missing=[]; drawPanel();
@@ -844,6 +873,8 @@ async function vendorSend(){
   try{ VEN.result=await hooks.vendor.send(VEN.kind, VEN.vals, VEN.id); }
   catch(e){ VEN.result={state:"failed",sheet:"",error:(e&&e.message)||"The email could not be sent."}; }
   VEN.busy=false; drawPanel(); vendorRecentLoad(VEN.unit);
+  if(VEN.kind==="monitor_swap") vendorAccountLoad(VEN.unit);
+  if(VQ.data) vqLoad();
 }
 function histBox(v){ const hist=(v.u && v.u.hx)||[]; return hist.length ? h("div",{class:"box"},h("h3",{text:"Set by hand on this unit"}),h("ul",{class:"hist"},hist.map(x=>histLi(x,null)))) : null; }
 function drawMhPanel(v){
@@ -1287,7 +1318,7 @@ function mgStart(){
   if(hooks.startView==="manager" || (typeof MGK.wasKnown==="function" && MGK.wasKnown())) mgShow(true);
   mgLoad(false);
 }
-function mgOpen(){ mgDraw(); if(MG.state==="idle" || MG.state==="failed" || (MG.state==="ready" && Date.now()-MG.at>60000 && !MG.edit && !MG.busy)) mgLoad(true); }
+function mgOpen(){ vqLoad(); mgDraw(); if(MG.state==="idle" || MG.state==="failed" || (MG.state==="ready" && Date.now()-MG.at>60000 && !MG.edit && !MG.busy)) mgLoad(true); }
 /* Which board unit a truck's unit is, when exactly one carries that name. */
 function mgIndex(vs){ const idx={}; for(const v of vs){ if(v.mhOnly && !v.name) continue; const k=mgKey(v.name); if(k) (idx[k]=idx[k]||[]).push(v); } return idx; }
 const mgUnitOf = (idx, name) => { const hit=idx[mgKey(name)]; return hit && hit.length===1 ? hit[0] : null; };
@@ -1301,7 +1332,7 @@ function mgDraw(part){
     if(feed) return;
     const body = MG.state==="failed" ? h("div",{class:"box"},h("p",{text:MG.err}),h("div",{class:"links"},h("button",{class:"lk",type:"button",onclick:()=>mgLoad(true)},"Try again"),mgTool("team","Open the older truck screen")))
       : h("div",{class:"box"},h("p",{class:"note",text:"Loading trucks and inspections…"}));
-    $("mgChecks").replaceChildren(body); $("mgTrucks").replaceChildren(); $("mgStd").replaceChildren(); $("mgGap").replaceChildren(); $("mgSim").replaceChildren(); $("mgX").replaceChildren(); $("mgTools").replaceChildren(); return;
+    $("mgChecks").replaceChildren(body); $("mgTrucks").replaceChildren(); $("mgStd").replaceChildren(); $("mgGap").replaceChildren(); $("mgVen").replaceChildren(); $("mgSim").replaceChildren(); $("mgX").replaceChildren(); $("mgTools").replaceChildren(); return;
   }
   const real=d.techs.filter(t=>!t.test), tests=d.techs.filter(t=>t.test), idx=mgIndex(vs);
   if(!part || part==="checks") $("mgChecks").replaceChildren(mgChecks(d, real));
@@ -1313,6 +1344,7 @@ function mgDraw(part){
     if(editing) mgEditSync(editing);
   }
   if(!part || part==="x"){ $("mgGap").replaceChildren(mgGaps(d)); $("mgX").replaceChildren(mgExchanges(d, idx)); }
+  if(!part || part==="x" || part==="ven") $("mgVen").replaceChildren(...[mgVendors()].filter(Boolean));
   if(!part || part==="x" || part==="sim") $("mgSim").replaceChildren(mgSims(d));
   if(!part || part==="x" || part==="std") $("mgStd").replaceChildren(mgStd(d));
   if(!part || part==="tools") $("mgTools").replaceChildren(mgTools());
@@ -1503,7 +1535,78 @@ async function stdRemove(){
   catch(x){ r.err=(x && x.message) || "That could not be saved."; }
   STDF.busy=false; mgDraw("std");
 }
-const SIMF = { open:false, text:"", carrier:"", note:"", busy:false, err:"", done:"", mark:null, show:"in_drawer", all:false };
+const SIMF = { open:false, text:"", carrier:"", note:"", busy:false, err:"", done:"", mark:null, show:"in_drawer", all:false, rule:false, ruleErr:"" };
+/* The owner's switch for "SIMs must come from the drawer". Turning it on asks once more, because it can stop a handoff. */
+function simRule(g){
+  if(!MGK || typeof MGK.simRequire!=="function") return null;
+  const on=g.requireListed;
+  if(SIMF.rule && !on) return h("div",{class:"mgedit",id:"simRule",style:"display:flex;flex-direction:column;gap:8px;margin:10px 0"},
+    h("p",{class:"note s-issues",role:"alert",text:"When this is on, IT cannot hand over a unit with a SIM that is not on the drawer list, or that the list shows somewhere else. The handoff is refused and says what to do next."
+      +(g.notListed.length ? " "+mgPlural(g.notListed.length,"SIM")+" handed out lately "+(g.notListed.length===1?"was":"were")+" not on the list, so add every card on hand first." : "")}),
+    SIMF.ruleErr ? h("p",{class:"note",role:"alert",text:SIMF.ruleErr}) : null,
+    h("div",{class:"links"},h("button",{class:"fixbtn",type:"button",disabled:SIMF.busy,onclick:()=>simRequire(true)},"Yes, turn it on"),
+      h("button",{class:"lk",type:"button",onclick:()=>{ SIMF.rule=false; SIMF.ruleErr=""; mgDraw("sim"); }},"Cancel")));
+  return h("div",{class:"prow "+(on?"s-up":""),id:"simRule"},
+    h("div",{class:"pmain"},h("span",{class:"name",text:"SIMs must come from the drawer: "+(on?"On":"Off")}),
+      h("span",{class:"sub",text:(on ? "A handoff with a SIM that is not free in the drawer is refused." : "Any SIM can be handed over. A SIM not on the list is only recorded.")+(SIMF.ruleErr?" "+SIMF.ruleErr:"")})),
+    h("div",{class:"links"},h("button",{class:"lk",type:"button",disabled:SIMF.busy,onclick:()=>{ if(on) simRequire(false); else { SIMF.rule=true; SIMF.ruleErr=""; mgDraw("sim"); } }},on?"Turn off":"Turn on")));
+}
+async function simRequire(on){
+  if(SIMF.busy) return; SIMF.busy=true; SIMF.ruleErr=""; mgDraw("sim");
+  try{ MG.data=await MGK.simRequire(on); MG.at=Date.now(); SIMF.rule=false; toast(on ? "On. Handoffs now only take SIMs from the drawer." : "Off. Any SIM can be handed over again.", 7000); }
+  catch(x){ SIMF.ruleErr=(x && x.message) || "That could not be saved."; }
+  SIMF.busy=false; mgDraw("sim");
+}
+/* Waiting on vendor: every email COS sent that nobody has marked done yet (owner). */
+const VQ = { data:null, err:"", loading:false, busy:false, close:null, done:false };
+const VKIND = { sim_cancel_vendera:"Cancel SIM (Vendera)", sim_cancel_simetry:"Cancel SIM (Simetry)", monitor_add:"Add account", monitor_remove:"Remove account", monitor_swap:"Swap unit" };
+function vqLoad(){
+  if(!hooks || !hooks.vendor || typeof hooks.vendor.open!=="function" || VQ.loading) return;
+  VQ.loading=true;
+  hooks.vendor.open().then(d=>{ VQ.data=d; VQ.err=""; },()=>{ VQ.err="The vendor list could not be read just now."; }).finally(()=>{ VQ.loading=false; mgDraw("ven"); });
+}
+function mgVendors(){
+  if(!hooks || !hooks.vendor || typeof hooks.vendor.open!=="function") return null;
+  const title=h("h3",{text:"Waiting on vendor"});
+  if(!VQ.data) return h("div",{class:"box",id:"mgVenBox"},title,h("p",{class:"note",text:VQ.err||"Loading the emails sent to vendors…"}),
+    VQ.err ? h("div",{class:"links"},h("button",{class:"lk",type:"button",onclick:()=>{ vqLoad(); mgDraw("ven"); }},"Try again")) : null);
+  const open=VQ.data.open, waiting=open.filter(r=>r.state==="sent"), other=open.filter(r=>r.state!=="sent");
+  const days=r=>r.at ? Math.floor((Date.now()-Date.parse(r.at))/864e5) : 0, late=waiting.filter(r=>days(r)>=3);
+  const row=r=>{
+    const sent=r.state==="sent", closing=VQ.close && VQ.close.id===r.id, c=VQ.close;
+    const what=(VKIND[r.kind]||"Email")+" · "+r.unit;
+    return h("div",{class:"prow "+(sent ? (days(r)>=3?"s-issues":"") : "s-down"),"data-vq":r.id},
+      h("div",{class:"pmain"},h("span",{class:"name",text:what}),
+        h("span",{class:"sub",text: sent ? "Sent to "+r.to+" by "+r.by+(r.at?" · "+mgWhen(r.at):"")+(days(r)>=3?" · no answer marked in "+days(r)+" days":"")
+          : r.state==="review" ? "Gmail did not answer. Check your Sent folder to see if it went."+(r.at?" · "+mgWhen(r.at):"") : "Not sent"+(r.error?": "+r.error:".")+(r.at?" · "+mgWhen(r.at):"")})),
+      closing ? h("div",{style:"grid-column:1 / -1;display:flex;flex-direction:column;gap:8px"},
+        sent && r.kind==="monitor_add" ? h("label",{class:"mgfield"},"Eyeforce account number from their reply (optional)",h("input",{class:"tin",type:"text",maxlength:"12",placeholder:"EYE17351","aria-label":"Eyeforce account number",value:c.eye,oninput:e=>{ c.eye=e.target.value; }}),
+          h("span",{class:"note",text:"COS saves it on "+r.unit+", so Remove account and Swap unit fill it in later."})) : null,
+        h("label",{class:"mgfield"},"Note (optional)",h("input",{class:"tin",type:"text",maxlength:"300","aria-label":"Note",value:c.note,oninput:e=>{ c.note=e.target.value; }})),
+        c.err ? h("p",{class:"note",role:"alert",text:c.err}) : null,
+        h("div",{class:"links"},h("button",{class:"fixbtn",type:"button",disabled:VQ.busy,onclick:()=>vqClose()},VQ.busy?"Saving…":sent?"Mark done":"Clear it"),
+          h("button",{class:"lk",type:"button",onclick:()=>{ VQ.close=null; mgDraw("ven"); }},"Cancel")))
+      : h("div",{class:"links"},h("button",{class:"lk",type:"button",disabled:VQ.busy,onclick:()=>{ VQ.close={id:r.id,eye:"",note:"",err:""}; mgDraw("ven"); }},sent?"Mark done":r.state==="review"?"Mark done":"Clear")));
+  };
+  return h("div",{class:"box",id:"mgVenBox"},title,
+    h("p",{class:"big",text: waiting.length ? mgPlural(waiting.length,"email")+" waiting on a vendor." : "Nothing is waiting on a vendor."}),
+    late.length ? h("p",{class:"note s-issues",text:mgPlural(late.length,"email")+" sent 3 or more days ago with no answer marked. Follow up with the vendor."}) : null,
+    other.length ? h("p",{class:"note s-down",text:mgPlural(other.length,"email")+" did not go out cleanly. Check below."}) : null,
+    VQ.err ? h("p",{class:"note",role:"alert",text:VQ.err}) : null,
+    ...other.map(row), ...waiting.map(row),
+    h("p",{class:"note",text:"Mark an email done when the vendor confirms. It leaves this list and stays on the unit card."}),
+    VQ.data.done.length ? h("div",{class:"links"},h("button",{class:"lk",type:"button",onclick:()=>{ VQ.done=!VQ.done; mgDraw("ven"); }},VQ.done?"Hide the last done":"Show the last done ("+VQ.data.done.length+")")) : null,
+    ...(VQ.done ? VQ.data.done.map(r=>h("p",{class:"note",text:(VKIND[r.kind]||"Email")+" · "+r.unit+" · done by "+r.by+(r.at?" · "+mgWhen(r.at):"")+(r.note?" · "+r.note:"")})) : []));
+}
+async function vqClose(){
+  const c=VQ.close; if(!c || VQ.busy) return;
+  const eye=String(c.eye||"").toUpperCase().replace(/\s/g,"");
+  if(eye && !/^EYE\d{3,8}$/.test(eye)){ c.err="An Eyeforce account number looks like EYE17351."; mgDraw("ven"); return; }
+  VQ.busy=true; c.err=""; mgDraw("ven");
+  try{ VQ.data=await hooks.vendor.close(c.id, String(c.note||"").trim(), eye); VQ.close=null; toast(eye ? "Done. "+eye+" is saved on the unit." : "Done.", 6000); }
+  catch(x){ c.err=(x && x.message) || "That could not be saved."; }
+  VQ.busy=false; mgDraw("ven");
+}
 const simSplit = t => String(t||"").split(/[\r\n,;]+/).map(x=>x.replace(/[^0-9A-Za-z]/g,"")).filter(Boolean);
 function mgSims(d){
   const title=h("h3",{text:"SIM drawer"});
@@ -1517,6 +1620,7 @@ function mgSims(d){
   return h("div",{class:"box",id:"mgSimBox"},title,
     h("p",{class:"big",text:mgPlural(inDrawer.length,"SIM")+" in the drawer."}),
     h("p",{class:"note",text:out.length+" out in units or on trucks · "+bad.length+" bad or deactivated."}),
+    simRule(g),
     g.notListed.length ? h("div",{class:"prow s-issues"},h("div",{class:"pmain"},h("span",{class:"name",text:mgPlural(g.notListed.length,"SIM")+" handed out that were not on the drawer list"}),
       h("span",{class:"sub",text:g.notListed.slice(0,5).map(x=>x.sim+" ("+x.detail+")").join(" · ")+(g.notListed.length>5?" …":"")}))) : null,
     h("div",{class:"links"},tab("in_drawer","In the drawer",inDrawer.length),tab("out","Out",out.length),tab("bad","Bad",bad.length)),
