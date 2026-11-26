@@ -59,6 +59,10 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-26** — Deployed `cos-unit-camera-status/morning-list-v21` (#549): live now
+  **v22 `a306656f`** (pins updated). The camera-status read carries `overnight` (the
+  morning list, Owner and approved IT; Tech Check `cos_overnight_v1`). Rollback
+  `rollback-to-v21-entry`. A next patch to this function must start from v22.
 - **2026-11-25** — Tech Check: morning list. `public.cos_overnight_v1` (Owner or
   approved IT, read only) lists field cameras down, new in 24 h first, with router
   reading, likely cause and IT-sheet line. Operations patch
