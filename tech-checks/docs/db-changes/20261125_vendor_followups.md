@@ -1,9 +1,12 @@
-# 2026-11-25 — Vendor follow-ups: account number on the unit, Waiting on vendor, SIM rule switch (prepared)
+# 2026-11-25 — Vendor follow-ups: account number on the unit, Waiting on vendor, SIM rule switch
 
 Asked by James ("Proceed with your recommendations"): the SIM rule on/off button, saving the Eyeforce account
 number on the unit, and a "Waiting on vendor" list in the Manager tab.
 
-Status: **prepared, not applied or deployed** (needs James's go-ahead to merge and deploy).
+Status: **applied and deployed 2026-11-26 ~05:09 UTC (James: "merge 553 and deploy").** SQL applied to Tech
+Check; #553 merged (5005994); `cos-vendor-request` v3 deployed as a pinned entry
+(`docs/cos-vendor-request-v3-entry/serve.ts`). Checked: Helios 002 has no number, RII029 reads EYE17376 from its
+camera record, the open list is empty, and the new functions are closed to anon and authenticated.
 
 ## What changes
 

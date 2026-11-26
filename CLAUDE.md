@@ -59,11 +59,13 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
-- **2026-11-25** — Vendor follow-ups (prepared, deploy pending James): Tech Check
-  `cos-vendor-requests-v3.sql` (EYE account number per unit in `app_private.vendor_unit_accounts`,
-  `vendor_requests.closed_*`, four service_role functions; reads `camera_devices.eyeforce_id`, never
-  writes it); `cos-vendor-request` v3 actions `account` / `account_set` / `open` / `close`; Manager
-  tab "Waiting on vendor" box and the SIM-rule switch (`operations-host.js` kind `simRequire`). Record
+- **2026-11-26** — Vendor follow-ups **live** (#553, 05:09 UTC): Tech Check
+  `cos-vendor-requests-v3.sql` applied (EYE account number per unit in
+  `app_private.vendor_unit_accounts`, `vendor_requests.closed_*`, four service_role functions; reads
+  `camera_devices.eyeforce_id`, never writes it); `cos-vendor-request` **v3 is a pinned entry**
+  (`docs/cos-vendor-request-v3-entry/serve.ts`, commit 5005994) with actions `account` /
+  `account_set` / `open` / `close` — a next change must redeploy with a new pin. Manager tab
+  "Waiting on vendor" box and the SIM-rule switch (`operations-host.js` kind `simRequire`). Record
   in `tech-checks/docs/db-changes/20261125_vendor_followups.md`.
 - **2026-11-26** — Deployed `cos-unit-camera-status/morning-list-v21` (#549): live now
   **v22 `a306656f`** (pins updated). The camera-status read carries `overnight` (the
