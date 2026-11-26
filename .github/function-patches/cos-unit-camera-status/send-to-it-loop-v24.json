@@ -1,0 +1,71 @@
+{
+  "slug": "cos-unit-camera-status",
+  "projectRef": "tughscoxralhofrckvxy",
+  "sourceCommit": "95e3e5a4f81f0f823e7e646a01a8235da7c5f425",
+  "deployedFileNames": {
+    "index.ts": "cos-unit-camera-status/index.ts",
+    "deno.json": "cos-unit-camera-status/deno.json"
+  },
+  "entrypointPath": "cos-unit-camera-status/index.ts",
+  "importMapPath": "cos-unit-camera-status/deno.json",
+  "verifyJwt": false,
+  "sourceDir": "tech-checks/docs/cos-unit-camera-status-v24-entry",
+  "description": "Send to IT loop. The camera-status read also reads the Send to IT reports (Operations public.cos_troubleshoot_open_v1: open ones and ones closed in the last 7 days), and POST /api/unit-camera-status/troubleshoot-close closes one as fixed or not needed with a note through public.cos_troubleshoot_close_v1. Seven exact edits to live v24; nothing else changes.",
+  "authorization": "James, 2026-11-26: 'Proceed' on building the Send to IT loop. Running the deploy still needs his explicit go for that run.",
+  "releaseStatus": "PREPARED",
+  "sourceRecord": "tech-checks/docs/cos-unit-camera-status-v24-entry/index.ts",
+  "requireLiveBeforeDeploy": {
+    "status": "ACTIVE",
+    "version": 24,
+    "ezbr_sha256": "455769503273901501fc921c0152141ed18e59101868e82a7cf924fd6f169213"
+  },
+  "edits": [
+    {
+      "file": "index.ts",
+      "needle": "          const [cameras, integrations, handEdits, otherDevices, otherHealth, aLinks, vccMoves, overnight, routerSwaps] = await Promise.all([\n",
+      "replacement": "          const [cameras, integrations, handEdits, otherDevices, otherHealth, aLinks, vccMoves, overnight, routerSwaps, tsOpen] = await Promise.all([\n",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "v?.contract === \"COS_ROUTER_SWAPS_V1\" && Array.isArray(v.items) ? v.items.slice(0, 100) : null).catch(() => null)\n          ]);\n",
+      "replacement": "v?.contract === \"COS_ROUTER_SWAPS_V1\" && Array.isArray(v.items) ? v.items.slice(0, 100) : null).catch(() => null),\n            // Send to IT reports: open ones, and ones closed in the last 7 days, so the card shows Open or Fixed.\n            rpc(\"cos_troubleshoot_open_v1\", { ...actorPayload }, request.signal).then((v) => v?.contract === \"COS_TROUBLESHOOT_OPEN_V1\" && Array.isArray(v.items) ? v.items.slice(0, 300) : null).catch(() => null)\n          ]);\n",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "            routerSwaps,\n",
+      "replacement": "            routerSwaps,\n            troubleshootReports: tsOpen,\n",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "      if (path === \"/api/unit-camera-status/troubleshoot\") {\n",
+      "replacement": "      if (path === \"/api/unit-camera-status/troubleshoot-close\") {\n        // Close a Send to IT report as fixed or not needed, with a note (James, 26 Nov: close the loop). The report itself\n        // is never changed; Operations adds a closing row with who and when.\n        if (method !== \"POST\") fail16(\"Use POST to close a troubleshoot report.\", 405);\n        if (body === null) body = await requestBody(request);\n        const cb = body && typeof body === \"object\" && !Array.isArray(body) ? body : {};\n        const cId = typeof cb.id === \"string\" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cb.id) ? cb.id : null;\n        const cNote = typeof cb.note === \"string\" && cb.note.trim() !== \"\" && cb.note.length <= 1e3 ? cb.note.trim() : null;\n        if (!cId || !cNote || (cb.outcome !== \"fixed\" && cb.outcome !== \"not_needed\")) return json({ error: \"Say what was done before closing it. Nothing was changed.\" }, 422);\n        if (/(\\d{1,3}\\.){3}\\d{1,3}/.test(cNote)) return json({ error: \"Notes carry last octets only, not a whole IP address. Nothing was changed.\" }, 422);\n        const cRole = context.legacyOwner && context.actorId ? \"owner\" : \"it\";\n        const cName = (context.name || \"\").trim() || (cRole === \"owner\" ? \"Owner\" : \"IT technician\");\n        const cReceipt = await rpc(\"cos_troubleshoot_close_v1\", { ...actorPayload, p_report_id: cId, p_payload: { outcome: cb.outcome, note: cNote, actorName: cName } }, request.signal);\n        if (cReceipt?.contract !== \"COS_TROUBLESHOOT_CLOSE_RESULT_V1\") fail16(\"The report could not be closed. Nothing was changed.\", 503);\n        const cList = await rpc(\"cos_troubleshoot_open_v1\", { ...actorPayload }, request.signal).catch(() => null);\n        return json({ contract: \"COS_TROUBLESHOOT_CLOSED_V1\", id: cReceipt.id, closedAt: cReceipt.closedAt, by: cReceipt.closedBy, duplicate: cReceipt.repeat === true, troubleshootReports: cList?.contract === \"COS_TROUBLESHOOT_OPEN_V1\" && Array.isArray(cList.items) ? cList.items.slice(0, 300) : null });\n      }\n      if (path === \"/api/unit-camera-status/troubleshoot\") {\n",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "\"/api/unit-camera-status/vcc-move\", \"/api/unit-camera-status/router-swap\"];",
+      "replacement": "\"/api/unit-camera-status/vcc-move\", \"/api/unit-camera-status/router-swap\", \"/api/unit-camera-status/troubleshoot-close\"];",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "\"/api/unit-camera-status/vcc-move\",\"/api/unit-camera-status/router-swap\"];",
+      "replacement": "\"/api/unit-camera-status/vcc-move\",\"/api/unit-camera-status/router-swap\",\"/api/unit-camera-status/troubleshoot-close\"];",
+      "occurrences": 1
+    }
+  ],
+  "expectedBefore": {
+    "index.ts": "9c44f8703126dece5ec49ca5dcdcc4372b03cfcc0d0d9967c64c853bfd893ab2",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "expectedAfter": {
+    "index.ts": "18042550c61f24cf0547d492e38b6bd4bf3b3d795b208c6c6d37abedfca21233",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "dryRun": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/send-to-it-loop-v24.json --dry-run",
+  "deploy": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/send-to-it-loop-v24.json --deploy",
+  "rollback": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/rollback-to-v24-entry.json --deploy"
+}
