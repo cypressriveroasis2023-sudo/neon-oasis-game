@@ -786,6 +786,33 @@ test('the other COS screens open from the board, by the names IT sees', async ({
   await expect.poll(() => host.evaluate(element => element.ownerDocument.defaultView.location.hash)).toBe('#camera-health');
 });
 
+test('the morning list shows new and still-down field units with a likely cause, and leaves the shop out', async ({page}, info) => {
+  test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');
+  const record = (id, unitNumber, category, placement, customer) => ({recordId: 'mhelp_product:' + id, productId: String(id), unitNumber, category, placement, uploadLifecycle: 'UNFLAGGED', customer});
+  const value = structuredClone(field);
+  value.uploadInventory = {
+    contract: 'COS_MHELP_UPLOAD_INVENTORY_V1', source: 'mhelpdesk_api', countBasis: 'mhelp_product_records_not_unique_physical_units', sourceSha256: 'd'.repeat(64), receivedAt: fresh, lastApiReadAt: fresh,
+    records: [record(1, 'Helios 001', 'Helios Solar Tower', 'FIELD', 'Fixture Homes'), record(2, 'Spotter 002', 'Spotter', 'FIELD', 'Fixture Homes: Lot 2')],
+    summary: {totalRecords: 2, fieldRecords: 2, shopRecords: 0, unflaggedFieldRecords: 2, doNotUseRecords: 0, missingRecords: 0},
+  };
+  const item = (unitKey, isNew, cause) => ({unitKey, new: isNew, down: 1, total: 2, downSince: fresh, cameras: [{name: unitKey + ' Cam 1', downSince: fresh}], router: {status: 'offline', carrier: 'AT&T', bars: '3'}, cause, sheetLine: unitKey + ': 1 of 2 cameras offline. Router offline. Likely power or signal.'});
+  const overnight = {since: fresh, items: [item('HELIOS 001', true, 'The router is offline too: no power or no cell signal at the unit.'), item('SPOTTER 002', false, 'Check power and battery first.')]};
+  const {app, state} = await mountFleet(page, false, {cameraStatus: reportOf(units, {overnight}), field: value, skipInitialFieldCount: true});
+  const host = app.locator('.cos-board-host');
+  await expect(host).toBeVisible();
+  await inBoard(host, root => root.getElementById('tabPunch').click());
+  const chips = () => inBoard(host, root => [...root.querySelectorAll('#punchChips .chip')].map(chip => chip.textContent));
+  await expect.poll(chips).toContain('Morning list \u00b7 2');
+  await inBoard(host, root => [...root.querySelectorAll('#punchChips .chip')].find(chip => chip.textContent.startsWith('Morning list')).click());
+  const shown = await inBoard(host, root => root.getElementById('viewPunch').textContent);
+  expect(shown).toContain('New since yesterday · 1');
+  expect(shown).toContain('Still down · 1');
+  expect(shown).toContain('no power or no cell signal');
+  expect(shown).toContain('offline · AT&T · 3 bars');
+  expect(await inBoard(host, root => [...root.querySelectorAll('#punchList .fixbtn')].map(b => b.textContent))).toEqual(['Copy for the IT sheet']);
+  expect(state.errors).toEqual([]);
+});
+
 test('Moved in VCC lists camera records VCC disagrees with, and one tap fixes one', async ({page}, info) => {
   test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');
   // James, 25 Nov: a camera moved from 253 to 265 in VCC stayed under 253 in COS. VCC is right about its own cameras.
