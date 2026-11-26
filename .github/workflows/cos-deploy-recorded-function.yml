@@ -108,7 +108,7 @@ jobs:
         if: inputs.patch == 'rollback-to-v21-entry'
         run: printf '%s  %s\n' 'd67ab47071364f4e6bb7d6551a1e92c291f361afbbc5719d52208f5e74280556' '.github/function-patches/cos-unit-camera-status/rollback-to-v21-entry.json' | sha256sum -c -
       - name: Pin the read-only live archive preflight
-        run: printf '%s  %s\n' 'cb634d16da255c900ab1e9193cbca3977e97516774a01dbbe2c821b61a78fb16' '.github/scripts/preflight-live-function-pins.mjs' | sha256sum -c -
+        run: printf '%s  %s\n' '9687ae761eeaa5704fa388566189c0176fb5354fd452ce4f79132ad7cff73574' '.github/scripts/preflight-live-function-pins.mjs' | sha256sum -c -
       - name: Choose the recorded patch path
         id: recorded
         run: |
