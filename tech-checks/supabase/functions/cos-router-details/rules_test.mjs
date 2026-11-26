@@ -20,3 +20,10 @@ test('requests are exact', () => {
   assert.equal(readRequest({ action: 'delete' }), null);
   assert.equal(readRequest([]), null);
 });
+
+test('trend asks for one unit only', () => {
+  assert.deepEqual(readRequest({ action: 'trend', unit: ' SPOTTER 100 ' }), { action: 'trend', unit: 'SPOTTER 100' });
+  assert.equal(readRequest({ action: 'trend', unit: '' }), null);
+  assert.equal(readRequest({ action: 'trend', unit: 'x'.repeat(81) }), null);
+  assert.equal(readRequest({ action: 'trend', unit: 'A', extra: 1 }), null);
+});
