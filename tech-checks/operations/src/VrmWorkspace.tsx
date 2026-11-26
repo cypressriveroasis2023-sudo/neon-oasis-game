@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { api, OperationsApiError } from './api';
 import { getVrmFleet } from './vrmFleetApi';
 import { readVrmFleetConfig, type VrmUnit } from '../../supabase/functions/cos-operations-pages/vrm';
 import './vrm.css';
 import VrmReadOnlyDashboard from './VrmReadOnlyDashboard';
 import { readDashboardPower, shortDate, unitTileSummary } from './vrmReadOnlyModel';
-import { heliosPlacement, placementLabel, victronNeedsAttention } from './victronAttention';
+import { heliosPlacement, placementLabel, victronFleetView, victronNeedsAttention } from './victronAttention';
 import { canonicalCameraUnit } from './fieldCameraHealth';
 import { mpptLine, readVrmMppt, type Mppt } from './vrmMppt';
 import { cloudyWarning, heliosSpots, outlookLine, readSunForecast, sunOutlook, type SunDay } from './vrmWeather';
@@ -160,8 +160,15 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
     // This effect handles only an incoming navigation target.
   }, [initialUnit,initialInstallationId]);
   const select = (installationId:number) => { setSelected(installationId); onSelectInstallation?.(installationId); };
-  const index = units.findIndex(item => item.installationId === selected);
-  const unit = index < 0 ? null : units[index];
+  // Field or Shop per mHelp. Shop units go last: a unit in the shop that is not powered is normal, not down.
+  const place = new Map(units.map(item => [item.installationId, heliosPlacement(item.name, inventory)]));
+  const inShop = (item: {installationId: number}) => place.get(item.installationId) === 'shop';
+  const tiles = new Map(units.map(item => [item.installationId, unitTileSummary(item, power.rows, now)]));
+  const view = victronFleetView(units, item => place.get(item.installationId) ?? 'unknown', item => tiles.get(item.installationId)!);
+  const {ordered, shop: shopUnits, shopOn, placed, summary} = view;
+  const shopOff = (item: {installationId: number}) => view.shopOff.has(item.installationId);
+  const index = ordered.findIndex(item => item.installationId === selected);
+  const unit = index < 0 ? null : ordered[index];
   const enabled = units.filter(item => item.embedUrl).length;
   const nameCounts = new Map<string,number>();
   for (const item of units) nameCounts.set(item.name, (nameCounts.get(item.name) ?? 0) + 1);
@@ -173,16 +180,6 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
   const night = units.length > 0 && history ? nightReport(units, history, now, name => heliosPlacement(name, inventory) === 'shop') : null;
   const nightRows = new Map((night?.rows ?? []).map(r => [r.installationId, r]));
   const attention = victronNeedsAttention(units, power.rows, inventory, now, history, tonight, weather, mppt);
-  // Only speak about Field power once at least one unit's Field/Shop is known from mHelp.
-  const placed = units.filter(item => heliosPlacement(item.name, inventory) !== 'unknown').length;
-  const tiles = new Map(units.map(item => [item.installationId, unitTileSummary(item, power.rows, now)]));
-  const tally = (tones:string[]) => [...tiles.values()].filter(tile => tones.includes(tile.tone)).length;
-  const summary = [
-    {key:'good', label:'Reporting', value:tally(['good','fair','low'])},
-    {key:'low', label:'Low battery', value:tally(['low'])},
-    {key:'stale', label:'Stale / no reading', value:tally(['stale','none'])},
-    {key:'unavailable', label:'Unavailable', value:tally(['unavailable'])},
-  ];
   const syncTone = !sync ? 'stale' : error || sync.state === 'error' ? 'low' : sync.state === 'current' ? 'good' : 'stale';
   const lastSuccess = readableTime(sync?.lastSuccessAt ?? null);
   const nextSync = readableTime(sync?.nextSyncAt ?? null);
@@ -195,7 +192,7 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
       <p className='vrm-sync-line'><i aria-hidden='true'/><strong>{error ? 'Saved sync status, not reverified: ' : ''}{syncDescription(sync)}</strong>{sync.error ? <span> {sync.error}</span> : null}</p>
       <p className='vrm-sync-times'>{lastSuccess ? <span title={lastSuccess}>Synced {shortTime(sync.lastSuccessAt ?? null)}</span> : <span>No successful sync yet</span>}{nextSync && <span title={nextSync}>Next {shortTime(sync.nextSyncAt ?? null)}</span>}<span>{sync.scheduleActive ? 'Auto every 15 min' : 'Auto sync off'}</span></p>
     </div>}
-    {units.length > 0 && <ul className='vrm-fleet-summary' aria-label='Fleet power summary'>{summary.map(item => <li key={item.key} className={'vrm-tone-'+item.key}><strong>{item.value}</strong><span>{item.label}</span></li>)}</ul>}
+    {units.length > 0 && <ul className='vrm-fleet-summary' aria-label='Fleet power summary'>{summary.map(item => <li key={item.label} className={'vrm-tone-'+item.key}><strong>{item.value}</strong><span>{item.label}</span></li>)}</ul>}
     {units.length > 0 && placed > 0 && <section className={'vrm-attention' + (attention.length ? '' : ' vrm-attention-clear')} aria-label='Needs attention'>
       <h3>{attention.length ? 'Needs attention · Field units' : 'No Field power issues'}</h3>
       {attention.length > 0 && <ul>{attention.map(item => <li key={item.installationId}><button type='button' className={'vrm-attn-'+item.kind} onClick={() => select(item.installationId)}><strong>{item.name}</strong><span>{item.line}</span></button></li>)}</ul>}
@@ -204,9 +201,11 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
     {units.length > 0 && <VrmTechGuide/>}
     {!loaded && loading && <p role='status'>Loading your Victron installations…</p>}
     {loaded && units.length === 0 && <div className='vrm-awaiting' role='status'><h3>No installations in the saved fleet</h3><p>{canDiscover ? 'Refresh the fleet to check the connected Victron account.' : 'No saved installations are available. Ask an Owner to check the fleet sync.'} No installation IDs or dashboards are assumed.</p></div>}
-    {units.length > 0 && <nav className='tabs vrm-unit-grid' aria-label='Helios installations'>{units.map(item => <button key={item.installationId} className={(selected === item.installationId ? 'selected' : 'secondary') + ' vrm-tone-' + tiles.get(item.installationId)!.tone} aria-pressed={selected === item.installationId} onClick={() => select(item.installationId)}>
+    {units.length > 0 && <nav className='tabs vrm-unit-grid' aria-label='Helios installations'>{ordered.map(item => <Fragment key={item.installationId}>
+      {shopUnits[0]?.installationId === item.installationId && <p className='vrm-shop-divider'><b>In the shop · {shopUnits.length}</b><span>Not powered is normal here. These are not counted as down.{shopOn.length > 0 ? ' Powered up now: ' + shopOn.map(u => u.name).join(', ') + '. If one is at a site, move it to Field in mHelp so its alerts switch on.' : ''}</span></p>}
+      <button className={(selected === item.installationId ? 'selected' : 'secondary') + ' vrm-tone-' + tiles.get(item.installationId)!.tone + (shopOff(item) ? ' vrm-shop-off' : '')} aria-pressed={selected === item.installationId} onClick={() => select(item.installationId)}>
       <span className='vrm-tile-head'><strong>{item.name}</strong>{heliosPlacement(item.name, inventory) !== 'unknown' && <em aria-hidden='true' className={'vrm-place vrm-place-'+heliosPlacement(item.name, inventory)}>{placementLabel(heliosPlacement(item.name, inventory))}</em>}</span>{(nameCounts.get(item.name) ?? 0) > 1 && <small>Installation {item.installationId}</small>}<small className={item.available === false ? 'vrm-tile-status' : 'vrm-sr-only'}>{item.available === false ? 'Unavailable in latest sync' : item.embedUrl ? 'Dashboard enabled' : 'Read-only power'}</small>
-      {(() => { const tile = tiles.get(item.installationId)!; if (tile.tone === 'unavailable') return tile.lastSeen ? <span className='vrm-tile-reading' aria-hidden='true'><span className='vrm-tile-solar vrm-tile-seen'>Last seen {shortDate(tile.lastSeen, now)}</span></span> : null; return <span className='vrm-tile-reading' aria-hidden='true' title={toneLabel[tile.tone]}>
+      {(() => { const tile = tiles.get(item.installationId)!; if (shopOff(item)) return <span className='vrm-tile-reading' aria-hidden='true' title='In the shop and not powered. Not counted as down.'><span className='vrm-tile-idle'>Not powered</span><span className='vrm-tile-solar vrm-tile-seen'>{tile.lastSeen ? 'Last seen ' + shortDate(tile.lastSeen, now) : 'Never connected'}</span></span>; if (tile.tone === 'unavailable') return tile.lastSeen ? <span className='vrm-tile-reading' aria-hidden='true'><span className='vrm-tile-solar vrm-tile-seen'>Last seen {shortDate(tile.lastSeen, now)}</span></span> : null; return <span className='vrm-tile-reading' aria-hidden='true' title={toneLabel[tile.tone]}>
         <span className='vrm-tile-soc'><i/>{tile.soc ? Math.round(tile.soc.value) + '%' : '—'}</span>
         <span className='vrm-tile-bar'><b style={{width: (tile.soc ? Math.max(0, Math.min(100, tile.soc.value)) : 0) + '%'}}/></span>
         {tile.tone === 'stale' || tile.tone === 'none'
@@ -218,12 +217,13 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
             ? <span className={'vrm-tile-night vrm-night-' + t.verdict} title={tonightHeadline(t)}>{t.verdict === 'low' ? (t.floorAt !== null ? '🌙 20% by ' + new Date(t.floorAt * 1000).toLocaleTimeString(undefined, {hour: 'numeric', minute: '2-digit'}) : '🌙 Low tonight') : '🌙 Tight tonight'}</span>
             : null)(tonight.get(item.installationId)) || tile.flow && <span className={'vrm-tile-flow vrm-flow-' + tile.flow.state} title={tile.flow.state === 'charging' ? 'Charging' : tile.flow.state === 'draining' ? 'Draining' : 'Idle'}>{tile.flow.state === 'idle' ? 'Idle' : (tile.flow.state === 'charging' ? '↑ ' : '↓ ') + (tile.flow.watts !== null ? Math.abs(tile.flow.watts) + ' W' : tile.flow.amps !== null ? Math.abs(tile.flow.amps) + ' A' : '') + (tile.flow.state === 'charging' ? ' in' : ' out')}</span>}
         {(r => r && r.status !== 'none' && <span className={'vrm-tile-low vrm-lvl-' + nightLevel(r)} title={night?.done ? 'Lowest battery last night (5 PM–7 AM)' : 'Lowest battery so far tonight'}>{r.status === 'power' ? '🔌 Plugged in' : '🌙 Low ' + r.low + '%'}</span>)(nightRows.get(item.installationId))}
+        {inShop(item) && tile.fresh && <span className='vrm-tile-shopon' title='Powered up, but mHelp still says Shop. Shop units do not raise alerts.'>⚡ Powered up</span>}
       </span>; })()}
-    </button>)}</nav>}
+    </button></Fragment>)}</nav>}
     {unit && <>
     <div className='vrm-dashboard-heading'><div className='vrm-selected-unit'><span className='vrm-eyebrow'>SELECTED INSTALLATION</span><h3>{unit.name}</h3><span className='vrm-access-status'>{unit.available === false ? 'Unavailable in the latest fleet sync' : unit.embedUrl ? 'Read-only dashboard' : 'Read-only power dashboard'}</span></div>
       <div className='vrm-view-actions' aria-label='Dashboard controls'>
-        <div className='vrm-step-controls'><button className='secondary' aria-label='Previous Helios unit' disabled={index <= 0} onClick={() => select(units[index - 1].installationId)}>←</button><span>{index + 1} / {units.length}</span><button className='secondary' aria-label='Next Helios unit' disabled={index >= units.length - 1} onClick={() => select(units[index + 1].installationId)}>→</button></div>
+        <div className='vrm-step-controls'><button className='secondary' aria-label='Previous Helios unit' disabled={index <= 0} onClick={() => select(ordered[index - 1].installationId)}>←</button><span>{index + 1} / {units.length}</span><button className='secondary' aria-label='Next Helios unit' disabled={index >= ordered.length - 1} onClick={() => select(ordered[index + 1].installationId)}>→</button></div>
         {unit.embedUrl && <><button className='secondary' onClick={() => setRevision(value => value + 1)}>Reload view</button><button className='secondary' aria-expanded={expanded} aria-controls='vrm-dashboard' onClick={() => setExpanded(value => !value)}>{expanded ? 'Compact view' : 'Expand dashboard'}</button></>}
         <a className='operations-reference-link' href={unit.portalUrl} target='_blank' rel='noopener noreferrer'>Open {unit.name} in VRM ↗</a>
       </div>
@@ -274,6 +274,6 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
     })()}
     <p className='vrm-note'>{enabled} embedded dashboards · {units.length-enabled} COS read-only power views. New installations appear automatically after discovery. Installation names and portal links come from the saved fleet; battery and solar readings come from Victron.</p>
     </>}
-    <details className='vrm-help'><summary>Dashboard help &amp; reporting</summary><p>Battery, solar, and load readings are supplied by Victron. Additional measurements depend on the equipment reporting from this installation. Use its VRM portal for history, alarms, and detailed charts. Tile colors: green 50% and up, amber 20–49%, red under 20%, grey when the reading is older than 45 minutes or missing.</p><p>Readings update at this unit’s configured VRM reporting interval. Check the dashboard’s last-update time before treating a reading as current. Reload view reloads the selected dashboard. {canDiscover ? 'Refresh fleet asks the server to discover installations now.' : 'Reload saved fleet reads the current saved installations. Fleet discovery and sharing settings remain with your Owner.'} This visible workspace checks the saved fleet every minute; automatic discovery runs separately every 15 minutes when configured.</p><p>For history, alarms, trends, and installation settings, use Open in VRM with your Victron account. COS displays existing approved Victron embeds or its own read-only power view. New installations do not need public sharing for the COS view. Neither view changes equipment settings.</p></details>
+    <details className='vrm-help'><summary>Dashboard help &amp; reporting</summary><p>Battery, solar, and load readings are supplied by Victron. Additional measurements depend on the equipment reporting from this installation. Use its VRM portal for history, alarms, and detailed charts. Tile colors: green 50% and up, amber 20–49%, red under 20%, grey when the reading is older than 45 minutes or missing. Units mHelp says are in the shop sit at the bottom; one that is not powered says Not powered and is not counted as down.</p><p>Readings update at this unit’s configured VRM reporting interval. Check the dashboard’s last-update time before treating a reading as current. Reload view reloads the selected dashboard. {canDiscover ? 'Refresh fleet asks the server to discover installations now.' : 'Reload saved fleet reads the current saved installations. Fleet discovery and sharing settings remain with your Owner.'} This visible workspace checks the saved fleet every minute; automatic discovery runs separately every 15 minutes when configured.</p><p>For history, alarms, trends, and installation settings, use Open in VRM with your Victron account. COS displays existing approved Victron embeds or its own read-only power view. New installations do not need public sharing for the COS view. Neither view changes equipment settings.</p></details>
   </section>;
 }
