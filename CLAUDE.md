@@ -59,8 +59,13 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-26** — Deployed `cos-unit-camera-status/down-needs-two-misses-v22` (#557,
+  05:31 UTC, James's go): live now **v23 `2efe829a`** (pins updated). A Sniper or CAM V
+  whose saved check missed once reads Not verified ("Avigilon check missed once,
+  checking again"); the second miss in a row, or a confirmed outage, is Down. Rollback
+  `rollback-to-v22-entry`. A next patch to this function must start from v23.
 - **2026-11-26** — Operations patch `cos-unit-camera-status/down-needs-two-misses-v22`
-  is **prepared, not deployed** (starts from live v22 `a306656f`). A Sniper or CAM V
+  was **prepared** (now deployed, see above) (starts from live v22 `a306656f`). A Sniper or CAM V
   whose saved check missed once reads Not verified ("Avigilon check missed once,
   checking again") instead of Down; the second miss in a row, or a confirmed outage,
   is Down. The read adds `confirmed_outage,consecutive_failures` to its
