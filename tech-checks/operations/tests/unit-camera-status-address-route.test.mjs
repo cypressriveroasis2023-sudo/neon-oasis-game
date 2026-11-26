@@ -11,8 +11,8 @@ const response=(data,status=200)=>new Response(JSON.stringify(data),{status,head
 const census=(matches)=>({result:{addressMatches:matches}});
 const katy={matchedAddress:'9500 KATY FWY, HOUSTON, TX, 77024',coordinates:{x:-95.534,y:29.7838}};
 
-function fixture({geocode=census([katy]),geocodeStatus=200,edits=[],role='owner',repeat=false,remoteResult=null,reconAgeMs=120000,aLinks=[],linkReply=null,vcc={contract:'COS_VCC_MOVES_V1',fresh:true,syncedAt:'2026-11-25T20:33:09Z',items:[]},vccReply=null,overnight={contract:'COS_OVERNIGHT_V1',since:'2026-11-25T04:56:17Z',items:[]}}={}){
- const calls=[],unexpected=[],recorded=[],asked=[],linked=[],moved=[],fixtureNow=Date.now();
+function fixture({geocode=census([katy]),geocodeStatus=200,edits=[],role='owner',repeat=false,remoteResult=null,reconAgeMs=120000,aLinks=[],linkReply=null,vcc={contract:'COS_VCC_MOVES_V1',fresh:true,syncedAt:'2026-11-25T20:33:09Z',items:[]},vccReply=null,overnight={contract:'COS_OVERNIGHT_V1',since:'2026-11-25T04:56:17Z',items:[]},swaps={contract:'COS_ROUTER_SWAPS_V1',items:[]},swapReply=null}={}){
+ const calls=[],unexpected=[],recorded=[],asked=[],linked=[],moved=[],swapped=[],fixtureNow=Date.now();
  const transport=async(url,init={})=>{
   const parsed=new URL(url),name=parsed.pathname.split('/').at(-1),body=init.body?JSON.parse(init.body):null,headers=new Headers(init.headers);
   calls.push({url,method:init.method||'GET',body});
@@ -31,6 +31,8 @@ function fixture({geocode=census([katy]),geocodeStatus=200,edits=[],role='owner'
   if(name==='cos_camera_unit_hand_edit_state_v1')return response({contract:'COS_UNIT_STATUS_HAND_EDITS_V1',edits});
   if(name==='cos_camera_unit_hand_edit_v1'){recorded.push(body);return response({contract:'COS_UNIT_STATUS_HAND_EDIT_RESULT_V1',id:body.p_request_id,applied:!repeat,repeat,latitude:repeat?null:undefined});}
   if(name==='cos_mhelp_hand_link_state_v1')return aLinks===null?response({message:'no'},500):response({contract:'COS_MHELP_HAND_LINKS_V1',links:aLinks});
+  if(name==='cos_router_swaps_state_v1')return swaps===null?response({code:'42501',message:'no'},403):response(swaps);
+  if(name==='cos_router_swap_apply_v1'){swapped.push({body,auth:headers.get('authorization')});return swapReply?response(swapReply.data,swapReply.status):response({contract:'COS_ROUTER_SWAP_RESULT_V1',key:body.p_key,unit:'SPOTTER 265',oldSerial:'RF3022434424854',newSerial:'RF3152533023860'});}
   if(name==='cos_overnight_v1')return overnight===null?response({code:'42501',message:'no'},403):(assert.deepEqual(body,{p_hours:24}),response(overnight));
   if(name==='cos_vcc_moves_state_v1')return vcc===null?response({code:'42501',message:'no'},403):response(vcc);
   if(name==='cos_vcc_move_apply_v1'){moved.push({body,auth:headers.get('authorization')});return vccReply?response(vccReply.data,vccReply.status):response({contract:'COS_VCC_MOVE_RESULT_V1',key:body.p_key,kind:'gone',cameraId:158,unit:'SOLARSPOTTER 029',name:'SolarSpotter 029_4',state:'deactivated'});}
@@ -48,7 +50,7 @@ function fixture({geocode=census([katy]),geocodeStatus=200,edits=[],role='owner'
  const handler=createOperationsHandler({platformUrl:nativeOrigin,serviceKey,fetch:transport});
  const send=(path,method,body)=>handler(new Request('https://synthetic-bridge.invalid/functions/v1/cos-operations-pages',{method:'POST',
   headers:{Authorization:'Bearer '+callerToken,'Content-Type':'application/json'},body:JSON.stringify({path,method,body})}));
- return {calls,unexpected,recorded,asked,linked,moved,send};
+ return {calls,unexpected,recorded,asked,linked,moved,swapped,send};
 }
 const geocodeCalls=f=>f.calls.filter(c=>c.url.includes('geocoding.geo.census.gov'));
 
@@ -306,4 +308,28 @@ test('the read carries the morning list for the Owner and approved IT, and null 
  const r=await g.send('/api/unit-camera-status','GET');
  assert.equal(r.status,200,'a refused morning list never stops the board');
  assert.equal((await r.json()).overnight,null);
+});
+
+// Router swapped (James, 25 Nov: "build router swap").
+test('the read carries router swaps for the Owner and approved IT, and null for anyone Tech Check refuses',async()=>{
+ const item={key:'swap:rf3152533023860',unit:'SPOTTER 265',oldSerial:'RF3022434424854',newSerial:'RF3152533023860',newName:'Spotter 265 (Solar)'};
+ const f=fixture({swaps:{contract:'COS_ROUTER_SWAPS_V1',items:[item]}});
+ assert.deepEqual((await (await f.send('/api/unit-camera-status','GET')).json()).routerSwaps,[item]);
+ const g=fixture({swaps:null});
+ const r=await g.send('/api/unit-camera-status','GET');
+ assert.equal(r.status,200,'a refused swap read never stops the board');
+ assert.equal((await r.json()).routerSwaps,null);
+});
+test('a router swap is applied as the signed-in person; a key COS never listed or a refusal changes nothing',async()=>{
+ const f=fixture();
+ const r=await f.send('/api/unit-camera-status/router-swap','POST',{key:'SWAP:RF3152533023860'});
+ assert.equal(r.status,200,await r.clone().text());
+ assert.deepEqual(f.swapped[0].body,{p_key:'swap:rf3152533023860',p_actor_name:'Synthetic Owner'});
+ assert.equal(f.swapped[0].auth,'Bearer '+callerToken);
+ assert.equal((await r.json()).routerSwapped.unit,'SPOTTER 265');
+ assert.equal((await f.send('/api/unit-camera-status/router-swap','POST',{key:'moved:abc123'})).status,422);
+ assert.equal(f.swapped.length,1);
+ const g=fixture({swapReply:{status:409,data:{code:'PT409',message:'This is no longer listed. The router may already be linked; tap Refresh.'}}});
+ const r2=await g.send('/api/unit-camera-status/router-swap','POST',{key:'swap:rf3152533023860'});
+ assert.equal(r2.status,422);assert.match((await r2.json()).error,/no longer listed/);
 });

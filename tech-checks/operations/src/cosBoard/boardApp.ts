@@ -288,6 +288,7 @@ const PSEC = [["place","Placed differently","mHelp is official, so the board sho
   ["mhShop","Shop, no camera feed","In mHelp's shop list with no camera record. Normal for units on the shelf."],
   ["bdShop","Shop feed, not in mHelp","Camera records under shop with nothing in mHelp: test devices, retired units, old tracker rows. Not counted."],
   ["morning","Morning list","Field units with cameras down. New ones (last 24 hours) first, then the ones still down, each with a likely cause from the router. Copy the lines straight onto the IT sheet. Units in the shop are left out."],
+  ["swap","Router swapped","A unit still linked to its old router, which is offline, while InHand has a newer router named for that unit online and linked to nothing. Use the new router moves the unit's link, so the card and the morning list read the router that is really there. Its reading shows after the next InHand pull, within 30 minutes."],
   ["vcc","Moved in VCC","Camera records in COS that no longer match VCC: a camera VCC names for another unit, a camera VCC has that COS has never recorded, or one VCC stopped listing. VCC is right about its own cameras. Fix one with its button, or fix the name in VCC when there is no button."],
   ["done","Fixed by hand","Set by hand in COS, so these are off the list and stay off. mHelp still shows them differently: make the same change there when you can."]];
 /* The answers James added for the punch list: where each unit really is, what record to fix, and who fixes it. */
@@ -321,9 +322,11 @@ function drawPunch(vs){
     h("p",{class:"note",text:"mHelp read "+when(mh.meta.at)+". Camera systems read "+when(S.meta.v)+"."}));
   cnt.vcc = S.vcc ? S.vcc.items.length : 0;
   cnt.morning = S.morning ? morningItems().length : 0;
-  $("punchChips").replaceChildren(...PSEC.filter(([k])=>(k!=="vcc" || S.vcc) && (k!=="morning" || S.morning)).map(([k,l])=>h("button",{class:"chip",type:"button","aria-pressed":String(S.psec===k),onclick:()=>{S.psec=k;drawPunch();}},l+" · "+(cnt[k]||0))));
+  cnt.swap = S.swaps ? S.swaps.length : 0;
+  $("punchChips").replaceChildren(...PSEC.filter(([k])=>(k!=="vcc" || S.vcc) && (k!=="morning" || S.morning) && (k!=="swap" || (S.swaps && S.swaps.length))).map(([k,l])=>h("button",{class:"chip",type:"button","aria-pressed":String(S.psec===k),onclick:()=>{S.psec=k;drawPunch();}},l+" · "+(cnt[k]||0))));
   if(S.psec==="vcc"){ drawVcc(); return; }
   if(S.psec==="morning"){ drawMorning(); return; }
+  if(S.psec==="swap"){ drawSwaps(); return; }
   const sec=PSEC.find(p=>p[0]===S.psec), rows = S.psec==="done" ? items.filter(settled) : open.filter(i=>i.sec===S.psec);
   $("punchCount").textContent=sec[2];
   const can = S.db && S.canWrite!==false;
@@ -393,6 +396,29 @@ function drawMorning(){
     h("h3",{class:"mhead",text:"Still down · "+old.length}), ...old.map(row)
   ] : [h("div",{class:"empty",text:"Every field camera COS can see is up."})]));
 }
+/* Router swapped (James, 25 Nov: "build router swap"). Tech Check lists it and checks again before the swap. */
+function drawSwaps(){
+  const sec=PSEC.find(p=>p[0]==="swap"), items=S.swaps||[];
+  $("punchCount").textContent = sec[2];
+  const go = !!(hooks && typeof hooks.onRouterSwap==="function") && S.can===true;
+  const byKey={}; for(const v of Object.values(S.vmap||{})) byKey[String(v.k).toUpperCase()]=v;
+  $("punchList").replaceChildren(...(items.length ? items.map(it=>{
+    const uv=byKey[String(it.unit||"").toUpperCase()];
+    const lines=[["Unit: ", it.unit], ["Linked now: ", "old router, "+(it.oldStatus||"not reporting")+(it.oldLastOnline ? ", last online "+morningWhen(it.oldLastOnline) : "")],
+      ["In InHand: ", "\u201c"+it.newName+"\u201d, online, linked to nothing"], ["Why: ", it.why||""]];
+    return h("div",{class:"prow"+(uv?" s-"+uv.status:"")},h("button",{class:"pmain",type:"button",disabled:!uv,onclick:()=>{ if(uv) openUnit(uv.id); }},
+      h("span",{class:"name",text:(uv && uv.name) || it.unit}), lines.map(([a,b])=>h("span",{class:"sub"},h("b",{text:a}),b))),
+      go ? h("button",{class:"pdone",type:"button",disabled:S.busy,onclick:()=>routerSwap(it)},"Use the new router") : null);
+  }) : [h("div",{class:"empty",text:"No router swaps waiting."})]));
+}
+async function routerSwap(it){
+  if(S.busy || S.can!==true || !hooks || typeof hooks.onRouterSwap!=="function") return;
+  S.busy=true; drawPunch();
+  try{ const said = await hooks.onRouterSwap(it.key); toast(said || "Swapped.", 9000); }
+  catch(err){ toast("Not swapped. "+((err && err.message) || "COS could not confirm the swap."), 14000); }
+  S.busy=false; render();
+}
+function setSwaps(v){ S.swaps = Array.isArray(v) ? v.filter(x=>x && typeof x.key==="string" && /^swap:/.test(x.key)) : null; if(S.meta) render(); }
 function setMorning(v){ S.morning = v && Array.isArray(v.items) ? {since: v.since||null, items: v.items.filter(x=>x && typeof x.unitKey==="string")} : null; if(S.meta) render(); }
 function setVcc(v){ S.vcc = v && Array.isArray(v.items) ? {fresh: v.fresh===true, syncedAt: v.syncedAt||null, items: v.items.filter(x=>x && typeof x.key==="string")} : null; if(S.meta) render(); }
 async function markPunch(it, on){
@@ -1953,5 +1979,5 @@ function openByName(name){
 /* Whether this person may make a hand fix right now, and the reason when not. */
 function setEdit(state){ S.can = !!(state && state.can===true); S.canWhy = (state && state.why) || ""; if(S.meta) render(); }
 function destroy(){ for(const fn of cleanups.splice(0)){ try{ fn(); }catch(_){} } clearTimeout(toastTimer); clearTimeout(announceTimer); clearTimeout(savedTimer); cancelAnimationFrame(M.raf); root.replaceChildren(); }
-return { update, setEdit, setVcc, setMorning, destroy, root, setTurn: tvTurn, openByName };
+return { update, setEdit, setVcc, setMorning, setSwaps, destroy, root, setTurn: tvTurn, openByName };
 }
