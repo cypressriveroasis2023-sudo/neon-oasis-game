@@ -12,7 +12,7 @@
 import mapData from './boardMap.json';
 import {BOARD_CSS} from './boardStyle';
 import {troubleWalk, troubleKnown, troubleNote, TROUBLE_CSS} from './boardTrouble';
-import {ROUTER_DETAIL_FRESH_MS, signalWord, milesBetween, unitKeyOf} from '../routerDetails';
+import {ROUTER_DETAIL_FRESH_MS, signalWord, milesBetween, unitKeyOf, trendWords} from '../routerDetails';
 
 /* The router box on a unit card: the open-router button, signal bars and the warnings. */
 const ROUTER_CSS = `
@@ -26,6 +26,14 @@ const ROUTER_CSS = `
 .rtr .bars i:nth-child(1){height:20%}.rtr .bars i:nth-child(2){height:40%}.rtr .bars i:nth-child(3){height:60%}.rtr .bars i:nth-child(4){height:80%}.rtr .bars i:nth-child(5){height:100%}
 .rtr .bars.good i.on{background:#2ecc71}.rtr .bars.fair i.on{background:#f1c40f}.rtr .bars.poor i.on{background:#e74c3c}.rtr .bars i.on{background:#9aa}
 .rtr .note.warn{color:#ffcf66;border-left:3px solid #ffcf66;padding-left:8px}
+.rtr .trend{margin:10px 0 4px;padding:10px;border-radius:10px;background:rgba(255,255,255,.04)}
+.rtr .trend .tt{margin:0 0 6px}
+.rtr .trend .spark{display:block;width:100%;height:64px}
+.rtr .trend .spark .ln{fill:none;stroke:#7fb3ff;stroke-width:2;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.rtr .trend.worse .spark .ln{stroke:#ffcf66}
+.rtr .trend .spark .ref{stroke-width:1;stroke-dasharray:3 3;vector-effect:non-scaling-stroke}
+.rtr .trend .spark .ref.g{stroke:#2ecc71;opacity:.6}.rtr .trend .spark .ref.f{stroke:#e74c3c;opacity:.6}
+.rtr .trend .axis{display:flex;justify-content:space-between;gap:6px;margin:2px 0 6px;font-size:11px;opacity:.7}
 .rtr dd a{color:inherit}
 `;
 
@@ -291,6 +299,7 @@ const PSEC = [["place","Placed differently","mHelp is official, so the board sho
   ["sent","Sent to IT","Troubleshoot results sent to IT that nobody has closed yet, oldest first. Open the unit to read the note and close it as Fixed or Not needed once something is done; the card keeps it for 7 days after."],
   ["swap","Router swapped","A unit still linked to its old router, which is offline, while InHand has a newer router named for that unit online and linked to nothing. Use the new router moves the unit's link, so the card and the morning list read the router that is really there. Its reading shows after the next InHand pull, within 30 minutes."],
   ["vcc","Moved in VCC","Camera records in COS that no longer match VCC: a camera VCC names for another unit, a camera VCC has that COS has never recorded, or one VCC stopped listing. VCC is right about its own cameras. Fix one with its button, or fix the name in VCC when there is no button."],
+  ["routers","Router problems","Field units whose InHand router is offline, has poor signal, or reports a different IP than COS. A router reading is a hint only: it never proves the cameras work. Tap a unit to see its Router box, or copy the list for the IT sheet."],
   ["done","Fixed by hand","Set by hand in COS, so these are off the list and stay off. mHelp still shows them differently: make the same change there when you can."]];
 /* The answers James added for the punch list: where each unit really is, what record to fix, and who fixes it. */
 function normName(n){ return String(n||"").toUpperCase().replace(/SOLAR\s*SPOTTER/,"SS").replace(/RECON\s*(II|2)/,"RII").replace(/CAM[\s-]*V/,"CAMV").replace(/[^A-Z0-9.]/g,""); }
@@ -322,12 +331,14 @@ function drawPunch(vs){
     h("p",{class:"note",text:"mHelp is the official count: "+mh.meta.total+" pieces of equipment, "+mh.meta.field+" in the field and "+mh.meta.shop+" in the shop. "+mh.meta.stands+" of those are stands, poles and skids ("+mh.meta.standsField+" in the field). They count, but they have no cameras, so they are not listed on this board."}),
     h("p",{class:"note",text:"mHelp read "+when(mh.meta.at)+". Camera systems read "+when(S.meta.v)+"."}));
   cnt.vcc = S.vcc ? S.vcc.items.length : 0;
+  cnt.routers = routerProblems(vs).length;
   cnt.morning = S.morning ? morningItems().length : 0;
   cnt.swap = S.swaps ? S.swaps.length : 0;
   cnt.sent = S.tsr ? S.tsr.filter(r=>!r.closed).length : 0;
   $("punchChips").replaceChildren(...PSEC.filter(([k])=>(k!=="vcc" || S.vcc) && (k!=="morning" || S.morning) && (k!=="swap" || (S.swaps && S.swaps.length)) && (k!=="sent" || S.tsr)).map(([k,l])=>h("button",{class:"chip",type:"button","aria-pressed":String(S.psec===k),onclick:()=>{S.psec=k;drawPunch();}},l+" · "+(cnt[k]||0))));
   if(S.psec==="vcc"){ drawVcc(); return; }
   if(S.psec==="morning"){ drawMorning(); return; }
+  if(S.psec==="routers"){ drawRouterProblems(vs); return; }
   if(S.psec==="swap"){ drawSwaps(); return; }
   if(S.psec==="sent"){ drawSent(); return; }
   const sec=PSEC.find(p=>p[0]===S.psec), rows = S.psec==="done" ? items.filter(settled) : open.filter(i=>i.sec===S.psec);
@@ -342,6 +353,40 @@ function drawPunch(vs){
     const uv = it.unit && S.vmap ? S.vmap[it.unit] : null;
     return h("div",{class:"prow"+(uv?" s-"+uv.status:"")},main,btn);
   }) : [h("div",{class:"empty",text:"Nothing here."})]));
+}
+/* Router problems (James, 25 Nov: "make it better"). Field units only, from the 30-minute InHand reading (fresh
+   readings only, never a guess). Worst first: a down unit whose router is also off, then any router off, then poor
+   signal, then an IP that differs from the COS record. Each line says what to check first. */
+function routerProblems(vs){
+  if(!S.rd) return [];
+  const out=[];
+  for(const v of (vs||allViews())){
+    if(v.mhOnly || v.place!=="field") continue;
+    const ih=inhandNow(v.u); if(!ih.r || !ih.st) continue;
+    const r=ih.r, word=signalWord(r.sig), why=[];
+    let rank=9, first="";
+    if(ih.st==="of"){ rank = v.status==="down" ? 0 : 1; why.push("Router offline (InHand read "+when(secOf(r.at))+")"); first="Check power at the unit first, then the SIM and antenna."; }
+    if(ih.st==="on" && word==="Poor"){ rank=Math.min(rank,2); why.push("Poor signal"+(r.sig && typeof r.sig.rsrp==="number" ? " ("+r.sig.rsrp+" dBm)" : "")); first = first || "Check the antenna and its cable; a higher mount or a different carrier SIM may help."; }
+    if(r.cosDiffers){ rank=Math.min(rank,3); why.push("InHand IP "+r.ip+" differs from the COS record"); first = first || "Check which address the cameras answer on before changing the COS record."; }
+    if(rank<9) out.push({v, r, rank, why, first});
+  }
+  return out.sort((a,b)=>a.rank-b.rank || String(a.v.name).localeCompare(String(b.v.name)));
+}
+function drawRouterProblems(vs){
+  const sec=PSEC.find(p=>p[0]==="routers"), list=routerProblems(vs);
+  $("punchCount").textContent = sec[2] + (S.rd ? "" : " Router readings have not loaded yet.");
+  const lineOf = p => p.v.name+(p.v.site ? " ("+p.v.site+")" : "")+": "+p.why.join("; ")+". "+p.first;
+  const copy = list.length ? h("div",{class:"prow"},h("button",{class:"pdone",type:"button",onclick:()=>{
+    const text="Router problems, "+new Date().toLocaleDateString()+"\n"+list.map(p=>"- "+lineOf(p)).join("\n");
+    try{ navigator.clipboard.writeText(text).then(()=>toast("Router list copied."),()=>toast("Couldn't copy in this view.")); }catch(_){ toast("Couldn't copy in this view."); } }},"Copy list for the IT sheet")) : null;
+  $("punchList").replaceChildren(...(list.length ? [copy, ...list.map(p=>{
+    const main=h("button",{class:"pmain",type:"button",onclick:()=>openUnit(p.v.id)},
+      h("span",{class:"name"},p.v.name, p.v.status==="down" ? h("span",{class:"tag",text:"Down"}) : null),
+      p.v.site ? h("span",{class:"sub"},h("b",{text:"Site: "}),p.v.site) : null,
+      h("span",{class:"sub"},h("b",{text:"What: "}),p.why.join("; ")),
+      h("span",{class:"sub ans"},h("b",{text:"Check first: "}),p.first));
+    return h("div",{class:"prow s-"+p.v.status},main);
+  })] : [h("div",{class:"empty",text: S.rd ? "No field router problems in the latest InHand reading." : "Router readings have not loaded yet."})]));
 }
 /* Moved in VCC (James, 25 Nov). VCC is right about its own cameras; COS's records follow it one tap at a time.
    Tech Check works the list out again before any change and refuses one that is no longer listed or not safe. */
@@ -616,8 +661,9 @@ function routerBox(v){
      Offline read as "online" (James, 25 Nov, Sniper 168). */
   if(r.ip && IPV4.test(r.ip)) kids.push(h("a",{class:"rbtn"+(st==="ok"?"":" off"),href:"http://"+r.ip+":"+(r.port||8080),target:"_blank",rel:"noopener noreferrer"},
     h("b",{text:"Open router (:"+(r.port||8080)+")"}),h("span",{text: st==="ok" ? "Opens the router's own page in a new tab" : st==="bad" ? "The router is offline, so its page will not open until it is back. Last known address." : "No fresh InHand reading, so the page may not open."})));
+  /* Bug fixed 26 Nov: this "no IP" line had slipped under the offline warning's if, so it showed on every connected router. */
+  if(!(r.ip && IPV4.test(r.ip))) kids.push(h("p",{class:"note",text:"No public IP for this router yet, so there is no router page to open."}));
   if(st==="bad") kids.push(h("p",{class:"note warn",text:"The router is not reaching InHand"+(r.at ? " (InHand read "+when(secOf(r.at))+")" : "")+". With the router down, the cameras behind it cannot be reached either. Check power first, then the SIM and antenna."}));
-  else kids.push(h("p",{class:"note",text:"No public IP for this router yet, so there is no router page to open."}));
   const kv=[];
   const word = signalWord(r.sig);
   if(r.sig){
@@ -640,11 +686,44 @@ function routerBox(v){
   }
   const dl=h("dl",{class:"kv"}); for(const [a,b] of kv) dl.append(h("dt",{text:a}), typeof b==="string" ? h("dd",{text:b}) : h("dd",null,b));
   kids.push(dl);
+  kids.push(trendBox(r.unit || v.k));
   if(r.cosDiffers) kids.push(h("p",{class:"note warn",text:"InHand reports a different public IP than the COS record. The button uses InHand's, which is newer. Correct the COS record if the cameras use the same address."}));
   if(far) kids.push(far);
   kids.push(h("p",{class:"note",text:"Router status is a hint, not camera health. A connected router with offline cameras is still a camera problem."}));
   if(goScreen) kids.push(h("div",{class:"links"},goScreen));
   return h("div",{class:"box rtr",id:"rtrBox"},kids);
+}
+/* Signal over the last 7 days (James, 25 Nov): one line per hour, so a slowly failing antenna shows as a slope and a
+   one-off drop as a dip. Read when a card opens, kept 15 minutes. Gaps are hours the router was offline. */
+const TREND_KEEP_MS = 15*60000;
+function trendBox(unit){
+  const key=unitKeyOf(unit); S.rt = S.rt || new Map();
+  const got=S.rt.get(key);
+  if(!got || (Date.now()-got.at > TREND_KEEP_MS && !got.busy)){
+    if(hooks && typeof hooks.loadRouterTrend==="function"){
+      S.rt.set(key,{at:Date.now(),busy:true,t:got?got.t:null});
+      Promise.resolve(hooks.loadRouterTrend(unit)).then(t=>{ S.rt.set(key,{at:Date.now(),busy:false,t:t||null}); },()=>{ S.rt.set(key,{at:Date.now(),busy:false,t:null}); })
+        .then(()=>{ const open=S.openId && S.vmap && S.vmap[S.openId]; if(open && unitKeyOf(open.k)===key) drawPanel(); });
+    }
+    if(!got || !got.t) return h("div",{class:"trend"},h("p",{class:"note",text:"Reading signal history…"}));
+  }
+  const t=got.t;
+  if(!t) return h("div",{class:"trend"},h("p",{class:"note",text: got.busy ? "Reading signal history…" : "Signal history could not be read right now."}));
+  const words=trendWords(t), pts=t.points.filter(p=>typeof p.rsrp==="number");
+  const wrap=h("div",{class:"trend"+(t.verdict==="worse"?" worse":"")},h("p",{class:"tt"},h("b",{text:"Signal, last 7 days"})));
+  if(pts.length>=2){
+    const W=300,H=64,lo=-125,hi=-65,t1=Date.now(),t0=t1-7*864e5;
+    const X=ms=>Math.round(((ms-t0)/(t1-t0))*W*10)/10, Y=v=>Math.round((1-(Math.max(lo,Math.min(hi,v))-lo)/(hi-lo))*H*10)/10;
+    const NS="http://www.w3.org/2000/svg", el=(n,a)=>{ const e=document.createElementNS(NS,n); for(const k in a) e.setAttribute(k,String(a[k])); return e; };
+    const svg=el("svg",{viewBox:"0 0 "+W+" "+H,class:"spark",role:"img","aria-label":"Signal strength over the last 7 days. "+words});
+    for(const [v,c] of [[-90,"g"],[-105,"f"]]) svg.append(el("line",{x1:0,x2:W,y1:Y(v),y2:Y(v),class:"ref "+c}));
+    let d="", prev=0;
+    for(const p of pts){ const ms=Date.parse(p.t); d += (d && ms-prev<=2.5*3600e3 ? " L" : " M")+X(ms)+" "+Y(p.rsrp); prev=ms; }
+    svg.append(el("path",{d:d.trim(),class:"ln"}));
+    wrap.append(svg, h("p",{class:"axis"},h("span",{text:"7 days ago"}),h("span",{text:"green = good · red = poor"}),h("span",{text:"now"})));
+  }
+  wrap.append(h("p",{class:"note"+(t.verdict==="worse"?" warn":""),text:words}));
+  return wrap;
 }
 async function loadRouters(){
   if(!hooks || typeof hooks.loadRouters!=="function") return;
@@ -653,6 +732,7 @@ async function loadRouters(){
     if(!res || res.ok!==true || !res.data) return;
     S.rd = new Map(res.data.routers.map(r=>[unitKeyOf(r.unit), r]));
     if(S.meta) render(); else if(S.openId) drawPanel();
+    if(S.view==="punch" && S.meta) drawPunch();
   }catch(_){ /* the card simply has no router box */ }
 }
 /* The cameras COS has as off right now, by name, with when each was last online. The camera list first; the unit's own list as a fallback. */

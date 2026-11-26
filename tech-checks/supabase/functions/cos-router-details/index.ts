@@ -2,7 +2,8 @@
 //
 // Small and standalone, on Tech Check (where camera_unit_routers lives). It checks the caller's own Tech Check
 // sign-in and profile: active Owner or IT only. Read returns public.cos_router_details_v1(); link calls
-// public.cos_router_link_v1(), which writes one audited ADD_ROUTER_LINK row. Nothing is ever sent to InHand.
+// public.cos_router_link_v1(), which writes one audited ADD_ROUTER_LINK row; trend returns public.cos_router_trend_v1(unit)
+// (7 days of signal for one unit's card). Nothing is ever sent to InHand.
 import { allowed, readRequest, type Profile } from './rules.ts';
 
 const URL_ = Deno.env.get('SUPABASE_URL') ?? '';
@@ -60,6 +61,7 @@ Deno.serve(async request => {
   if (!allowed(profile)) return reply(request, { error: 'Router details are for COS Owner and IT accounts.' }, 403);
   try {
     if (ask.action === 'read') return reply(request, await rpc('cos_router_details_v1', {}));
+    if (ask.action === 'trend') return reply(request, await rpc('cos_router_trend_v1', { p_unit_key: ask.unit }));
     const result = await rpc('cos_router_link_v1', {
       p_unit_key: ask.unit, p_serial: ask.serial, p_actor_id: profile!.id,
       p_actor_name: (profile!.name || 'COS user') + ' (' + (profile!.role === 'owner' ? 'Owner' : 'IT') + ', Link router button)',

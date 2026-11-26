@@ -15,7 +15,7 @@ work. A change here is not local, however small it looks.
 | `public.camera_inventory_audit` | A new `action` value breaks the camera sweep. See the rule below. |
 | `public.camera_devices` | One row per **camera**, not per unit. The camera health sweep requires exactly one row per `unit_key` or it holds the unit unverified. |
 | `public.equipment_master` | What the camera sweep iterates. Still holds a stale 22 Sep 2026 import; a refresh is pending. |
-| `cron.job` (Tech Check) | 15 jobs on interleaved minutes. Pick a free minute; don't reuse another job's slot. |
+| `cron.job` (Tech Check) | 16 jobs on interleaved minutes. Pick a free minute; don't reuse another job's slot. |
 | Edge functions under `tech-checks/supabase/functions/` | Several are loaded from **pinned GitHub commits**, so the deployed code is not what's on `main`. Check the entrypoint before assuming. |
 | `tech-checks/operations/dist` | Committed to the repo and published by GitHub Pages on push to `main`. |
 | `tech-checks/supabase/migrations/` | Pinned by the `verify` workflow to an authorized file list. Adding a file here fails CI on every PR. Put change records in `tech-checks/docs/db-changes/` instead. |
@@ -95,6 +95,18 @@ Newest first. One line: date, what changed, what to watch.
   whose saved check missed once reads Not verified ("Avigilon check missed once,
   checking again"); the second miss in a row, or a confirmed outage, is Down. Rollback
   `rollback-to-v22-entry`. A next patch to this function must start from v23.
+- **2026-11-26** — Tech Check: router-down alert **live** (#554). Cron job **16**
+  `cos-router-down-alert` at `11,41` (after the InHand pull at :07/:37) calls the new edge
+  function `cos-router-down-alert` → `public.cos_router_down_alerts_v1()`: a field router
+  online then offline for two pulls alerts Owner + IT (in-app `camera_health` /
+  `camera_recovered`, plus web push). State in `inhand_private.router_watch` /
+  `router_alerts`. No audit row. First run seeded 278 routers, 0 alerts; watchdog `ok`.
+  Rollback in `tech-checks/docs/db-changes/20261126_router_down_alert.sql`.
+- **2026-11-26** — Tech Check: `cos_router_details_v1` trusts InHand's public IP only
+  while the router is online (fresh) and no other online router shares it; else the COS
+  record. Offline routers keep stale, reassigned IPs in InHand. "IP differs" 6 → 2; no
+  COS IP changed. Record in
+  `tech-checks/docs/db-changes/20261126_router_details_trust_inhand_ip_only_when_online.md`.
 - **2026-11-26** — Operations patch `cos-unit-camera-status/down-needs-two-misses-v22`
   was **prepared** (now deployed, see above) (starts from live v22 `a306656f`). A Sniper or CAM V
   whose saved check missed once reads Not verified ("Avigilon check missed once,
