@@ -9,10 +9,11 @@
 // Pin refresh 2026-11-26: camera v21/ac4a0ff3 became v22 (morning-list-v21).
 // Pin refresh 2026-11-26: camera v22/a306656f became v23 (down-needs-two-misses-v22).
 // Pin refresh 2026-11-26: camera v23/2efe829a became v24 (router-swap-v23).
+// Pin refresh 2026-11-26: camera v24/45576950 became v25 (send-to-it-loop-v24).
 export const LIVE_FUNCTION_PINS = Object.freeze({
   'cos-unit-camera-status': Object.freeze({
-    version: 24,
-    ezbr_sha256: '455769503273901501fc921c0152141ed18e59101868e82a7cf924fd6f169213',
+    version: 25,
+    ezbr_sha256: '2927fdeb1804593b7420fae10289dd5daf1e5377845f895b7e1e3d3c12eca38e',
   }),
   'cos-operations-pages': Object.freeze({
     version: 170,

@@ -14,7 +14,7 @@ import {heliosSpots, readSunForecast, sunOutlook, type OutlookDay, type SunDay} 
 import {getVrmFleet} from './vrmFleetApi';
 import {readVrmHistory, type HistoryPoint} from './vrmHistory';
 import {readVrmMppt, type Mppt} from './vrmMppt';
-import {readRouterDetails} from './routerDetails';
+import {readRouterDetails, readRouterTrend} from './routerDetails';
 import {boardEditState, handFixRequest, type BoardEditFlags, type BoardEditState, type BoardFixStep} from './cosBoard/boardEdit';
 import {mountCosBoard} from './cosBoard/boardApp';
 import {loadBoardFonts} from './cosBoard/boardFonts';
@@ -319,6 +319,7 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
       // The board is the screen James works from, so the other COS screens open from it, not only from More.
       // The unit card's router box: InHand status, signal and the :8080 link, read from Tech Check.
       loadRouters: () => readRouterDetails(),
+      loadRouterTrend: (unit: string) => readRouterTrend(unit),
       // Email a vendor from the unit card (James, 25 Nov): SIM cancellations and Eyeforce account changes.
       // The server keeps the templates, decides who may send which, and sends from James's Gmail with IT@ in copy.
       vendor: managerHost() ? {

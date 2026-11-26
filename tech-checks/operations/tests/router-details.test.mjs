@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {parseRouterDetails, readRouterDetails, linkRouter, signalWord, milesBetween, suggestUnit, unitKeyOf} from '../src/routerDetails.ts';
+import {parseRouterDetails, readRouterDetails, linkRouter, signalWord, milesBetween, suggestUnit, unitKeyOf, parseTrend, readRouterTrend, trendWords} from '../src/routerDetails.ts';
 
 const reply = (status, body) => async () => new Response(JSON.stringify(body), {status, headers: {'content-type': 'application/json'}});
 
@@ -53,4 +53,18 @@ test('unit card draws the router box with the :8080 button and never a SIM numbe
   assert.doesNotMatch(src.slice(src.indexOf('function routerBox'), src.indexOf('async function loadRouters')), /iccid|imsi|imei/i);
   const landing = fs.readFileSync(new URL('../src/CosBoardLanding.tsx', import.meta.url), 'utf8');
   assert.match(landing, /loadRouters: \(\) => readRouterDetails\(\)/);
+});
+
+test('signal trend: parsed safely and said plainly', async () => {
+  const t = parseTrend({unit: 'SPOTTER 100', since: '2026-11-19T06:00:00Z', recent: -100, before: -85, verdict: 'worse',
+    points: [{t: '2026-11-19T06:00:00Z', rsrp: -85, on: true}, {t: 'bad'}, {t: '2026-11-25T06:00:00Z', rsrp: -999, on: true}]});
+  assert.equal(t.points.length, 2); assert.equal(t.points[1].rsrp, undefined);
+  assert.match(trendWords(t), /Getting weaker: about 15 dB below the week before/);
+  assert.equal(parseTrend({unit: 'X', points: [], verdict: 'nonsense'}).verdict, 'none');
+  assert.equal(parseTrend(null), null);
+  assert.match(trendWords({...t, verdict: 'young'}), /Signal history started/);
+  assert.equal(trendWords(null), '');
+  const read = await readRouterTrend('SPOTTER 100', reply(200, {unit: 'SPOTTER 100', points: [], verdict: 'steady'}), 'tok');
+  assert.equal(read.verdict, 'steady');
+  assert.equal(await readRouterTrend('SPOTTER 100', reply(403, {error: 'no'}), 'tok'), null);
 });
