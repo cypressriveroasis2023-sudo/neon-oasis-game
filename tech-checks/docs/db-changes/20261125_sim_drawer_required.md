@@ -1,9 +1,10 @@
-# 2026-11-25 — SIMs must come from the SIM drawer (prepared)
+# 2026-11-25 — SIMs must come from the SIM drawer (applied, switched off)
 
 Project: Tech Check `goqrnolcvqnirjmzaeyk`
 SQL: `tech-checks/database-maintenance/techcheck-sim-drawer-required-v1.sql`
-Status: **prepared, not applied** (needs James's go-ahead). Applying it changes nothing on its own: the rule
-stays off until the Owner turns it on.
+Status: **applied 2026-11-26 ~04:55 UTC on James's go-ahead, rule left OFF** (`require_listed=false`), so no
+handoff changes until the Owner turns it on. Live dry run (rolled back) with the rule on: an unlisted SIM and a
+SIM on a truck were both refused with the NEXT STEP; a card in the drawer passed the check.
 
 - BEFORE INSERT trigger `sim_drawer_require_v1` on `app_private.techcheck_transfer_events`: when
   `sim_drawer_settings.require_listed` is on, an IT handoff (checkout) is refused if a SIM is not in the
