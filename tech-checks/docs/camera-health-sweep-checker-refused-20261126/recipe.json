@@ -1,0 +1,37 @@
+{
+ "contract": "COS_FUNCTION_EDIT_RECIPE_V1",
+ "function": "camera-health-sweep",
+ "project": "goqrnolcvqnirjmzaeyk",
+ "baselineVersion": 103,
+ "baselineFile": "tech-checks/docs/camera-health-sweep-endpoint-retry-20261110/source/index.ts",
+ "baselineCommit": "91e8d520acf56e5bcfb2c7b7096826daa551cdca",
+ "baselineSha256": "385c42471a82e54d09f9b6cf17656c4b918ae6e0af54dde43a5f5da6be4f6710",
+ "resultFile": "tech-checks/docs/camera-health-sweep-checker-refused-20261126/source/index.ts",
+ "resultSha256": "0e85bc0fa172fd0d3506d7e30c05e92a7b9f35c5aaecf34b5fed0693c4a7d04b",
+ "edits": [
+  {
+   "name": "checker-refused-helper",
+   "occurrences": 1,
+   "before": "async function collectScheduledDirect(db, probe, options = {}) {\n",
+   "after": "// A unit that is really down does not answer: its saved ports time out.\n// \"Connection refused\" on every saved port, for several endpoints in the same\n// run, is this worker's own network path refusing the connection. Seen on\n// 2026-11-26: every AT&T unit in one shard was refused within one millisecond,\n// including ports that had been open fifteen minutes earlier, while a unit on\n// another carrier in the same shard answered; all were open again on the next\n// run from a different worker. That is not evidence about the units, so\n// nothing is written for them in that run and their previous results stay.\n// One endpoint refusing on its own is still written as before.\nvar CHECKER_REFUSED_ENDPOINTS = 3;\nfunction refusedOnEveryPort(observed) {\n  const ports = object8(observed) && object8(observed.ports) ? Object.values(observed.ports) : [];\n  return ports.length > 0 && ports.every((p) => object8(p) && p.online === false && typeof p.error === \"string\" && /^Connection refused\\b/.test(p.error));\n}\nasync function collectScheduledDirect(db, probe, options = {}) {\n"
+  },
+  {
+   "name": "checker-refused-counter",
+   "occurrences": 1,
+   "before": "    const transport = /* @__PURE__ */ new Map();\n    let cursor = 0;\n    while (cursor < queue.length && now() + PROBE_TIMEOUT_MS + 1e3 < deadline) {\n",
+   "after": "    const transport = /* @__PURE__ */ new Map(), refusedEndpoints = /* @__PURE__ */ new Set();\n    let cursor = 0;\n    while (cursor < queue.length && now() + PROBE_TIMEOUT_MS + 1e3 < deadline) {\n"
+  },
+  {
+   "name": "checker-refused-detect",
+   "occurrences": 1,
+   "before": "      await Promise.all(wave.map(async (c, i) => {\n        const observed = observations[i], current = fresh2.selected.find((x) => String(x.device.id) === String(c.device.id));\n",
+   "after": "      // Endpoints are counted, not units: units behind one address share a probe.\n      wave.forEach((c, i) => {\n        if (refusedOnEveryPort(observations[i])) refusedEndpoints.add(c.host);\n      });\n      const checkerRefused = refusedEndpoints.size >= CHECKER_REFUSED_ENDPOINTS;\n      if (checkerRefused) console.info(\"direct_sweep_checker_refused \" + JSON.stringify({ shardIndex, shardCount, endpoints: refusedEndpoints.size }));\n      await Promise.all(wave.map(async (c, i) => {\n        const observed = observations[i], current = fresh2.selected.find((x) => String(x.device.id) === String(c.device.id));\n"
+  },
+  {
+   "name": "checker-refused-hold",
+   "occurrences": 1,
+   "before": "        if (!observed) return held(\"probe_incomplete\");\n        if (evidence && !tickets[i]) return held(\"endpoint_authority_unverified\");\n",
+   "after": "        if (!observed) return held(\"probe_incomplete\");\n        if (checkerRefused && refusedOnEveryPort(observed)) return held(\"checker_connection_refused\");\n        if (evidence && !tickets[i]) return held(\"endpoint_authority_unverified\");\n"
+  }
+ ]
+}
