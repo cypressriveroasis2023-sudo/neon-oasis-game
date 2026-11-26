@@ -116,6 +116,7 @@ async function formServer(page) {
     if (req.action === 'cameras') return route.fulfill({headers, json: {cameras: [
       {name: 'SPOTTER 002 / Cam 1', type: 'IP Camera', ip: '38.1.2.3', port: '1400 web, 1454 RTSP', serial: 'S1'},
       {name: 'SPOTTER 002 / Cam 2', type: 'IP Camera', ip: '38.1.2.3', port: '1500 web, 1554 RTSP', serial: 'S2'}]}});
+    if (req.action === 'account') return route.fulfill({headers, json: {account: {eye: null}}});
     const {values, missing} = check(req.kind, req.values);
     if (missing.length) return route.fulfill({headers, json: {ok: false, missing}});
     if (req.action === 'preview') return route.fulfill({headers, json: {ok: true, mail: render(req.kind, values, {name: 'Teddy Hopper', james: false, it: true}), form: cifFileName(req.kind, values)}});
@@ -168,4 +169,36 @@ test('IT fills the Eyeforce account form on the card: cameras from COS, plain pr
   const send = seen.filter(r => r.action === 'send');
   expect(send).toHaveLength(1);
   expect(send[0].values).toMatchObject({unit: 'Spotter 002', cam1_name: 'SPOTTER 002 / Cam 1', cam2_password: 'secret-1', s_mon_start: 'Same as above'});
+});
+
+// The Eyeforce account number is saved on the unit once, and Remove account starts with it filled in.
+test('the Eyeforce account number is added on the card, checked, and fills Remove account', async ({page}, info) => {
+  test.skip(info.project.name !== 'mobile-390', 'one phone size is enough here');
+  const host = await board(page);
+  const seen = [], saved = {};
+  await page.route(VENDOR, async route => {
+    const headers = {'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, content-type', 'access-control-allow-methods': 'POST, OPTIONS'};
+    if (route.request().method() === 'OPTIONS') return route.fulfill({status: 204, headers});
+    const req = route.request().postDataJSON(); seen.push(req);
+    if (req.action === 'templates') return route.fulfill({headers, json: {owner: true, templates: {sim_cancel_vendera: TEMPLATES.sim_cancel_vendera,
+      monitor_remove: {...TEMPLATES.monitor_remove, fields: [{key: 'unit', label: 'Unit', required: true}, {key: 'eye', label: 'Account to remove', required: true}]}}}});
+    if (req.action === 'check') return route.fulfill({headers, json: {account_ok: true, can_send: true, can_edit_sheets: true, sheet_opens: true}});
+    if (req.action === 'recent') return route.fulfill({headers, json: {recent: []}});
+    if (req.action === 'account') return route.fulfill({headers, json: {account: saved[req.unit] || {eye: null}}});
+    if (req.action === 'account_set') { saved[req.unit] = req.eye ? {eye: req.eye, by: 'James Martin', at: fresh, how: 'hand'} : {eye: null}; return route.fulfill({headers, json: {ok: true, account: saved[req.unit]}}); }
+    return route.fulfill({headers, json: {ok: false, missing: ['x']}});
+  });
+  await openUnit(host, 'Spotter 002');
+  await expect.poll(() => venText(host)).toContain('None saved for this unit yet.');
+  await tap(host, 'Add it');
+  await type(host, 'Eyeforce account number', '17351');
+  await tap(host, 'Save number');
+  await expect.poll(() => venText(host)).toContain('An Eyeforce account number looks like EYE17351.');
+  expect(seen.some(r => r.action === 'account_set')).toBe(false);
+  await type(host, 'Eyeforce account number', ' eye 17351');
+  await tap(host, 'Save number');
+  await expect.poll(() => venText(host)).toContain('EYE17351 · saved by James Martin');
+  expect(seen.filter(r => r.action === 'account_set')).toEqual([{action: 'account_set', unit: 'Spotter 002', eye: 'EYE17351'}]);
+  await tap(host, 'Remove account');
+  expect(await inBoard(host, root => root.querySelector('#venBox [aria-label="Account to remove"]').value)).toBe('EYE17351');
 });
