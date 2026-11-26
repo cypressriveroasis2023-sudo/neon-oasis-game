@@ -16,7 +16,27 @@ export type OtherDeviceRow = {
   source_last_seen_at?: string | null;
   public_ip?: string | null;
 };
-export type DeviceHealthRow = { camera_device_id?: number | string | null; overall_status?: string | null; checked_at?: string | null };
+export type DeviceHealthRow = {
+  camera_device_id?: number | string | null; overall_status?: string | null; checked_at?: string | null;
+  confirmed_outage?: boolean | null; consecutive_failures?: number | null;
+};
+/**
+ * A direct check that misses once is not an outage. Over the week to 25 Nov 2026,
+ * 55% of the units a sweep marked offline answered again on the very next sweep,
+ * and on that day eight field units failed one sweep together and were all back
+ * fifteen minutes later; the board read every one of them as Down. Two misses in
+ * a row is the bar: a third adds only 6 points and costs fifteen more minutes
+ * before a real outage shows.
+ */
+export const DOWN_AFTER_MISSES = 2;
+/**
+ * True only when the row itself says this is a first miss. A row with no count at
+ * all is NOT a first miss: an outage is never hidden because a count was not read.
+ */
+export function unconfirmedMiss(check: DeviceHealthRow | null | undefined): boolean {
+  return check?.confirmed_outage !== true && Number.isInteger(check?.consecutive_failures)
+    && Number(check!.consecutive_failures) < DOWN_AFTER_MISSES;
+}
 export type OtherFeed = { syncedAt?: string | null; status?: string | null; enabled?: boolean | null } | null | undefined;
 
 export const IP_CHECK_SOURCE = '2026_unit_tracker';
@@ -59,7 +79,11 @@ export function projectIpCheckUnits(
     seen.add(key);
     const check = checks.get(String(row.id)), ip = text(row.public_ip) || null;
     const said = text(check?.overall_status).toLowerCase();
-    const status: Status = ip && fresh(check?.checked_at, now, maxAgeMs) && (said === 'online' || said === 'offline') ? said : 'unknown';
+    const read: Status = ip && fresh(check?.checked_at, now, maxAgeMs) && (said === 'online' || said === 'offline') ? said : 'unknown';
+    // One missed check reads Not verified, with the reason on the card; the second
+    // miss in a row is what makes it Down. See DOWN_AFTER_MISSES.
+    const missedOnce = read === 'offline' && unconfirmedMiss(check);
+    const status: Status = missedOnce ? 'unknown' : read;
     const organization = text(row.organization), lower = organization.toLowerCase();
     const placement: 'FIELD' | 'SHOP' = SHOP_ORGANIZATIONS.has(lower) ? 'SHOP' : 'FIELD';
     const online = status === 'online' ? 1 : 0, offline = status === 'offline' ? 1 : 0, unknown = 1 - online - offline;
@@ -69,7 +93,7 @@ export function projectIpCheckUnits(
       siteNamePending: false,
       state: state(online, offline, unknown),
       cameras: 1, online, offline, unknown,
-      down: status === 'online' ? [] : [{name: ip ? 'Avigilon check' : 'No IP on file', status}],
+      down: status === 'online' ? [] : [{name: !ip ? 'No IP on file' : missedOnce ? 'Avigilon check missed once, checking again' : 'Avigilon check', status}],
       onlineInShop: placement === 'SHOP' && online > 0,
       publicIp: ip,
       observedAt: text(check?.checked_at) || null,
