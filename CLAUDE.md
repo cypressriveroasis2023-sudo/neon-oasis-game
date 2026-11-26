@@ -59,6 +59,12 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-26** — Tech Check: router signal history **live** (#561). New
+  `inhand_private.signal_history` (8 days), filled once per pull by
+  `public.cos_router_signal_record_v1()`, which `cos_router_down_alerts_v1` now calls first
+  (cron job 16; no new job). `public.cos_router_trend_v1(unit)` (service_role) feeds the unit
+  card's 7-day chart through `cos-router-details` **v2** (action `trend`). First record: 278
+  routers; watchdog `ok`. Record in `tech-checks/docs/db-changes/20261126_router_signal_history.sql`.
 - **2026-11-26** — Deployed `cos-unit-camera-status/send-to-it-loop-v24` (#564): live now
   **v25 `2927fdeb`** (pins updated). The camera-status read carries `troubleshootReports`,
   and `POST /api/unit-camera-status/troubleshoot-close` closes one (Operations
