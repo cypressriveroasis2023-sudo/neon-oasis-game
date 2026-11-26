@@ -9,15 +9,15 @@
   "entrypointPath": "cos-unit-camera-status/index.ts",
   "importMapPath": "cos-unit-camera-status/deno.json",
   "verifyJwt": false,
-  "sourceDir": "tech-checks/docs/cos-unit-camera-status-v22-entry",
-  "description": "Router swapped. The camera-status read also reads, for the Owner and approved IT, units whose linked router is offline while an unlinked InHand router named for the unit is online (Tech Check public.cos_router_swaps_state_v1), and POST /api/unit-camera-status/router-swap moves the unit's link to the new router through public.cos_router_swap_apply_v1. Eight exact edits to live v22; nothing else changes. Built on v22 alongside down-needs-two-misses-v22: whichever deploys second must be rebuilt on the first.",
+  "sourceDir": "tech-checks/docs/cos-unit-camera-status-v23-entry",
+  "description": "Router swapped. The camera-status read also reads, for the Owner and approved IT, units whose linked router is offline while an unlinked InHand router named for the unit is online (Tech Check public.cos_router_swaps_state_v1), and POST /api/unit-camera-status/router-swap moves the unit's link to the new router through public.cos_router_swap_apply_v1. Eight exact edits to live v23; nothing else changes. Rebuilt on live v23 (v22 plus down-needs-two-misses-v22).",
   "authorization": "James, 2026-11-25: 'build router swap'. Running the deploy still needs his explicit go for that run.",
   "releaseStatus": "PREPARED",
-  "sourceRecord": "tech-checks/docs/cos-unit-camera-status-v22-entry/index.ts",
+  "sourceRecord": "tech-checks/docs/cos-unit-camera-status-v23-entry/index.ts",
   "requireLiveBeforeDeploy": {
     "status": "ACTIVE",
-    "version": 22,
-    "ezbr_sha256": "a306656ff5c1b4b0ab65f1e1c371204de0939538fbdbf55db1eb57b428be336f"
+    "version": 23,
+    "ezbr_sha256": "2efe829ac0d113f8c8001bcd4bfdf1dc36352b428b9ff6032ed58071a379977b"
   },
   "edits": [
     {
@@ -70,14 +70,14 @@
     }
   ],
   "expectedBefore": {
-    "index.ts": "5b9ed4b666ab15d19057fc6abef3c6cc1fb6ba73d12d2f36cfa98168c0feeeb1",
+    "index.ts": "3f0cd5119ae169ca68dfcf846383ced717befef03763254e9d3bebbf3b0fa0d1",
     "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
   },
   "expectedAfter": {
-    "index.ts": "29fb23dbc610a1708e6ed20b97f23c976309308514c9e756de976cfe8f67deba",
+    "index.ts": "9c44f8703126dece5ec49ca5dcdcc4372b03cfcc0d0d9967c64c853bfd893ab2",
     "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
   },
-  "dryRun": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/router-swap-v22.json --dry-run",
-  "deploy": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/router-swap-v22.json --deploy",
-  "rollback": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/rollback-to-v22-entry.json --deploy"
+  "dryRun": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/router-swap-v23.json --dry-run",
+  "deploy": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/router-swap-v23.json --deploy",
+  "rollback": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/rollback-to-v23-entry.json --deploy"
 }

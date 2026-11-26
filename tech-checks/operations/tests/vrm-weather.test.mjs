@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {heliosSpots, readSunForecast, parseDaily, sunOutlook, cloudyWarning, outlookLine, isGray} from '../src/vrmWeather.ts';
+import {zipAreaSpot, heliosSpots, readSunForecast, parseDaily, sunOutlook, cloudyWarning, outlookLine, isGray} from '../src/vrmWeather.ts';
 import {victronNeedsAttention} from '../src/victronAttention.ts';
 import {canonicalCameraUnit} from '../src/fieldCameraHealth.ts';
 
@@ -22,10 +22,12 @@ test('only Field Helios units with real coordinates get a spot, rounded to about
   assert.deepEqual([...spots.values()], [{lat: 29.76, lon: -95.37}]);
 });
 
-test('gray day = under 5 MJ/m² of sun or 85%+ cloud', () => {
-  assert.equal(isGray({date: 'x', mj: 4.9, cloud: 10}), true);
-  assert.equal(isGray({date: 'x', mj: 9, cloud: 85}), true);
-  assert.equal(isGray({date: 'x', mj: 9, cloud: 60}), false);
+test('gray day = under 7 MJ/m² of sun; cloud cover only counts when there is no sunlight figure', () => {
+  assert.equal(isGray({date: 'x', mj: 6.9, cloud: 10}), true);
+  assert.equal(isGray({date: 'x', mj: 14.8, cloud: 96}), false);   // thin high cloud, full sun: the live Houston case
+  assert.equal(isGray({date: 'x', mj: 5.8, cloud: 93}), true);
+  assert.equal(isGray({date: 'x', mj: null, cloud: 85}), true);
+  assert.equal(isGray({date: 'x', mj: null, cloud: 60}), false);
 });
 
 test('the outlook is today and tomorrow in the morning, tomorrow and the next day after 3 PM', () => {
@@ -69,4 +71,29 @@ test('Needs attention: "Cloudy days ahead" for a Field unit already down, nothin
   const weather = new Map([[canonicalCameraUnit('HELIOS 001'), o], [canonicalCameraUnit('HELIOS 002'), o]]);
   const list = victronNeedsAttention(units, rows, inventory, now, null, null, weather);
   assert.deepEqual(list.map(i => [i.name, i.kind, i.line]), [['HELIOS 001', 'cloudy', 'Cloudy days ahead · tomorrow and Friday look gray, battery 72%']]);
+});
+
+test('no map point: aim at the ZIP area of the mHelp address (the right town is enough for sun)', () => {
+  assert.deepEqual(zipAreaSpot('123 Example Rd, Houston, TX, 77078'), {lat: 29.8, lon: -95.4});
+  assert.deepEqual(zipAreaSpot('9 Example Ln, Katy, TX 77493-1234'), {lat: 29.5, lon: -95.9});
+  assert.equal(zipAreaSpot('12345 Example St, Houston'), null);      // a street number is not a ZIP
+  assert.equal(zipAreaSpot('PO Box 77078'), null);
+  assert.equal(zipAreaSpot('1 Example St, Nowhere, TX 00012'), null); // no such ZIP area
+  assert.equal(zipAreaSpot(null), null);
+  const spots = heliosSpots([
+    {unitNumber: 'HELIOS 001', placement: 'field', latitude: null, longitude: null, address: '123 Example Rd, Houston, TX, 77078'},
+    {unitNumber: 'HELIOS 009', placement: 'field', latitude: null, longitude: null, address: null, mhelpLocation: {address: '5 Example Dr, Willis, TX, 77378'}},
+    {unitNumber: 'HELIOS 003', placement: 'field', latitude: 29.94, longitude: -95.33, address: '1 Example Way, Houston, TX, 77032'},
+    {unitNumber: 'HELIOS 014', placement: 'shop', latitude: null, longitude: null, address: '2 Example Ct, Houston, TX, 77084'},
+    {unitNumber: 'HELIOS 010', placement: 'field', latitude: null, longitude: null, address: null},
+  ]);
+  assert.deepEqual([...spots.values()], [{lat: 29.8, lon: -95.4}, {lat: 30.3, lon: -95.4}, {lat: 29.94, lon: -95.33}]);
+});
+
+test('the live forecast shape parses: three sites, MJ/m² and cloud %', () => {
+  const live = {latitude: 29.79513, longitude: -95.4152, daily_units: {shortwave_radiation_sum: 'MJ/m²', cloud_cover_mean: '%'},
+    daily: {time: ['2026-11-25', '2026-11-26', '2026-11-27', '2026-11-28'], shortwave_radiation_sum: [15.32, 15.67, 14.78, 5.80], cloud_cover_mean: [7, 39, 96, 93]}};
+  const d = parseDaily(live);
+  assert.deepEqual(d.map(isGray), [false, false, false, true]);
+  assert.deepEqual(sunOutlook(d, local(26, 18)).map(x => [x.label, x.gray]), [['Tomorrow', false], ['Saturday', true]]);
 });

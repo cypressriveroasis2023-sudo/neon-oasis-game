@@ -25,9 +25,9 @@ already has a router, so a swap could not be recorded.
 At apply time the list holds one item: SPOTTER 265, RF3022434424854 →
 RF3152533023860. Nothing has been swapped yet; that is James's tap.
 
-The Operations side ships as recorded patch `cos-unit-camera-status/router-swap-v22`
-(from live v22 `a306656f`, alongside `down-needs-two-misses-v22`: whichever
-deploys second must be rebuilt on the first). Rollback `rollback-to-v22-entry`.
+The Operations side ships as recorded patch `cos-unit-camera-status/router-swap-v23`
+(rebuilt on live v23 `2efe829a` after `down-needs-two-misses-v22` deployed).
+Rollback `rollback-to-v23-entry`.
 
 Rollback:
 
