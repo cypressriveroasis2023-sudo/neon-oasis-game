@@ -1,6 +1,8 @@
 # Camera health sweep: do not write "offline" when the checker itself is refused
 
-Prepared, **not deployed**. Deploying needs James's explicit go for that run.
+**Deployed 2026-11-26 18:39 UTC as `camera-health-sweep` v104** on James's go: a one-line
+loader importing `source/index.ts` at commit `caa6d893e2d159c782e0407533535fe73f246cd4`.
+Before that it was v103 (the loader in "Deploy and rollback" below).
 
 ## What was happening
 
