@@ -59,7 +59,14 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
-- **2026-11-26** — `camera-health-sweep` (Tech Check) fix **prepared, not deployed**:
+- **2026-11-26** — Deployed `camera-health-sweep` **v104** (Tech Check, 18:39 UTC, James's go):
+  a one-line loader pinned to `caa6d89`,
+  `tech-checks/docs/camera-health-sweep-checker-refused-20261126/source/index.ts` (SHA-256
+  `0e85bc0f…`, #567). Three or more endpoints refused on every saved port in one run are held
+  as `checker_connection_refused` and keep their previous result; timeouts are written as
+  before. Rollback: redeploy the v103 loader (commit `91e8d52`, path in that README). A next
+  change to the sweep must start from this source, not from `endpoint-retry-20261110`.
+- **2026-11-26** — `camera-health-sweep` (Tech Check) fix was **prepared** (now deployed, see above):
   `tech-checks/docs/camera-health-sweep-checker-refused-20261126/` (recipe against the live
   v103 source). When three or more endpoints in one run answer "Connection refused" on every
   saved port, the collector writes nothing for them (hold reason `checker_connection_refused`,
