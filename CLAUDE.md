@@ -59,6 +59,11 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-26** — Deployed `cos-unit-camera-status/router-swap-v23` (#560): live now
+  **v24 `45576950`** (pins updated). The camera-status read carries `routerSwaps`, and
+  `POST /api/unit-camera-status/router-swap` applies one (Tech Check
+  `cos_router_swap_apply_v1`). Rollback `rollback-to-v23-entry`. A next patch to
+  this function must start from v24.
 - **2026-11-26** — Tech Check: Router swapped. `public.cos_router_swaps_state_v1` /
   `cos_router_swap_apply_v1` (Owner or approved IT) move a unit's router link to a new
   InHand router; writes `ADD_ROUTER_LINK` with before_state `{inhand_serial, swap}` (no
