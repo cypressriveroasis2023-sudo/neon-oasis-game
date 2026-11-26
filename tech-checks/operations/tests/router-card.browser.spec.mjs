@@ -54,6 +54,7 @@ test('a unit card shows its router: Connected, the :8080 button, signal and carr
   expect(box.target).toBe('_blank');
   expect(box.rel).toContain('noopener');
   expect(box.text).toContain('Open router (:8080)');
+  expect(box.text).not.toContain('No public IP for this router yet');
   expect(box.text).toContain('Good · 4G · band B12 · -88 dBm');
   expect(box.text).toContain('T-Mobile');
   expect(box.text).toContain('InHand reports a different public IP');
@@ -161,4 +162,27 @@ test('Punch list: Router problems lists field units with an offline router, down
   expect(rows[0]).toContain('Spotter 002'); expect(rows[0]).toContain('Router offline'); expect(rows[0]).toContain('Check power at the unit first');
   expect(rows[1]).toContain('Helios 001'); expect(rows[1]).toContain('Poor signal (-112 dBm)');
   expect(await inBoard(host, root => root.querySelector('#punchList .pdone')?.textContent)).toBe('Copy list for the IT sheet');
+});
+
+test('the router box draws 7 days of signal and says when it is getting weaker', async ({page}, info) => {
+  test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');
+  const {app} = await mountFleet(page, false, {cameraStatus: report});
+  const host = app.locator('.cos-board-host');
+  await expect.poll(() => inBoard(host, root => root.querySelectorAll('.tile').length)).toBe(4);
+  const hour = 3600e3, end = Date.parse(fresh);
+  const points = Array.from({length: 150}, (_, i) => ({t: new Date(end - (149 - i) * hour).toISOString(), rsrp: i > 125 ? -100 : -85, on: true}));
+  await detailsServer(page, req => req.action === 'trend'
+    ? {status: 200, json: {unit: req.unit, since: points[0].t, points, recent: -100, before: -85, verdict: 'worse'}}
+    : {status: 200, json: {routers: [{unit: 'SPOTTER 002', serial: 'RF6150001', status: 'online', at: fresh, ip: '203.0.113.42', ipFrom: 'inhand', port: 8080, sig: {level: 3, rsrp: -100}}], unmatched: [], units: []}});
+  await page.route('**/functions/v1/cos-unit-camera-status', route => route.request().method() === 'OPTIONS'
+    ? route.fulfill({status: 204, headers: {'access-control-allow-origin': '*', 'access-control-allow-headers': '*'}})
+    : route.fulfill({status: 200, headers: {'access-control-allow-origin': '*'}, json: report}));
+  await inBoard(host, root => root.getElementById('refresh').click());
+  await refreshed(host);
+  await openUnit(host, 'Spotter 002');
+  await expect.poll(() => inBoard(host, root => root.querySelector('#rtrBox .trend')?.textContent || '')).toContain('Getting weaker: about 15 dB below the week before');
+  const svg = await inBoard(host, root => { const s = root.querySelector('#rtrBox .trend svg.spark'); return s ? {path: s.querySelector('path.ln')?.getAttribute('d') || '', refs: s.querySelectorAll('line.ref').length, label: s.getAttribute('aria-label')} : null; });
+  expect(svg.refs).toBe(2);
+  expect(svg.path.startsWith('M')).toBe(true);
+  expect(svg.label).toContain('Getting weaker');
 });

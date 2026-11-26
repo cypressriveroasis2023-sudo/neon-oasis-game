@@ -12,7 +12,7 @@
 import mapData from './boardMap.json';
 import {BOARD_CSS} from './boardStyle';
 import {troubleWalk, troubleKnown, troubleNote, TROUBLE_CSS} from './boardTrouble';
-import {ROUTER_DETAIL_FRESH_MS, signalWord, milesBetween, unitKeyOf} from '../routerDetails';
+import {ROUTER_DETAIL_FRESH_MS, signalWord, milesBetween, unitKeyOf, trendWords} from '../routerDetails';
 
 /* The router box on a unit card: the open-router button, signal bars and the warnings. */
 const ROUTER_CSS = `
@@ -26,6 +26,14 @@ const ROUTER_CSS = `
 .rtr .bars i:nth-child(1){height:20%}.rtr .bars i:nth-child(2){height:40%}.rtr .bars i:nth-child(3){height:60%}.rtr .bars i:nth-child(4){height:80%}.rtr .bars i:nth-child(5){height:100%}
 .rtr .bars.good i.on{background:#2ecc71}.rtr .bars.fair i.on{background:#f1c40f}.rtr .bars.poor i.on{background:#e74c3c}.rtr .bars i.on{background:#9aa}
 .rtr .note.warn{color:#ffcf66;border-left:3px solid #ffcf66;padding-left:8px}
+.rtr .trend{margin:10px 0 4px;padding:10px;border-radius:10px;background:rgba(255,255,255,.04)}
+.rtr .trend .tt{margin:0 0 6px}
+.rtr .trend .spark{display:block;width:100%;height:64px}
+.rtr .trend .spark .ln{fill:none;stroke:#7fb3ff;stroke-width:2;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.rtr .trend.worse .spark .ln{stroke:#ffcf66}
+.rtr .trend .spark .ref{stroke-width:1;stroke-dasharray:3 3;vector-effect:non-scaling-stroke}
+.rtr .trend .spark .ref.g{stroke:#2ecc71;opacity:.6}.rtr .trend .spark .ref.f{stroke:#e74c3c;opacity:.6}
+.rtr .trend .axis{display:flex;justify-content:space-between;gap:6px;margin:2px 0 6px;font-size:11px;opacity:.7}
 .rtr dd a{color:inherit}
 `;
 
@@ -585,8 +593,9 @@ function routerBox(v){
      Offline read as "online" (James, 25 Nov, Sniper 168). */
   if(r.ip && IPV4.test(r.ip)) kids.push(h("a",{class:"rbtn"+(st==="ok"?"":" off"),href:"http://"+r.ip+":"+(r.port||8080),target:"_blank",rel:"noopener noreferrer"},
     h("b",{text:"Open router (:"+(r.port||8080)+")"}),h("span",{text: st==="ok" ? "Opens the router's own page in a new tab" : st==="bad" ? "The router is offline, so its page will not open until it is back. Last known address." : "No fresh InHand reading, so the page may not open."})));
+  /* Bug fixed 26 Nov: this "no IP" line had slipped under the offline warning's if, so it showed on every connected router. */
+  if(!(r.ip && IPV4.test(r.ip))) kids.push(h("p",{class:"note",text:"No public IP for this router yet, so there is no router page to open."}));
   if(st==="bad") kids.push(h("p",{class:"note warn",text:"The router is not reaching InHand"+(r.at ? " (InHand read "+when(secOf(r.at))+")" : "")+". With the router down, the cameras behind it cannot be reached either. Check power first, then the SIM and antenna."}));
-  else kids.push(h("p",{class:"note",text:"No public IP for this router yet, so there is no router page to open."}));
   const kv=[];
   const word = signalWord(r.sig);
   if(r.sig){
@@ -609,11 +618,44 @@ function routerBox(v){
   }
   const dl=h("dl",{class:"kv"}); for(const [a,b] of kv) dl.append(h("dt",{text:a}), typeof b==="string" ? h("dd",{text:b}) : h("dd",null,b));
   kids.push(dl);
+  kids.push(trendBox(r.unit || v.k));
   if(r.cosDiffers) kids.push(h("p",{class:"note warn",text:"InHand reports a different public IP than the COS record. The button uses InHand's, which is newer. Correct the COS record if the cameras use the same address."}));
   if(far) kids.push(far);
   kids.push(h("p",{class:"note",text:"Router status is a hint, not camera health. A connected router with offline cameras is still a camera problem."}));
   if(goScreen) kids.push(h("div",{class:"links"},goScreen));
   return h("div",{class:"box rtr",id:"rtrBox"},kids);
+}
+/* Signal over the last 7 days (James, 25 Nov): one line per hour, so a slowly failing antenna shows as a slope and a
+   one-off drop as a dip. Read when a card opens, kept 15 minutes. Gaps are hours the router was offline. */
+const TREND_KEEP_MS = 15*60000;
+function trendBox(unit){
+  const key=unitKeyOf(unit); S.rt = S.rt || new Map();
+  const got=S.rt.get(key);
+  if(!got || (Date.now()-got.at > TREND_KEEP_MS && !got.busy)){
+    if(hooks && typeof hooks.loadRouterTrend==="function"){
+      S.rt.set(key,{at:Date.now(),busy:true,t:got?got.t:null});
+      Promise.resolve(hooks.loadRouterTrend(unit)).then(t=>{ S.rt.set(key,{at:Date.now(),busy:false,t:t||null}); },()=>{ S.rt.set(key,{at:Date.now(),busy:false,t:null}); })
+        .then(()=>{ const open=S.openId && S.vmap && S.vmap[S.openId]; if(open && unitKeyOf(open.k)===key) drawPanel(); });
+    }
+    if(!got || !got.t) return h("div",{class:"trend"},h("p",{class:"note",text:"Reading signal history…"}));
+  }
+  const t=got.t;
+  if(!t) return h("div",{class:"trend"},h("p",{class:"note",text: got.busy ? "Reading signal history…" : "Signal history could not be read right now."}));
+  const words=trendWords(t), pts=t.points.filter(p=>typeof p.rsrp==="number");
+  const wrap=h("div",{class:"trend"+(t.verdict==="worse"?" worse":"")},h("p",{class:"tt"},h("b",{text:"Signal, last 7 days"})));
+  if(pts.length>=2){
+    const W=300,H=64,lo=-125,hi=-65,t1=Date.now(),t0=t1-7*864e5;
+    const X=ms=>Math.round(((ms-t0)/(t1-t0))*W*10)/10, Y=v=>Math.round((1-(Math.max(lo,Math.min(hi,v))-lo)/(hi-lo))*H*10)/10;
+    const NS="http://www.w3.org/2000/svg", el=(n,a)=>{ const e=document.createElementNS(NS,n); for(const k in a) e.setAttribute(k,String(a[k])); return e; };
+    const svg=el("svg",{viewBox:"0 0 "+W+" "+H,class:"spark",role:"img","aria-label":"Signal strength over the last 7 days. "+words});
+    for(const [v,c] of [[-90,"g"],[-105,"f"]]) svg.append(el("line",{x1:0,x2:W,y1:Y(v),y2:Y(v),class:"ref "+c}));
+    let d="", prev=0;
+    for(const p of pts){ const ms=Date.parse(p.t); d += (d && ms-prev<=2.5*3600e3 ? " L" : " M")+X(ms)+" "+Y(p.rsrp); prev=ms; }
+    svg.append(el("path",{d:d.trim(),class:"ln"}));
+    wrap.append(svg, h("p",{class:"axis"},h("span",{text:"7 days ago"}),h("span",{text:"green = good · red = poor"}),h("span",{text:"now"})));
+  }
+  wrap.append(h("p",{class:"note"+(t.verdict==="worse"?" warn":""),text:words}));
+  return wrap;
 }
 async function loadRouters(){
   if(!hooks || typeof hooks.loadRouters!=="function") return;

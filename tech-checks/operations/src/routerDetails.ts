@@ -99,3 +99,36 @@ export function suggestUnit(name: string | null, units: string[]): string | null
   const hits = units.filter(u => u.replace(/[^A-Za-z0-9]/g, '').toUpperCase() === key);
   return hits.length === 1 ? hits[0] : null;
 }
+
+/** 7 days of one router's signal, hourly, for the unit card (James, 25 Nov: tell a failing antenna from a one-off drop). */
+export type TrendPoint = {t: string; rsrp?: number; level?: number; on: boolean};
+export type RouterTrend = {unit: string; since: string | null; points: TrendPoint[]; recent: number | null; before: number | null;
+  verdict: 'none' | 'offline' | 'young' | 'worse' | 'better' | 'steady'};
+const VERDICTS = new Set(['none', 'offline', 'young', 'worse', 'better', 'steady']);
+export function parseTrend(json: any): RouterTrend | null {
+  if (!json || typeof json !== 'object' || !Array.isArray(json.points)) return null;
+  const num = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v > -200 && v < 100 ? v : undefined;
+  const points: TrendPoint[] = json.points.slice(-200).filter((p: any) => p && typeof p.t === 'string' && Number.isFinite(Date.parse(p.t)))
+    .map((p: any) => ({t: p.t, rsrp: num(p.rsrp), level: typeof p.level === 'number' && p.level >= 0 && p.level <= 5 ? p.level : undefined, on: p.on === true}));
+  return {unit: String(json.unit || ''), since: typeof json.since === 'string' ? json.since : null, points,
+    recent: num(json.recent) ?? null, before: num(json.before) ?? null, verdict: VERDICTS.has(json.verdict) ? json.verdict : 'none'};
+}
+export async function readRouterTrend(unit: string, fetcher: typeof fetch = fetch, token?: string | null): Promise<RouterTrend | null> {
+  try {
+    const {status, json} = await call({action: 'trend', unit}, fetcher, token);
+    return status === 200 ? parseTrend(json) : null;
+  } catch { return null; }
+}
+/** The trend in one plain sentence. */
+export function trendWords(t: RouterTrend | null): string {
+  if (!t) return '';
+  const d = t.recent !== null && t.before !== null ? Math.abs(Math.round(t.recent - t.before)) : 0;
+  switch (t.verdict) {
+    case 'worse': return 'Getting weaker: about ' + d + ' dB below the week before. A slow drop like this usually means the antenna, its cable or something new blocking it.';
+    case 'better': return 'Better than the week before by about ' + d + ' dB.';
+    case 'steady': return 'Steady over the week.';
+    case 'offline': return 'Offline for most of the last day, so there is no recent signal to compare.';
+    case 'young': return 'Signal history started ' + (t.since ? new Date(t.since).toLocaleDateString() : 'recently') + '; the week fills in day by day.';
+    default: return 'No signal history yet.';
+  }
+}
