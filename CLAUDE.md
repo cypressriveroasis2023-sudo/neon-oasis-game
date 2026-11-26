@@ -59,6 +59,19 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-25** — Prepared, **not deployed**: patch
+  `cos-unit-camera-status/down-needs-two-misses-v21` (from live v21 `ac4a0ff3`,
+  source record `tech-checks/docs/cos-unit-camera-status-v21-entry`, rollback
+  `rollback-to-v21-entry`). The board's direct-check read also reads
+  `confirmed_outage` and `consecutive_failures`, and a Sniper or CAM V whose saved
+  check has missed exactly once reads Not verified ("Avigilon check missed once,
+  checking again") instead of Down; two misses in a row or a confirmed outage is
+  Down. A row with no count is never a first miss. Why: the **running** sweep is
+  pinned to a 10 Nov source that writes `offline` on the first miss (the 19 Nov
+  source change to `verifying` was never deployed), and 55% of a week's Down
+  events were back on the next sweep. Three exact edits, no database write. Same
+  rule in `shared/otherUnitStatus.ts`. A next patch must start from v21 until this
+  deploys, then from v22.
 - **2026-11-25** — Vendor emails v2 **live** (#544, 22:46 UTC): Eyeforce account add / unit
   swap are the full CIF form, approved IT may send them, the filled CIF goes as an attachment.
   Tech Check `cos-vendor-requests-v2.sql` applied (actor `fleet`, unit cameras, cron-secret read);

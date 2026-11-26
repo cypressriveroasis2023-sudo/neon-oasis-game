@@ -1,0 +1,53 @@
+{
+  "slug": "cos-unit-camera-status",
+  "projectRef": "tughscoxralhofrckvxy",
+  "sourceCommit": "bea33de03288f5b82d96d19798296cbfc2c6a0bc",
+  "deployedFileNames": {
+    "index.ts": "cos-unit-camera-status/index.ts",
+    "deno.json": "cos-unit-camera-status/deno.json"
+  },
+  "entrypointPath": "cos-unit-camera-status/index.ts",
+  "importMapPath": "cos-unit-camera-status/deno.json",
+  "verifyJwt": false,
+  "sourceDir": "tech-checks/docs/cos-unit-camera-status-v21-entry",
+  "description": "Down needs two misses. The board's direct-check read (Snipers and CAM Vs) also reads confirmed_outage and consecutive_failures, and a unit whose saved check has missed exactly once reads Not verified, with 'Avigilon check missed once, checking again' on the card, instead of Down. Two misses in a row, or a confirmed outage, is Down as before. A row with no count is never treated as a first miss, so an outage is not hidden when the count was not read. Three exact edits to live v21; nothing else changes. Nothing is written to any database.",
+  "authorization": "James, 2026-11-25, after eight field Snipers read Down on one bad sweep and were back fifteen minutes later: 'Proceed with your recomendations' (a unit should need two consecutive misses before it reads Down). Running the deploy still needs his explicit go for that run.",
+  "releaseStatus": "PREPARED",
+  "sourceRecord": "tech-checks/docs/cos-unit-camera-status-v21-entry/index.ts",
+  "requireLiveBeforeDeploy": {
+    "status": "ACTIVE",
+    "version": 21,
+    "ezbr_sha256": "ac4a0ff3cbfb9d605ed1ac6ce51b555467d0ae93a4c30a22865e48debb54e407"
+  },
+  "edits": [
+    {
+      "file": "index.ts",
+      "needle": "legacyAll(\"camera_health_current?select=camera_device_id,overall_status,checked_at&order=camera_device_id.asc\", context.headers).catch(() => null)",
+      "replacement": "legacyAll(\"camera_health_current?select=camera_device_id,overall_status,checked_at,confirmed_outage,consecutive_failures&order=camera_device_id.asc\", context.headers).catch(() => null)",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "    const status2 = ip && fresh(check?.checked_at, now, maxAgeMs) && (said === \"online\" || said === \"offline\") ? said : \"unknown\";\n    const organization = text19(row2.organization), lower = organization.toLowerCase();\n    const placement3 = SHOP_ORGANIZATIONS.has(lower) ? \"SHOP\" : \"FIELD\";\n",
+      "replacement": "    const read2 = ip && fresh(check?.checked_at, now, maxAgeMs) && (said === \"online\" || said === \"offline\") ? said : \"unknown\";\n    const missedOnce = read2 === \"offline\" && check?.confirmed_outage !== true && Number.isInteger(check?.consecutive_failures) && Number(check.consecutive_failures) < 2;\n    const status2 = missedOnce ? \"unknown\" : read2;\n    const organization = text19(row2.organization), lower = organization.toLowerCase();\n    const placement3 = SHOP_ORGANIZATIONS.has(lower) ? \"SHOP\" : \"FIELD\";\n",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "      down: status2 === \"online\" ? [] : [{ name: ip ? \"Avigilon check\" : \"No IP on file\", status: status2 }],\n",
+      "replacement": "      down: status2 === \"online\" ? [] : [{ name: !ip ? \"No IP on file\" : missedOnce ? \"Avigilon check missed once, checking again\" : \"Avigilon check\", status: status2 }],\n",
+      "occurrences": 1
+    }
+  ],
+  "expectedBefore": {
+    "index.ts": "2dc0cf1dcbfc34aa2df2a8585d2ce2643b3e54c3f5614e257e03df1028809a57",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "expectedAfter": {
+    "index.ts": "c6a2bd73cb557c99426be7e56a95e262fb14114a3ff34bfe29fa3ebbc4e2fa0c",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "dryRun": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/down-needs-two-misses-v21.json --dry-run",
+  "deploy": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/down-needs-two-misses-v21.json --deploy",
+  "rollback": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/rollback-to-v21-entry.json --deploy"
+}

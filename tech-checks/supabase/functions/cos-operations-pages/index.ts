@@ -986,7 +986,7 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
             // Snipers, CAMVs and Recon II: saved readings COS already collects.
             // If they cannot be read the Star4Live units still show.
             legacyAll('camera_devices?select=id,device_name,unit_key,organization,source,activation_state,source_last_seen_at,public_ip&source=in.(2026_unit_tracker,reconeyez)&activation_state=eq.active&order=id.asc', context.headers).catch(() => null),
-            legacyAll('camera_health_current?select=camera_device_id,overall_status,checked_at&order=camera_device_id.asc', context.headers).catch(() => null),
+            legacyAll('camera_health_current?select=camera_device_id,overall_status,checked_at,confirmed_outage,consecutive_failures&order=camera_device_id.asc', context.headers).catch(() => null),
             // A# links (mHelp product ids) by unit, so the card knows each unit's A#. Unreadable links hide nothing else.
             readJson(LEGACY_URL + '/rest/v1/rpc/cos_mhelp_hand_link_state_v1', {method: 'POST', headers: {...context.headers, 'Content-Type': 'application/json'}, body: '{}'}, 'A# links could not be read.')
               .then(v => v?.contract === 'COS_MHELP_HAND_LINKS_V1' && Array.isArray(v.links) ? v.links : null).catch(() => null),
