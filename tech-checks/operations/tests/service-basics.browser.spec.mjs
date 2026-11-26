@@ -27,7 +27,10 @@ test.beforeEach(async({page})=>mountServiceBasics(page));
 
 test('Service gets daily tools and ticket-free returns across refresh and redraw',async({page},testInfo)=>{
   const home=page.locator('#wlSvcHome');
-  await expect(home.locator('button:visible')).toHaveCount(3);
+  // Four since #536 put My truck on the Service home.
+  await expect(home.locator('button:visible')).toHaveCount(4);
+  await expect(home.locator('[data-cos-my-truck]')).toHaveCount(1);
+  await expect(home.getByRole('button',{name:/My truck/})).toBeVisible();
   await expect(home.getByRole('button',{name:/Truck Inspection/})).toBeVisible();
   await expect(home.getByRole('button',{name:/Truck Inventory/})).toBeVisible();
   await expect(home).toContainText('Trailer inspection if you are taking a trailer');
@@ -35,7 +38,8 @@ test('Service gets daily tools and ticket-free returns across refresh and redraw
   await expect(page.locator('#tab-owner')).toBeHidden();
   await expect(page.locator('#tab-it')).toBeHidden();
   for(let n=0;n<3;n++) await page.evaluate(async()=>{document.getElementById('wlSvcHome').remove();await renderServiceHome();});
-  await expect(home.locator('button:visible')).toHaveCount(3);
+  await expect(home.locator('button:visible')).toHaveCount(4);
+  await expect(home.locator('[data-cos-my-truck]')).toHaveCount(1);
   await expect(home.locator('[data-cos-service-basics-copy]')).toHaveCount(1);
   await page.screenshot({path:testInfo.outputPath('service-basics-home.png'),fullPage:true});
 });
