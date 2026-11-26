@@ -72,6 +72,11 @@ Newest first. One line: date, what changed, what to watch.
   events were back on the next sweep. Three exact edits, no database write. Same
   rule in `shared/otherUnitStatus.ts`. A next patch must start from v21 until this
   deploys, then from v22.
+- **2026-11-25** — Tech Check: BEFORE INSERT trigger `sim_drawer_require_v1` on
+  `app_private.techcheck_transfer_events` and `public.sim_drawer_require_v1(boolean)` (Owner).
+  Applied with the rule **off** (`sim_drawer_settings.require_listed=false`); when on, a checkout
+  with a SIM not free in the drawer is refused. Do not turn it on without James. Record in
+  `tech-checks/docs/db-changes/20261125_sim_drawer_required.md`.
 - **2026-11-25** — Vendor emails v2 **live** (#544, 22:46 UTC): Eyeforce account add / unit
   swap are the full CIF form, approved IT may send them, the filled CIF goes as an attachment.
   Tech Check `cos-vendor-requests-v2.sql` applied (actor `fleet`, unit cameras, cron-secret read);
