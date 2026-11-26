@@ -59,6 +59,11 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-26** — Operations: Send to IT loop. `cos_troubleshoot_private.report_closures`,
+  `public.cos_troubleshoot_open_v1` / `cos_troubleshoot_close_v1` (service_role only).
+  Operations patch `cos-unit-camera-status/send-to-it-loop-v24` is **prepared, not
+  deployed** (starts from live v24). Record in
+  `tech-checks/docs/db-changes/20261126_troubleshoot_loop.md`.
 - **2026-11-26** — Deployed `cos-unit-camera-status/router-swap-v23` (#560): live now
   **v24 `45576950`** (pins updated). The camera-status read carries `routerSwaps`, and
   `POST /api/unit-camera-status/router-swap` applies one (Tech Check
