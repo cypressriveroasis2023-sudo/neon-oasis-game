@@ -59,6 +59,13 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-26** — Tech Check: Router swapped. `public.cos_router_swaps_state_v1` /
+  `cos_router_swap_apply_v1` (Owner or approved IT) move a unit's router link to a new
+  InHand router; writes `ADD_ROUTER_LINK` with before_state `{inhand_serial, swap}` (no
+  `id`/`public_ip`; endpoint claims stay complete, tested). Operations patch
+  `cos-unit-camera-status/router-swap-v22` is **prepared, not deployed**, built on v22
+  like `down-needs-two-misses-v22`: whichever deploys second must be rebuilt on the
+  first. Record in `tech-checks/docs/db-changes/20261126_router_swaps.md`.
 - **2026-11-26** — Operations patch `cos-unit-camera-status/down-needs-two-misses-v22`
   is **prepared, not deployed** (starts from live v22 `a306656f`). A Sniper or CAM V
   whose saved check missed once reads Not verified ("Avigilon check missed once,
