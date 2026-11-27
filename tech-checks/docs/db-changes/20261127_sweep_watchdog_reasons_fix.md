@@ -1,6 +1,6 @@
 # Sweep watchdog crashes whenever it has something to report
 
-**Prepared, not applied.** Tech Check (`goqrnolcvqnirjmzaeyk`). Applying it needs James's go.
+**Applied 2026-11-27 17:50 UTC (James's go).** Tech Check (`goqrnolcvqnirjmzaeyk`). First run after: `alarm`, reasons `no_fresh_reading_for_any_eligible_unit` + `sweep_readings_stale_over_25_minutes`, 0 of 44 fresh, recorded.
 
 ## What is wrong
 
