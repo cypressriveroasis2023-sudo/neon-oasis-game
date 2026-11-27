@@ -43,6 +43,8 @@ on:
           - rollback-to-v23-entry
           - send-to-it-loop-v24
           - rollback-to-v24-entry
+          - last-direct-check-v25
+          - rollback-to-v25-entry
           - rollback-to-v22-entry
       confirm:
         description: 'Type the patch name again to confirm. Deploying changes production immediately.'
@@ -131,6 +133,12 @@ jobs:
       - name: Pin the v24 rollback file
         if: inputs.patch == 'rollback-to-v24-entry'
         run: printf '%s  %s\n' 'b06bfb457977072dc8eb69bc403e655ba168cd23d98f7e09926b2d2e89879cf1' '.github/function-patches/cos-unit-camera-status/rollback-to-v24-entry.json' | sha256sum -c -
+      - name: Pin the last direct check patch file
+        if: inputs.patch == 'last-direct-check-v25'
+        run: printf '%s  %s\n' '4692788b7082874952c9b41a2dd6a10c3a9ddf815d83aed6a6f4263eec09edbb' '.github/function-patches/cos-unit-camera-status/last-direct-check-v25.json' | sha256sum -c -
+      - name: Pin the last direct check rollback file
+        if: inputs.patch == 'rollback-to-v25-entry'
+        run: printf '%s  %s\n' '268292326956376a7cc85f25b75c22baab3abfb75c975667acf0541c95bf50e0' '.github/function-patches/cos-unit-camera-status/rollback-to-v25-entry.json' | sha256sum -c -
       - name: Pin the read-only live archive preflight
         run: printf '%s  %s\n' 'cf718bb9497b4e7ffe7af4dce2c23076cbcf59f2b39859cfa2a1def3e38be280' '.github/scripts/preflight-live-function-pins.mjs' | sha256sum -c -
       - name: Choose the recorded patch path
@@ -138,7 +146,7 @@ jobs:
         run: |
           name="${{ inputs.patch }}"
           case "$name" in
-            camera-routes-only-v16|rollback-to-v16-entry|troubleshoot-route-v17|rollback-to-v17-entry|camera-ports-v18|rollback-to-v18-entry|a-links-v19|rollback-to-v19-entry|vcc-moves-v20|rollback-to-v20-entry|morning-list-v21|rollback-to-v21-entry|down-needs-two-misses-v22|rollback-to-v22-entry|router-swap-v23|rollback-to-v23-entry|send-to-it-loop-v24|rollback-to-v24-entry)
+            camera-routes-only-v16|rollback-to-v16-entry|troubleshoot-route-v17|rollback-to-v17-entry|camera-ports-v18|rollback-to-v18-entry|a-links-v19|rollback-to-v19-entry|vcc-moves-v20|rollback-to-v20-entry|morning-list-v21|rollback-to-v21-entry|down-needs-two-misses-v22|rollback-to-v22-entry|router-swap-v23|rollback-to-v23-entry|send-to-it-loop-v24|rollback-to-v24-entry|last-direct-check-v25|rollback-to-v25-entry)
               echo "file=.github/function-patches/cos-unit-camera-status/${name}.json" >> "$GITHUB_OUTPUT"
               ;;
             *)

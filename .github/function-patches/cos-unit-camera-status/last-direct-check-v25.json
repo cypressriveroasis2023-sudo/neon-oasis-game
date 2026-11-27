@@ -1,0 +1,41 @@
+{
+  "slug": "cos-unit-camera-status",
+  "projectRef": "tughscoxralhofrckvxy",
+  "sourceCommit": "9e775d569b629270e2ce2a0f3adc5cc9c2b11e2a",
+  "deployedFileNames": {
+    "index.ts": "cos-unit-camera-status/index.ts",
+    "deno.json": "cos-unit-camera-status/deno.json"
+  },
+  "entrypointPath": "cos-unit-camera-status/index.ts",
+  "importMapPath": "cos-unit-camera-status/deno.json",
+  "verifyJwt": false,
+  "sourceDir": "tech-checks/docs/cos-unit-camera-status-v25-entry",
+  "description": "Last direct check. Each Sniper and CAM V in the camera-status read also carries directCheck: what COS's own check last found (online or offline), when, and whether it is a confirmed outage, whatever its age. Status, counts and every other field are unchanged; a check that has gone quiet still reads Not verified. The board uses it with the router's own report when the checker cannot reach the carrier. One exact edit to live v25. Nothing is written to any database and no new query is made.",
+  "authorization": "James, 2026-11-26, after the checker was refused by the carrier for three and a half hours and about 29 Snipers had no current reading: 'Proceed' (use the router's own report as a second witness). Running the deploy still needs his explicit go for that run.",
+  "releaseStatus": "PREPARED",
+  "sourceRecord": "tech-checks/docs/cos-unit-camera-status-v25-entry/index.ts",
+  "requireLiveBeforeDeploy": {
+    "status": "ACTIVE",
+    "version": 25,
+    "ezbr_sha256": "2927fdeb1804593b7420fae10289dd5daf1e5377845f895b7e1e3d3c12eca38e"
+  },
+  "edits": [
+    {
+      "file": "index.ts",
+      "needle": "      observedAt: text19(check?.checked_at) || null,\n      source: \"ip_check\"\n    });\n",
+      "replacement": "      observedAt: text19(check?.checked_at) || null,\n      source: \"ip_check\",\n      ...(said === \"online\" || said === \"offline\") && Number.isFinite(Date.parse(text19(check?.checked_at))) ? { directCheck: { status: said, at: new Date(Date.parse(text19(check?.checked_at))).toISOString(), confirmed: check?.confirmed_outage === true } } : {}\n    });\n",
+      "occurrences": 1
+    }
+  ],
+  "expectedBefore": {
+    "index.ts": "18042550c61f24cf0547d492e38b6bd4bf3b3d795b208c6c6d37abedfca21233",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "expectedAfter": {
+    "index.ts": "d99660f88439f29a29bd43d79ae6f979666b2d487b2a2b470929971949aa7cf1",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "dryRun": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/last-direct-check-v25.json --dry-run",
+  "deploy": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/last-direct-check-v25.json --deploy",
+  "rollback": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/rollback-to-v25-entry.json --deploy"
+}
