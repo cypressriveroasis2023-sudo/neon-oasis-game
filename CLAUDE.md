@@ -59,6 +59,19 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-27** — Router as a second witness for Snipers / CAM Vs (**board client merged, inert;
+  function patch prepared, not deployed**). Operations patch
+  `cos-unit-camera-status/last-direct-check-v25` (starts from live v25 `2927fdeb`) adds
+  `directCheck` to each IP-checked unit: what COS's own check last found, when, and whether it
+  is a confirmed outage. Status and counts are unchanged. `src/cosBoard/boardData.ts`
+  (`routerWitness`): when that check has no current reading, a single InHand live-pull report
+  under 45 minutes old and newer than the check may uphold it (last Online + router online =
+  Up; confirmed outage + router offline = Down), for at most six hours; anything else stays
+  Not verified. The card says when a line is the router's report. Until the patch deploys no
+  unit carries `directCheck`, so the board behaves exactly as before. Rollback
+  `rollback-to-v25-entry`. If another patch to this function deploys first, rebuild this one.
+  Note: the board judges a direct check current for **20 minutes** (`CAMERA_FRESH_MS`), not the
+  45 the function uses, so one held or refused sweep already reads Not verified on the board.
 - **2026-11-26** — Deployed `camera-health-sweep` **v104** (Tech Check, 18:39 UTC, James's go):
   a one-line loader pinned to `caa6d89`,
   `tech-checks/docs/camera-health-sweep-checker-refused-20261126/source/index.ts` (SHA-256
