@@ -299,6 +299,7 @@ const PSEC = [["place","Placed differently","mHelp is official, so the board sho
   ["sent","Sent to IT","Troubleshoot results sent to IT that nobody has closed yet, oldest first. Open the unit to read the note and close it as Fixed or Not needed once something is done; the card keeps it for 7 days after."],
   ["swap","Router swapped","A unit still linked to its old router, which is offline, while InHand has a newer router named for that unit online and linked to nothing. Use the new router moves the unit's link, so the card and the morning list read the router that is really there. Its reading shows after the next InHand pull, within 30 minutes."],
   ["vcc","Moved in VCC","Camera records in COS that no longer match VCC: a camera VCC names for another unit, a camera VCC has that COS has never recorded, or one VCC stopped listing. VCC is right about its own cameras. Fix one with its button, or fix the name in VCC when there is no button."],
+  ["far","Router far from site","Field units whose router's cell tower is more than 25 miles from where COS has the unit. The unit may have moved, the router may be on a different unit, or the pin may be wrong. Cell-tower spots are rough, so check before changing anything."],
   ["routers","Router problems","Field units whose InHand router is offline, has poor signal, or reports a different IP than COS. A router reading is a hint only: it never proves the cameras work. Tap a unit to see its Router box, or copy the list for the IT sheet."],
   ["done","Fixed by hand","Set by hand in COS, so these are off the list and stay off. mHelp still shows them differently: make the same change there when you can."]];
 /* The answers James added for the punch list: where each unit really is, what record to fix, and who fixes it. */
@@ -332,6 +333,7 @@ function drawPunch(vs){
     h("p",{class:"note",text:"mHelp read "+when(mh.meta.at)+". Camera systems read "+when(S.meta.v)+"."}));
   cnt.vcc = S.vcc ? S.vcc.items.length : 0;
   cnt.routers = routerProblems(vs).length;
+  cnt.far = routersFar(vs).length;
   cnt.morning = S.morning ? morningItems().length : 0;
   cnt.swap = S.swaps ? S.swaps.length : 0;
   cnt.sent = S.tsr ? S.tsr.filter(r=>!r.closed).length : 0;
@@ -339,6 +341,7 @@ function drawPunch(vs){
   if(S.psec==="vcc"){ drawVcc(); return; }
   if(S.psec==="morning"){ drawMorning(); return; }
   if(S.psec==="routers"){ drawRouterProblems(vs); return; }
+  if(S.psec==="far"){ drawRoutersFar(vs); return; }
   if(S.psec==="swap"){ drawSwaps(); return; }
   if(S.psec==="sent"){ drawSent(); return; }
   const sec=PSEC.find(p=>p[0]===S.psec), rows = S.psec==="done" ? items.filter(settled) : open.filter(i=>i.sec===S.psec);
@@ -371,6 +374,40 @@ function routerProblems(vs){
     if(rank<9) out.push({v, r, rank, why, first});
   }
   return out.sort((a,b)=>a.rank-b.rank || String(a.v.name).localeCompare(String(b.v.name)));
+}
+/* Router far from site (James, 26 Nov, after Sniper 168: router near Schiller Road, COS site Presidio Square).
+   Field units only, with a COS pin and an InHand cell-tower spot; over 25 miles apart, farthest first. Read only. */
+const FAR_MI = 25;
+function routersFar(vs){
+  if(!S.rd) return [];
+  const out=[];
+  for(const v of (vs||allViews())){
+    if(v.mhOnly || v.place!=="field") continue;
+    const r = S.rd.get(unitKeyOf(v.k)) || S.rd.get(unitKeyOf(v.name));
+    if(!r || !r.gps) continue;
+    const pin=pinOf(v); if(!pin) continue;
+    const mi=milesBetween(r.gps, pin);
+    if(mi!==null && mi>FAR_MI) out.push({v, r, mi, pin});
+  }
+  return out.sort((a,b)=>b.mi-a.mi);
+}
+function drawRoutersFar(vs){
+  const sec=PSEC.find(p=>p[0]==="far"), list=routersFar(vs);
+  $("punchCount").textContent = sec[2] + (S.rd ? "" : " Router readings have not loaded yet.");
+  const maps = p => "https://www.google.com/maps/dir/"+p.r.gps.lat.toFixed(5)+","+p.r.gps.lng.toFixed(5)+"/"+p.pin.lat.toFixed(5)+","+p.pin.lng.toFixed(5);
+  const lineOf = p => p.v.name+(p.v.site ? " ("+p.v.site+")" : "")+": router's cell tower is about "+Math.round(p.mi)+" miles from the COS pin. Check where the unit really is before changing anything.";
+  const copy = list.length ? h("div",{class:"prow"},h("button",{class:"pdone",type:"button",onclick:()=>{
+    const text="Routers far from their site, "+new Date().toLocaleDateString()+"\n"+list.map(p=>"- "+lineOf(p)).join("\n");
+    try{ navigator.clipboard.writeText(text).then(()=>toast("List copied."),()=>toast("Couldn't copy in this view.")); }catch(_){ toast("Couldn't copy in this view."); } }},"Copy list for the IT sheet")) : null;
+  $("punchList").replaceChildren(...(list.length ? [copy, ...list.map(p=>{
+    const main=h("button",{class:"pmain",type:"button",onclick:()=>openUnit(p.v.id)},
+      h("span",{class:"name"},p.v.name, h("span",{class:"tag",text:Math.round(p.mi)+" mi"})),
+      p.v.site ? h("span",{class:"sub"},h("b",{text:"COS site: "}),p.v.site) : null,
+      h("span",{class:"sub"},h("b",{text:"Router: "}),(p.r.status==="online" ? "online" : p.r.status==="offline" ? "offline" : "no fresh reading")+(p.r.gps.t ? " · cell-tower spot from "+new Date(p.r.gps.t).toLocaleDateString() : "")),
+      h("span",{class:"sub ans"},h("b",{text:"Check first: "}),"Is the unit at the COS site? If it moved, fix the site; if not, the router may belong to another unit."));
+    const map=h("a",{class:"lk",href:maps(p),target:"_blank",rel:"noopener noreferrer"},"Map: router → site");
+    return h("div",{class:"prow s-"+p.v.status},main,h("div",{class:"links"},map));
+  })] : [h("div",{class:"empty",text: S.rd ? "No field router more than "+FAR_MI+" miles from its site." : "Router readings have not loaded yet."})]));
 }
 function drawRouterProblems(vs){
   const sec=PSEC.find(p=>p[0]==="routers"), list=routerProblems(vs);

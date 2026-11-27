@@ -186,3 +186,37 @@ test('the router box draws 7 days of signal and says when it is getting weaker',
   expect(svg.path.startsWith('M')).toBe(true);
   expect(svg.label).toContain('Getting weaker');
 });
+
+test('Punch list: Router far from site lists field units whose router is over 25 miles from the COS pin, farthest first', async ({page}, info) => {
+  test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');
+  const record = (id, unitNumber, category) => ({recordId: 'mhelp_product:' + id, productId: String(id), unitNumber, category, placement: 'FIELD', uploadLifecycle: 'UNFLAGGED', customer: 'Fixture Homes'});
+  const value = structuredClone(field);
+  value.uploadInventory = {
+    contract: 'COS_MHELP_UPLOAD_INVENTORY_V1', source: 'mhelpdesk_api', countBasis: 'mhelp_product_records_not_unique_physical_units', sourceSha256: 'a'.repeat(64), receivedAt: fresh, lastApiReadAt: fresh,
+    records: [record(1, 'Helios 001', 'Helios Solar Tower'), record(2, 'Spotter 002', 'Spotter'), record(3, 'Spotter 003', 'Spotter')],
+    summary: {totalRecords: 3, fieldRecords: 3, shopRecords: 0, unflaggedFieldRecords: 3, doNotUseRecords: 0, missingRecords: 0},
+  };
+  const at = (latitude, longitude) => ({location: {latitude, longitude, matchedAddress: null, source: 'hand'}});
+  const placedRows = [unit('HELIOS 001', at(29.76, -95.37)), unit('SPOTTER 002', at(29.76, -95.37))];
+  const placedReport = {...report, units: placedRows, counts: countUnits(placedRows)};
+  const {app} = await mountFleet(page, false, {cameraStatus: placedReport, field: value});
+  const host = app.locator('.cos-board-host');
+  await expect.poll(() => inBoard(host, root => root.querySelectorAll('.tile').length)).toBe(4);
+  await detailsServer(page, {routers: [
+    {unit: 'HELIOS 001', serial: 'RF1', status: 'online', at: fresh, port: 8080, gps: {lat: 29.77, lng: -95.36}},            // about a mile: fine
+    {unit: 'SPOTTER 002', serial: 'RF2', status: 'online', at: fresh, port: 8080, gps: {lat: 30.27, lng: -97.74, t: fresh}}], unmatched: [], units: []}); // Austin, ~145 mi
+  await page.route('**/functions/v1/cos-unit-camera-status', route => route.request().method() === 'OPTIONS'
+    ? route.fulfill({status: 204, headers: {'access-control-allow-origin': '*', 'access-control-allow-headers': '*'}})
+    : route.fulfill({status: 200, headers: {'access-control-allow-origin': '*'}, json: placedReport}));
+  await inBoard(host, root => root.getElementById('refresh').click());
+  await refreshed(host);
+  await inBoard(host, root => root.getElementById('tabPunch').click());
+  await expect.poll(() => inBoard(host, root => [...root.querySelectorAll('#punchChips .chip')].map(c => c.textContent).find(t => t.startsWith('Router far')) || '')).toBe('Router far from site · 1');
+  await inBoard(host, root => [...root.querySelectorAll('#punchChips .chip')].find(c => c.textContent.startsWith('Router far')).click());
+  const rows = await inBoard(host, root => [...root.querySelectorAll('#punchList .prow')].filter(r => r.querySelector('.pmain')).map(r => ({text: r.textContent, map: r.querySelector('a.lk')?.href || ''})));
+  expect(rows.length).toBe(1);
+  expect(rows[0].text).toContain('Spotter 002');
+  expect(rows[0].text).toMatch(/1[34]\d mi/);
+  expect(rows[0].text).toContain('Is the unit at the COS site?');
+  expect(rows[0].map).toContain('https://www.google.com/maps/dir/30.27000,-97.74000/29.76000,-95.37000');
+});
