@@ -186,3 +186,13 @@ html[data-theme='light'] .vrm-fleet-summary li,html[data-theme='light'] .vrm-wor
 .vrm-sky b{font-weight:650}
 .vrm-sky em{flex-basis:100%;font-style:normal;color:#f5b942;font-weight:650}
 .vrm-attention .vrm-attn-charger span{color:#ff6b7a;font-weight:700}.vrm-attention .vrm-attn-panel span{color:#f5b942;font-weight:650}
+/* Shop units: last in the grid, calm when not powered. */
+.vrm-shop-divider{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin:8px 0 0;padding:10px 2px 0;border-top:1px solid var(--vt-line);font-size:12px;line-height:1.45;color:#a3b3ca}
+.vrm-shop-divider b{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#93c5fd;white-space:nowrap}
+#root#root .operations-shell .vrm-workspace .vrm-unit-grid button.vrm-shop-off{min-height:0;border-color:#22344d!important}
+#root#root .operations-shell .vrm-workspace .vrm-unit-grid button.vrm-shop-off:not(.selected) strong{color:#8a99ad}
+.vrm-tile-idle{font-size:13px;font-weight:700;line-height:1.2;color:#93c5fd}
+.vrm-tile-shopon{font-size:10.5px;font-weight:700;color:#93c5fd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vrm-fleet-summary .vrm-tone-fair{border-left-color:var(--vt-fair)}.vrm-fleet-summary .vrm-tone-shop{border-left-color:#3b82f6}
+html[data-theme='light'] .vrm-shop-divider{color:#40586c}html[data-theme='light'] .vrm-shop-divider b,html[data-theme='light'] .vrm-tile-idle,html[data-theme='light'] .vrm-tile-shopon{color:#1d4ed8}
+.g-shop{background:#3b82f6}

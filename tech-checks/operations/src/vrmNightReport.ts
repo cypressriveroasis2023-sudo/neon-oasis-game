@@ -9,7 +9,7 @@ export type NightRow = {
 };
 export type NightReport = {
   from: number; to: number; done: boolean; rows: NightRow[];
-  reporting: number; attention: number; lowest: {name: string; low: number} | null; silent: number;
+  reporting: number; attention: number; lowest: {name: string; low: number} | null; silent: number; shopOff: number;
   bottom: string[];
 };
 
@@ -52,7 +52,9 @@ export function nightReport(units: readonly {installationId: number; name: strin
   const onBattery = live.filter(r => r.status !== 'power');
   const lowestRow = onBattery.reduce<NightRow | null>((m, r) => r.low !== null && (!m || r.low < (m.low as number)) ? r : m, null);
   const attention = rows.filter(r => (r.status === 'act' || r.status === 'watch') && !isShop(r.name));
-  const silent = rows.length - live.length;
+  // A unit in the shop that is not powered is not a missing report.
+  const shopOff = rows.filter(r => r.status === 'none' && isShop(r.name)).length;
+  const silent = rows.length - live.length - shopOff;
   const bottom: string[] = [];
   if (!live.length) bottom.push('No Helios saved readings for this night yet.');
   else if (attention.length) bottom.push(attention.length + (attention.length === 1 ? ' unit needs' : ' units need') + ' a look' + (attention.length <= 3 ? ': ' + attention.map(r => r.name).join(', ') : ' (see Needs attention)') + '.');
@@ -63,7 +65,8 @@ export function nightReport(units: readonly {installationId: number; name: strin
   if (rates.length) bottom.push('They used ' + range(rates, '%') + ' an hour overnight.');
   const power = live.filter(r => r.status === 'power');
   if (power.length) bottom.push('On outside power all night: ' + power.map(r => r.name).join(', ') + '.');
-  if (silent) bottom.push(silent + ' not reporting (tested and unplugged units show here with the last time they connected).');
+  if (silent) bottom.push(silent + ' not reporting (see the grey tiles for the last time they connected).');
+  if (shopOff) bottom.push(shopOff + ' in the shop, not powered.');
   return {from: w.from, to: w.to, done: w.done, rows, reporting: live.length, attention: attention.length,
-    lowest: lowestRow ? {name: lowestRow.name, low: lowestRow.low as number} : null, silent, bottom};
+    lowest: lowestRow ? {name: lowestRow.name, low: lowestRow.low as number} : null, silent, shopOff, bottom};
 }
