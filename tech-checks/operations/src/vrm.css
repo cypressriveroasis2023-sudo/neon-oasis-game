@@ -260,3 +260,8 @@ html[data-theme='light'] .vrm-fleet-summary li{background:linear-gradient(180deg
 #root#root .operations-shell .vrm-workspace .vrm-unit-grid button.vrm-shop-off:not(.selected) .vrm-tile-head strong{color:#9b917a!important}
 .vrm-workspace .vrm-unit-grid .vrm-shop-divider b{color:var(--vt-lux)}
 .vrm-workspace .vrm-fleet-summary li,.vrm-workspace .vrm-fleet-summary li[class*='vrm-tone-']{border-left-color:var(--vt-lux-faint)}
+html[data-theme='light'] .vrm-workspace{--vt-lux:#8a6d2f;--vt-lux-soft:rgba(138,109,47,.42);--vt-lux-faint:rgba(138,109,47,.24);--vt-ink:#1d232c;--vt-emerald:#12936a;--vt-amber:#a8700c;--vt-ruby:#d23a4f;--vt-mute:#667085}
+html[data-theme='light'] #root#root .operations-shell .vrm-workspace .vrm-unit-grid button.selected .vrm-tile-head strong{color:#5c4514!important}
+html[data-theme='light'] #root#root .operations-shell .vrm-workspace .vrm-unit-grid button.vrm-shop-off{background:linear-gradient(180deg,#f7f5f0,#efece4)!important;border-color:#e0d9c8!important}
+html[data-theme='light'] #root#root .operations-shell .vrm-workspace .vrm-unit-grid button.vrm-shop-off:not(.selected) .vrm-tile-head strong{color:#8b826d!important}
+html[data-theme='light'] .vrm-unit-grid .vrm-flow-draining{color:#8a6d2f}html[data-theme='light'] .vrm-ring-off .vrm-ring-track{stroke:rgba(0,0,0,.14)}
