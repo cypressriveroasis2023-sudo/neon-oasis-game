@@ -62,7 +62,8 @@ export function victronFleetView<U extends {installationId: number; name: string
 export function victronNeedsAttention(units: readonly VrmUnit[], rows: SafeVrmPower[], inventory: readonly InventoryUnit[] | null, now: number, history?: ReadonlyMap<number, HistoryPoint[]> | null, tonight?: ReadonlyMap<number, Tonight> | null, weather?: ReadonlyMap<string, OutlookDay[]> | null, mppt?: ReadonlyMap<number, Mppt> | null): VictronAttention[] {
   const out: VictronAttention[] = [];
   const fieldIds = units.filter(unit => heliosPlacement(unit.name, inventory) === 'field').map(unit => unit.installationId);
-  const peers = peerYield(mppt, fieldIds, now);
+  // Units are compared on the same calendar day: the chargers do not all start a new day at the same minute.
+  const peersOn = {0: peerYield(mppt, fieldIds, now, 0), [-1]: peerYield(mppt, fieldIds, now, -1)} as Record<0 | -1, number | null>;
   for (const unit of units) {
     if (heliosPlacement(unit.name, inventory) !== 'field') continue;
     const tile = unitTileSummary(unit, rows, now);
@@ -87,8 +88,8 @@ export function victronNeedsAttention(units: readonly VrmUnit[], rows: SafeVrmPo
     if (tile.tone === 'good' || tile.tone === 'fair' || tile.tone === 'low') {
       const listed = out.filter(item => item.installationId === unit.installationId);
       // "Made less than the others" only counts for a unit whose battery had room to charge yesterday.
-      const needed = hadRoomYesterday(history?.get(unit.installationId), now);
-      for (const flag of mpptFlags(mppt?.get(unit.installationId), now, {needed, peerYield: peers})) {
+      const needed = (day: 0 | -1) => hadRoomYesterday(history?.get(unit.installationId), now, day);
+      for (const flag of mpptFlags(mppt?.get(unit.installationId), now, {needed, peerYield: day => peersOn[day]})) {
         if (flag.kind === 'charger' || !listed.some(item => item.kind === 'alarm')) out.push({installationId: unit.installationId, name: unit.name, kind: flag.kind, line: flag.line});
       }
     }

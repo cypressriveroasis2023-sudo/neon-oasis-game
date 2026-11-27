@@ -99,9 +99,10 @@ export function dayPeak(points: HistoryPoint[], now: number): {peak: number; lab
  * A unit that stayed full (on outside power, or barely used) makes little because it needed little.
  * Needs 8+ readings; without them the answer is no.
  */
-export function hadRoomYesterday(points: readonly HistoryPoint[] | null | undefined, now: number): boolean {
+export function hadRoomYesterday(points: readonly HistoryPoint[] | null | undefined, now: number, dayOffset: 0 | -1 = -1): boolean {
   if (!points?.length) return false;
-  const d = new Date(now), from = at(d, -1, 7), to = at(d, -1, 17);
+  // dayOffset 0 asks about today instead: late in the evening the charger's newest finished day is today.
+  const d = new Date(now), from = at(d, dayOffset, 7), to = at(d, dayOffset, 17);
   const day = points.filter(p => p[1] !== null && p[0] >= from && p[0] <= to);
   return day.length >= 8 && Math.min(...day.map(p => p[1] as number)) < 90;
 }
