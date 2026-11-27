@@ -74,9 +74,9 @@ Newest first. One line: date, what changed, what to watch.
   the app; no code change is involved and none should be made to get around it.
 - **2026-11-27** — `public.cos_sweep_watchdog_check_v1()` **crashes whenever it has a reason to
   record** (`text[] || 'literal'` → malformed array literal), so it logged nothing through the
-  26 Nov refusal or today's hold. Fix **prepared, not applied** (needs James's go):
-  `tech-checks/docs/db-changes/20261127_sweep_watchdog_reasons_fix.md`. Until then do not
-  trust `cos_sweep_watchdog_recent_v1` showing `ok`; check `cron.job_run_details` for job 15.
+  26 Nov refusal or today's hold. Fix **applied** 17:50 UTC (James's go): the four lines now use
+  `array_append`; first run recorded `alarm` (0 of 44 fresh). Record
+  `tech-checks/docs/db-changes/20261127_sweep_watchdog_reasons_fix.md`.
 - **2026-11-27** — Deployed `cos-unit-camera-status/last-direct-check-v25` (#572, 15:20 UTC,
   James's go): live now **v26 `d1136141`** (pins updated). Each IP-checked unit carries
   `directCheck`, so the board's router second witness (`boardData.routerWitness`) is now
