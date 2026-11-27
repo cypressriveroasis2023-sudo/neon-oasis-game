@@ -13,6 +13,9 @@ const cards: { metric: PowerMetric; label: string; kind: string }[] = [
   {metric:'battery_power',label:'Battery power',kind:'detail'},
 ];
 const time = (value:string) => new Date(value).toLocaleString(undefined,{month:'numeric',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'});
+/** On a card, a reading from today needs only its time; an older one keeps its date. */
+const cardTime = (value:string, now:number) => new Date(value).toDateString() === new Date(now).toDateString()
+  ? new Date(value).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}) : time(value);
 export default function VrmReadOnlyDashboard({unit,rows,invalid=false,readFailed=false,now,embedded=false}:{unit:VrmUnit;rows:SafeVrmPower[];invalid?:boolean;readFailed?:boolean;now:number;embedded?:boolean}) {
   const row = dashboardPowerFor(unit, rows);
   const selected = cards.map(card => ({...card,readings:card.metric === 'battery_soc' ? chargeReadings(row,now) : [selectReading(row,card.metric,now)].filter(reading => reading !== undefined)}));
@@ -30,7 +33,7 @@ export default function VrmReadOnlyDashboard({unit,rows,invalid=false,readFailed
       {readings.length ? readings.map((reading,index) => <div className='vrm-native-reading' key={reading.source+':'+reading.instance+':'+index}>
         <strong className='vrm-native-value'>{reading.value.toLocaleString(undefined,{maximumFractionDigits:2})}<small> {reading.unit}</small></strong>
         {metric==='battery_soc'&&<meter className='cos-energy-charge' min={0} max={100} low={20} optimum={80} value={reading.value} aria-label={'Saved battery charge · '+reading.source+' '+reading.instance}>{reading.value}%</meter>}
-        <p><span className={readingIsFresh(reading,now)?'':'vrm-native-warning'}>{readingIsFresh(reading,now)?'Saved reading':'Stale'} · {time(reading.observedAt)}</span><span className='vrm-native-source'>{reading.source} · instance {reading.instance}</span></p>
+        <p><span className={readingIsFresh(reading,now)?'':'vrm-native-warning'}>{readingIsFresh(reading,now)?'Saved reading':'Stale'} · {cardTime(reading.observedAt,now)}</span><span className='vrm-native-source'>{reading.source} · instance {reading.instance}</span></p>
       </div>) : <><strong className='vrm-native-value'>—</strong><p>Not reported</p></>}
     </article>)}</div>
     {alarms.length > 0 && <p className='vrm-native-warning' role='status'>Reported alarms: {alarms.map(reading => reading.metric.replaceAll('_',' ')+' ('+(readingIsFresh(reading,now)?'reported':'stale')+' '+time(reading.observedAt)+')').join('; ')}.</p>}
