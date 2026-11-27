@@ -40,3 +40,29 @@ drop function if exists public.cos_vrm_placement_read();
 
 Then redeploy `cos-vrm-mppt-read` from the commit before this one (or leave v2: with the function gone it
 answers `placements: null` and the page falls back to the saved list alone).
+
+## Changed the same day: read the active upload, not the census view
+
+Applied 2026-11-27 at about 15:27 CST (`apply_migration`, name `cos_vrm_placement_read_active_upload`), with the
+manager's approval. Same function name, same answer shape, same grants.
+
+**What went wrong.** The first version read `cos_mhelp_placement_private.census_mhelp_current_coverage`. That view
+joins the census product and address tables, which are filled by the address job *after* an upload becomes
+active. A new mHelp upload was admitted at 15:21 CST; the view had **0 rows** from then on (still 0 at 15:30),
+so the function answered an empty list and the Victron page lost Field/Shop for HELIOS 011-020 again. The same
+gap follows every mHelp upload (three were admitted between 00:50 and 01:35 that night).
+
+**What it reads now.** The active upload itself: `upload_control.active_sha256` -> `upload_batches.records`
+(newest batch for that source), taking `unitNumber`, `placement` and `sourceAddress.zip`. No dependency on the
+census tables. About 13 ms.
+
+**Checked afterwards.** 20 units (12 FIELD, 8 SHOP) while the census view was still empty; `anon` and
+`authenticated` cannot execute it.
+
+**Also changed.** The page ignores an empty placement answer and keeps the last list it had. The scheduled
+"Helios night power alert" now takes Field/Shop from this function instead of the view.
+
+**Rollback of this step** (back to the census view): re-apply the function body from commit `e776dca9`
+(`git show e776dca9:tech-checks/operations/db/20261127_cos_vrm_placement_read.sql`).
+
+**For anyone else using `census_mhelp_current_coverage`:** expect it to be empty for a while after each upload.

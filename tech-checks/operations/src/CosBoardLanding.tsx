@@ -104,7 +104,7 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
     let live = true;
     const read = () => {
       void readVrmHistory().then(units => { if (live && units) setHistory(new Map(units.map(u => [u.installationId, u.points]))); });
-      void readVrmExtras().then(extra => { if (!live) return; if (extra.mppt) setMppt(extra.mppt); if (extra.places) setPlaces(extra.places); });
+      void readVrmExtras().then(extra => { if (!live) return; if (extra.mppt) setMppt(extra.mppt); if (extra.places?.length) setPlaces(extra.places); });
     };
     read();
     const timer = window.setInterval(() => { if (document.visibilityState === 'visible') read(); }, 15 * 60 * 1000);
