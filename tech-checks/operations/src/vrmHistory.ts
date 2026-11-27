@@ -155,6 +155,7 @@ export type Tonight = {
   atMorning: number;        // estimated % at 7 AM (0..100)
   floorAt: number | null;   // epoch s when it reaches 20%, if before 7 AM
   morning: number;          // epoch s of the 7 AM being forecast
+  lowerBy?: number;         // points taken off the saved (system) charge because a lower battery monitor disagrees
 };
 
 const nextSeven = (now: number) => { const d = new Date(now); const t = new Date(d); t.setHours(7, 0, 0, 0); if (d.getHours() >= 7) t.setDate(t.getDate() + 1); return t.getTime() / 1000; };
@@ -166,7 +167,7 @@ export function isNightForecastTime(now: number): boolean { const h = new Date(n
  * Straight-line forecast from the last 2 hours of battery readings (needs 4+ readings over 45+ minutes,
  * the newest no older than 45 minutes). Only from 5 PM to 7 AM. Returns null when there is not enough to go on.
  */
-export function tonightForecast(points: HistoryPoint[], now: number): Tonight | null {
+export function tonightForecast(points: HistoryPoint[], now: number, lowerBy = 0): Tonight | null {
   if (!isNightForecastTime(now)) return null;
   const nowS = now / 1000;
   const recent = points.filter(p => p[1] !== null && p[0] >= nowS - 2 * 3600 && p[0] <= nowS + 300);
@@ -178,14 +179,17 @@ export function tonightForecast(points: HistoryPoint[], now: number): Tonight | 
   const mx = xs.reduce((a, b) => a + b, 0) / xs.length, my = ys.reduce((a, b) => a + b, 0) / ys.length;
   const den = xs.reduce((a, x) => a + (x - mx) ** 2, 0);
   const rate = den ? xs.reduce((a, x, i) => a + (x - mx) * (ys[i] - my), 0) / den : 0;
-  const battery = last[1] as number, morning = nextSeven(now);
+  // The saved history is the system's charge. When a lower monitor disagrees, the estimate starts from the
+  // lower level and keeps the measured rate of loss.
+  const off = lowerBy > 0 ? lowerBy : 0, extra = off ? {lowerBy: Math.round(off)} : {};
+  const battery = Math.max(0, (last[1] as number) - off), morning = nextSeven(now);
   const hours = Math.max(0, (morning - last[0]) / 3600);
   const atMorning = Math.max(0, Math.min(100, battery + rate * hours));
-  if (rate >= -0.2) return {verdict: 'charging', battery: Math.round(battery), ratePerHour: Math.round(rate * 10) / 10, atMorning: Math.round(atMorning), floorAt: null, morning};
+  if (rate >= -0.2) return {verdict: 'charging', battery: Math.round(battery), ratePerHour: Math.round(rate * 10) / 10, atMorning: Math.round(atMorning), floorAt: null, morning, ...extra};
   const toFloor = battery > NIGHT_FLOOR_PERCENT ? (battery - NIGHT_FLOOR_PERCENT) / -rate : 0;
   const floorAt = last[0] + toFloor * 3600;
   const verdict: TonightVerdict = floorAt < morning ? 'low' : atMorning < NIGHT_TIGHT_PERCENT ? 'tight' : 'ok';
-  return {verdict, battery: Math.round(battery), ratePerHour: Math.round(rate * 10) / 10, atMorning: Math.round(atMorning), floorAt: floorAt < morning ? Math.round(floorAt) : null, morning};
+  return {verdict, battery: Math.round(battery), ratePerHour: Math.round(rate * 10) / 10, atMorning: Math.round(atMorning), floorAt: floorAt < morning ? Math.round(floorAt) : null, morning, ...extra};
 }
 
 const clock = (s: number) => new Date(s * 1000).toLocaleTimeString(undefined, {hour: 'numeric', minute: '2-digit'});
@@ -201,7 +205,7 @@ export function tonightHeadline(t: Tonight): string {
 /** The why, in one short line. */
 export function tonightBasis(t: Tonight): string {
   const rate = Math.abs(t.ratePerHour);
-  return 'Battery ' + t.battery + '% now, ' + (t.ratePerHour < 0 ? 'losing about ' + rate + '% an hour' : t.ratePerHour > 0 ? 'gaining about ' + rate + '% an hour' : 'flat') + ' over the last 2 hours.';
+  return 'Battery ' + t.battery + '% now' + (t.lowerBy ? ' on the lower monitor (the system says ' + Math.min(100, t.battery + t.lowerBy) + '%)' : '') + ', ' + (t.ratePerHour < 0 ? 'losing about ' + rate + '% an hour' : t.ratePerHour > 0 ? 'gaining about ' + rate + '% an hour' : 'flat') + ' over the last 2 hours.';
 }
 
 /** What a tech should do about it, short and in order. Empty when nothing needs doing. */

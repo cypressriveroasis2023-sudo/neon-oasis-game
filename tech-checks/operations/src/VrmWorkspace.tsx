@@ -187,9 +187,8 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
   const enabled = units.filter(item => item.embedUrl).length;
   const nameCounts = new Map<string,number>();
   for (const item of units) nameCounts.set(item.name, (nameCounts.get(item.name) ?? 0) + 1);
-  const tiles0 = (item: typeof units[number]) => unitTileSummary(item, power.rows, now).fresh;
   const tonight = new Map<number, Tonight>();
-  for (const item of units) { const t = history && tiles0(item) ? tonightForecast(history.get(item.installationId) ?? [], now) : null; if (t) tonight.set(item.installationId, t); }
+  for (const item of units) { const tile = tiles.get(item.installationId)!; const t = history && tile.fresh ? tonightForecast(history.get(item.installationId) ?? [], now, tile.socGap) : null; if (t) tonight.set(item.installationId, t); }
   const weather = new Map<string, ReturnType<typeof sunOutlook>>();
   if (sky) for (const [key, days] of sky) { const o = sunOutlook(days, now); if (o.length) weather.set(key, o); }
   const night = units.length > 0 && history ? nightReport(units, history, now, name => heliosPlacement(name, inventory) === 'shop') : null;
@@ -210,7 +209,7 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
     {units.length > 0 && <ul className='vrm-fleet-summary' aria-label='Fleet power summary'>{summary.map(item => <li key={item.label} className={'vrm-tone-'+item.key}><strong>{item.value}</strong><span>{item.label}</span></li>)}</ul>}
     {units.length > 0 && placed > 0 && <section className={'vrm-attention' + (attention.length ? '' : ' vrm-attention-clear')} aria-label='Needs attention'>
       <h3>{attention.length ? 'Needs attention · Field units' : 'No Field power issues'}</h3>
-      {attention.length > 0 && <ul>{attention.map(item => <li key={item.installationId}><button type='button' className={'vrm-attn-'+item.kind} onClick={() => select(item.installationId)}><strong>{item.name}</strong><span>{item.line}</span></button></li>)}</ul>}
+      {attention.length > 0 && <ul>{attention.map((item, index) => <li key={item.installationId + ':' + item.kind + ':' + index}><button type='button' className={'vrm-attn-'+item.kind} onClick={() => select(item.installationId)}><strong>{item.name}</strong><span>{item.line}</span></button></li>)}</ul>}
     </section>}
     {night && <VrmNightReport report={night}/>}
     {units.length > 0 && <VrmTechGuide/>}
@@ -229,6 +228,7 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
           <svg viewBox='0 0 64 64'><circle className='vrm-ring-track' cx='32' cy='32' r='27'/><circle className='vrm-ring-fill' cx='32' cy='32' r='27' pathLength={100} strokeDasharray={(tile.soc ? Math.max(0, Math.min(100, tile.soc.value)) : 0) + ' 100'}/></svg>
           <span className={'vrm-tile-soc' + (tile.soc && Math.round(tile.soc.value) >= 100 ? ' vrm-soc-full' : '')}>{tile.soc ? <>{Math.round(tile.soc.value)}<small>%</small></> : '—'}</span>
         </span>
+        {tile.socGap > 0 && tile.socUsual && <span className='vrm-tile-differ' title='The battery monitors disagree by more than 10 points. The page goes by the lower one.'>system says {Math.round(tile.socUsual.value)}%</span>}
         {tile.tone === 'stale' || tile.tone === 'none'
           ? <span className='vrm-tile-solar vrm-tile-seen'>{lastReading}</span>
           : <span className='vrm-tile-solar'><TileIcon name='sun'/>{tile.solar ? Math.round(tile.solar.value) + ' ' + tile.solar.unit : '—'}</span>}
@@ -265,7 +265,7 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
       const day = last24h(points, now);
       if (day.length < 2) return <section className='vrm-history'><h4>Last 24 hours</h4><p className='vrm-note'>History is building up. It starts from when it was switched on and fills in with each Victron sync.</p></section>;
       const night = overnightLow(points, now), sun = solarVsYesterday(points, now), flags = historyFlags(points, now);
-      const t = tonightForecast(points, now), steps = t ? tonightSteps(t) : [];
+      const t = tonightForecast(points, now, tiles.get(unit.installationId)?.socGap ?? 0), steps = t ? tonightSteps(t) : [];
       return <section className='vrm-history'>
         <div className={'vrm-tonight vrm-tonight-' + (t ? t.verdict : 'none')}>
           <h4>Tonight</h4>

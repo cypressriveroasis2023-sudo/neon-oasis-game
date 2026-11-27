@@ -27,14 +27,30 @@ export function primaryCharge(charges: readonly Charge[], now: number): Charge |
   const pool = fresh.length ? fresh : charges;
   return pool.find(reading => reading.source === 'system') ?? [...pool].sort((a, b) => a.value - b.value)[0];
 }
+/**
+ * The cautious rule. A Helios reports its charge from more than one battery monitor, and on real units they can
+ * sit 15-25 points apart with no way to tell from here which is right. When current monitors differ by more than
+ * CHARGE_DISAGREE_POINTS, the page goes by the LOWEST current one: being wrong low costs a look, being wrong
+ * high costs a dead camera. Still a real, labeled reading; never an average.
+ * `gap` is how far below the usual (system) reading that is, and `usual` is that reading.
+ */
+export const CHARGE_DISAGREE_POINTS = 10;
+export function cautiousCharge(charges: readonly Charge[], now: number): {reading: Charge | undefined; usual: Charge | undefined; gap: number} {
+  const usual = primaryCharge(charges, now);
+  const fresh = charges.filter(reading => readingIsFresh(reading, now));
+  if (!usual || fresh.length < 2 || !readingIsFresh(usual, now)) return {reading: usual, usual, gap: 0};
+  const lowest = [...fresh].sort((a, b) => a.value - b.value)[0];
+  const gap = usual.value - lowest.value;
+  return gap > CHARGE_DISAGREE_POINTS ? {reading: lowest, usual, gap} : {reading: usual, usual, gap: 0};
+}
 /** How the battery monitors compare. They "agree" when all are equally current and within one point of each other. */
 export const CHARGE_AGREE_POINTS = 1;
-export function chargeAgreement(charges: readonly Charge[], now: number): {lead: Charge | undefined; spread: number; agree: boolean} {
-  const lead = primaryCharge(charges, now);
-  if (charges.length < 2) return {lead, spread: 0, agree: false};
+export function chargeAgreement(charges: readonly Charge[], now: number): {lead: Charge | undefined; spread: number; agree: boolean; cautious: boolean} {
+  const {reading: lead, gap} = cautiousCharge(charges, now);
+  if (charges.length < 2) return {lead, spread: 0, agree: false, cautious: false};
   const values = charges.map(reading => reading.value), spread = Math.max(...values) - Math.min(...values);
   const sameAge = charges.every(reading => readingIsFresh(reading, now)) || charges.every(reading => !readingIsFresh(reading, now));
-  return {lead, spread, agree: sameAge && spread <= CHARGE_AGREE_POINTS};
+  return {lead, spread, agree: sameAge && spread <= CHARGE_AGREE_POINTS, cautious: gap > 0};
 }
 /** Select one labeled non-SOC source, never sum system totals and individual devices. */
 export function selectReading(row: SafeVrmPower | undefined, metric: PowerMetric, now: number) {
@@ -52,10 +68,11 @@ export type TileTone = 'good' | 'fair' | 'low' | 'stale' | 'none' | 'unavailable
 /** One glanceable reading per unit tile. Prefers the system SOC; otherwise the
  * lowest single battery monitor (never an average). Stale readings stay grey. */
 export function unitTileSummary(unit: VrmUnit, rows: SafeVrmPower[], now: number) {
-  if (unit.available === false) return { tone: 'unavailable' as TileTone, soc: undefined, solar: undefined, fresh: false, flow: undefined, alarms: [] as VictronAlarm[], lastSeen: lastConnected(unit, undefined) };
+  if (unit.available === false) return { tone: 'unavailable' as TileTone, soc: undefined, socGap: 0, socUsual: undefined, solar: undefined, fresh: false, flow: undefined, alarms: [] as VictronAlarm[], lastSeen: lastConnected(unit, undefined) };
   const row = dashboardPowerFor(unit, rows);
   const charges = chargeReadings(row, now);
-  const soc = primaryCharge(charges, now);
+  // The lower monitor when they disagree by a lot (see cautiousCharge). `socGap` > 0 says that happened.
+  const {reading: soc, usual: socUsual, gap: socGap} = cautiousCharge(charges, now);
   const solar = selectReading(row, 'solar_power', now);
   const isFresh = Boolean(soc && readingIsFresh(soc, now)) && !row?.errorCode;
   const alarms = victronAlarms(row, now);
@@ -64,7 +81,7 @@ export function unitTileSummary(unit: VrmUnit, rows: SafeVrmPower[], now: number
   // Victron's own alarm outranks our colors: an alarm is red, a warning is at least amber.
   if (worst === 2 && (tone === 'good' || tone === 'fair')) tone = 'low';
   else if (worst === 1 && tone === 'good') tone = 'fair';
-  return { tone, soc, solar, fresh: isFresh, flow: powerFlow(row, now), alarms, lastSeen: lastConnected(unit, row) };
+  return { tone, soc, socGap, socUsual, solar, fresh: isFresh, flow: powerFlow(row, now), alarms, lastSeen: lastConnected(unit, row) };
 }
 
 export type PowerFlow = {state: 'charging' | 'draining' | 'idle'; watts: number | null; amps: number | null};
