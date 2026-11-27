@@ -22,3 +22,21 @@ export function safeVrmMppt(value: unknown, now = Date.now()): {units: VrmMpptUn
   });
   return {units};
 }
+
+/** Field or Shop for one Helios from mHelp's own current list (ZIP for Field units only). */
+export type VrmPlacementUnit = {installationId: number; name: string; placement: 'FIELD' | 'SHOP'; zip: string | null};
+
+/** Same rule: anything unexpected fails the whole placement answer, and the page falls back to what it had. */
+export function safeVrmPlacement(value: unknown): {units: VrmPlacementUnit[]} {
+  const v = value as {units?: unknown};
+  if (!v || typeof v !== 'object' || !Array.isArray(v.units) || v.units.length > 200) throw Error('Placement unavailable');
+  const seen = new Set<number>(), names = new Set<string>();
+  const units = v.units.map((u: any): VrmPlacementUnit => {
+    const name = typeof u?.name === 'string' ? u.name.replace(/\s+/g, ' ').trim().toUpperCase() : '';
+    if (!u || !Number.isSafeInteger(u.installationId) || u.installationId < 1 || seen.has(u.installationId) || !/^HELIOS \d{1,3}$/.test(name) || names.has(name)
+      || u.placement !== 'FIELD' && u.placement !== 'SHOP' || u.zip !== null && u.zip !== undefined && !(typeof u.zip === 'string' && /^\d{5}$/.test(u.zip))) throw Error('Placement inconsistent');
+    seen.add(u.installationId); names.add(name);
+    return {installationId: u.installationId, name: u.name, placement: u.placement, zip: u.placement === 'FIELD' ? u.zip ?? null : null};
+  });
+  return {units};
+}

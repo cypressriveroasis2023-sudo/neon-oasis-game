@@ -31,15 +31,38 @@ export function parseMppt(value: unknown, now = Date.now()): Map<number, Mppt> |
   return out;
 }
 
-export async function readVrmMppt(fetcher: typeof fetch = fetch, token?: string | null): Promise<Map<number, Mppt> | null> {
+/** Field or Shop for one Helios, from mHelp's own current list. ZIP only for Field units. */
+export type MhelpPlace = {name: string; placement: 'FIELD' | 'SHOP'; zip: string | null};
+/** The `placements` part of the same answer. Anything odd means no placement from here, never a guess. */
+export function parsePlacements(value: unknown): MhelpPlace[] | null {
+  const list = (value as {placements?: unknown} | null)?.placements;
+  if (!Array.isArray(list) || list.length > 200) return null;
+  const out: MhelpPlace[] = [], names = new Set<string>();
+  for (const raw of list) {
+    const u = raw as Record<string, unknown> | null;
+    const name = typeof u?.name === 'string' ? u.name.replace(/\s+/g, ' ').trim().toUpperCase() : '';
+    if (!u || !/^HELIOS \d{1,3}$/.test(name) || names.has(name) || u.placement !== 'FIELD' && u.placement !== 'SHOP'
+      || u.zip !== null && u.zip !== undefined && !(typeof u.zip === 'string' && /^\d{5}$/.test(u.zip))) return null;
+    names.add(name);
+    out.push({name, placement: u.placement, zip: u.placement === 'FIELD' ? (u.zip as string | null | undefined) ?? null : null});
+  }
+  return out;
+}
+
+/** One read: the charger readings and, with them, mHelp's Field/Shop for every Helios. */
+export async function readVrmExtras(fetcher: typeof fetch = fetch, token?: string | null): Promise<{mppt: Map<number, Mppt> | null; places: MhelpPlace[] | null}> {
   try {
     const access = token === undefined ? await readParentAccessToken() : token;
-    if (!access) return null;
+    if (!access) return {mppt: null, places: null};
     const response = await fetcher(URL_, {method: 'POST', headers: {Authorization: 'Bearer ' + access, 'Content-Type': 'application/json'},
       body: JSON.stringify({action: 'read'}), cache: 'no-store'});
-    if (!response.ok) return null;
-    return parseMppt(await response.json());
-  } catch { return null; }
+    if (!response.ok) return {mppt: null, places: null};
+    const body = await response.json();
+    return {mppt: parseMppt(body), places: parsePlacements(body)};
+  } catch { return {mppt: null, places: null}; }
+}
+export async function readVrmMppt(fetcher: typeof fetch = fetch, token?: string | null): Promise<Map<number, Mppt> | null> {
+  return (await readVrmExtras(fetcher, token)).mppt;
 }
 
 /** The charger is reporting now (not an unplugged unit's last saved numbers). */

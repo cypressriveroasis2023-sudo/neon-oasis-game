@@ -20,6 +20,20 @@ export function heliosPlacement(name: string, inventory: readonly InventoryUnit[
   return matches.length === 1 ? inventoryPlacement(matches[0] as Parameters<typeof inventoryPlacement>[0]) : 'unknown';
 }
 
+/**
+ * The saved equipment list decides Field or Shop. It does not hold every Helios (011-020 were never added),
+ * so for a Helios it has no record of at all, mHelp's own current list answers instead. A Helios the saved
+ * list does have keeps the saved answer, including "unknown, needs review".
+ */
+export function withMhelpPlacement<T extends {unitNumber?: unknown}>(inventory: readonly T[] | null, places: readonly {name: string; placement: 'FIELD' | 'SHOP'; zip: string | null}[] | null | undefined): (T | InventoryUnit)[] | null {
+  if (!places?.length) return inventory as T[] | null;
+  const have = new Set((inventory ?? []).map(unit => typeof unit?.unitNumber === 'string' ? canonicalCameraUnit(unit.unitNumber) : null));
+  const extra = places.filter(place => { const key = canonicalCameraUnit(place.name); return !!key?.startsWith('HELIOS|') && !have.has(key); })
+    // "US 77493" is all the address the weather needs: it aims the forecast at the ZIP area.
+    .map(place => ({unitNumber: place.name, placement: place.placement, placementSource: 'mhelp_current_list', ...(place.zip ? {address: 'US ' + place.zip} : {})}) as InventoryUnit);
+  return extra.length ? [...(inventory ?? []), ...extra] : inventory as T[] | null;
+}
+
 export function placementLabel(placement: VictronPlacement): string {
   return placement === 'field' ? 'Field' : placement === 'shop' ? 'Shop' : 'Placement unknown';
 }

@@ -13,7 +13,8 @@ import {boardPowerByUnit, type BoardPower} from './cosBoard/boardPower';
 import {heliosSpots, readSunForecast, sunOutlook, type OutlookDay, type SunDay} from './vrmWeather';
 import {getVrmFleet} from './vrmFleetApi';
 import {readVrmHistory, type HistoryPoint} from './vrmHistory';
-import {readVrmMppt, type Mppt} from './vrmMppt';
+import {readVrmExtras, type MhelpPlace, type Mppt} from './vrmMppt';
+import {withMhelpPlacement} from './victronAttention';
 import {readRouterDetails, readRouterTrend} from './routerDetails';
 import {boardEditState, handFixRequest, type BoardEditFlags, type BoardEditState, type BoardFixStep} from './cosBoard/boardEdit';
 import {mountCosBoard} from './cosBoard/boardApp';
@@ -97,15 +98,17 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
   // Saved Victron history (best-effort, every 15 minutes): last night's low and history flags on Helios cards.
   const [history, setHistory] = useState<Map<number, HistoryPoint[]> | null>(null);
   const [mppt, setMppt] = useState<Map<number, Mppt> | null>(null);
+  // mHelp's own Field/Shop for any Helios the saved equipment list does not hold (so its site gets a forecast too).
+  const [places, setPlaces] = useState<MhelpPlace[] | null>(null);
   useEffect(() => {
     let live = true;
     const read = () => {
       void readVrmHistory().then(units => { if (live && units) setHistory(new Map(units.map(u => [u.installationId, u.points]))); });
-      void readVrmMppt().then(map => { if (live && map) setMppt(map); });
+      void readVrmExtras().then(extra => { if (!live) return; if (extra.mppt) setMppt(extra.mppt); if (extra.places) setPlaces(extra.places); });
     };
     read();
     const timer = window.setInterval(() => { if (document.visibilityState === 'visible') read(); }, 15 * 60 * 1000);
-    const drop = () => { setHistory(null); setMppt(null); };
+    const drop = () => { setHistory(null); setMppt(null); setPlaces(null); };
     window.addEventListener('cos-private-data-invalidated', drop);
     return () => { live = false; window.clearInterval(timer); window.removeEventListener('cos-private-data-invalidated', drop); };
   }, []);
@@ -113,8 +116,8 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
   const [sky, setSky] = useState<Map<string, SunDay[]> | null>(null);
   const spots = useMemo(() => {
     const m = fieldMap as {inventoryItems?: unknown; items?: unknown} | null | undefined;
-    return heliosSpots(Array.isArray(m?.inventoryItems) ? m.inventoryItems : Array.isArray(m?.items) ? m.items : null);
-  }, [fieldMap]);
+    return heliosSpots(withMhelpPlacement(Array.isArray(m?.inventoryItems) ? m.inventoryItems as {unitNumber?: unknown}[] : Array.isArray(m?.items) ? m.items as {unitNumber?: unknown}[] : null, places));
+  }, [fieldMap, places]);
   const spotsKey = [...spots].map(([k, v]) => k + '@' + v.lat + ',' + v.lon).join(';');
   useEffect(() => {
     if (!spotsKey) return;
