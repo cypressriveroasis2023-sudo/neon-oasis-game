@@ -2,10 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {PGlite} from '@electric-sql/pglite';
-import {parseMppt, readVrmMppt, mpptFresh, mpptFlags, mpptLine, peerYield, solarDays} from '../src/vrmMppt.ts';
-import {victronNeedsAttention} from '../src/victronAttention.ts';
+import {parseMppt, parsePlacements, readVrmExtras, readVrmMppt, mpptFresh, mpptFlags, mpptLine, peerYield, solarDays} from '../src/vrmMppt.ts';
+import {heliosPlacement, victronNeedsAttention, withMhelpPlacement} from '../src/victronAttention.ts';
+import {heliosSpots} from '../src/vrmWeather.ts';
 import {hadRoomYesterday} from '../src/vrmHistory.ts';
-import {safeVrmMppt} from '../../supabase/functions/cos-vrm-mppt-read/read.ts';
+import {safeVrmMppt, safeVrmPlacement} from '../../supabase/functions/cos-vrm-mppt-read/read.ts';
 
 const local = (day, hour, min = 0) => new Date(2026, 10, day, hour, min).getTime();
 const NOW = local(26, 11), S = Math.round(NOW / 1000);
@@ -159,4 +160,62 @@ test('late evening, units are compared on the same day and against that day\'s b
   assert.match(today[0].line, /Panels made 0.2 kWh today · the others made about 0.84 kWh/);
   assert.deepEqual(victronNeedsAttention(units, rows, inventory, late, new Map([[1, day(25, 70)]]), null, null, mppt).filter(i => i.kind === 'panel'), []);
   assert.equal(hadRoomYesterday(day(26, 70), late, 0), true); assert.equal(hadRoomYesterday(day(26, 70), late), false);
+});
+
+// The saved equipment list only holds HELIOS 001-010. mHelp's own current list places the rest.
+const place = (n, placement, zip = null) => ({installationId: 7000 + n, name: 'HELIOS ' + String(n).padStart(3, '0'), placement, zip});
+
+test('database read: Field/Shop from mHelp for each Helios with exactly one current record, service role only', async () => {
+  const db = new PGlite();
+  await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
+    create schema cos_vrm_private; create schema cos_mhelp_placement_private;
+    create table cos_vrm_private.installations(installation_id bigint primary key, name text not null);
+    create table cos_mhelp_placement_private.census_mhelp_current_coverage(product_id text, unit_number text, placement text, zip text);
+    insert into cos_vrm_private.installations values(7011,'HELIOS 011'),(7012,'HELIOS 012'),(7013,'HELIOS 013'),(7014,'HELIOS 014'),(7015,'HELIOS 015'),(7099,'Shop bench');
+    insert into cos_mhelp_placement_private.census_mhelp_current_coverage values
+      ('1','Helios 011','FIELD','77493-1234'),('2','Helios  012','SHOP','77040'),
+      ('3','Helios 013','FIELD','77001'),('4','HELIOS 013','SHOP',null),     -- two records: left out
+      ('5','Helios 014','UNKNOWN',null),                                      -- not Field or Shop: left out
+      ('6','Shop bench','SHOP',null);                                         -- not a Helios: left out`);
+  await db.exec(readFileSync(new URL('../db/20261127_cos_vrm_placement_read.sql', import.meta.url), 'utf8'));
+  const out = (await db.query('select public.cos_vrm_placement_read() v')).rows[0].v;
+  assert.deepEqual(out, {units: [{installationId: 7011, name: 'HELIOS 011', placement: 'FIELD', zip: '77493'}, {installationId: 7012, name: 'HELIOS 012', placement: 'SHOP', zip: null}]});
+  assert.equal(safeVrmPlacement(out).units.length, 2);
+  for (const role of ['anon', 'authenticated']) { await db.exec('begin; set local role ' + role); await assert.rejects(db.query('select public.cos_vrm_placement_read()'), /permission denied/); await db.exec('rollback'); }
+});
+
+test('placement answer: bounded and exact on both sides; anything odd means no placement, never a guess', async () => {
+  const good = [place(11, 'FIELD', '77493'), place(12, 'SHOP')];
+  assert.deepEqual(safeVrmPlacement({units: good}).units, good);
+  assert.deepEqual(parsePlacements({units: [], placements: good}), [{name: 'HELIOS 011', placement: 'FIELD', zip: '77493'}, {name: 'HELIOS 012', placement: 'SHOP', zip: null}]);
+  for (const bad of [[place(11, 'FIELD'), place(11, 'SHOP')], [{...place(11, 'FIELD'), placement: 'YARD'}], [{...place(11, 'FIELD'), zip: '7749'}], [{...place(11, 'FIELD'), name: 'Shop bench'}]]) {
+    assert.throws(() => safeVrmPlacement({units: bad})); assert.equal(parsePlacements({placements: bad}), null);
+  }
+  assert.equal(parsePlacements({units: []}), null); assert.equal(parsePlacements({placements: null}), null); assert.equal(parsePlacements(null), null);
+  // One read carries both; the charger readings do not depend on the placement part.
+  const S3 = Math.round(Date.now() / 1000) - 120;
+  const both = await readVrmExtras(async () => Response.json({units: [unit(1, {observedAt: S3})], placements: good}), 't');
+  assert.equal(both.mppt.size, 1); assert.equal(both.places.length, 2);
+  const noPlace = await readVrmExtras(async () => Response.json({units: [unit(1, {observedAt: S3})], placements: null}), 't');
+  assert.equal(noPlace.mppt.size, 1); assert.equal(noPlace.places, null);
+  assert.deepEqual(await readVrmExtras(async () => new Response('', {status: 503}), 't'), {mppt: null, places: null});
+});
+
+test('the saved list decides; mHelp answers only for a Helios the saved list does not have at all', () => {
+  const saved = [
+    {unitNumber: 'HELIOS 001', effectivePlacement: {contract: 'COS_EFFECTIVE_FLEET_PLACEMENT_V1', state: 'field'}},
+    {unitNumber: 'HELIOS 002', effectivePlacement: {contract: 'COS_EFFECTIVE_FLEET_PLACEMENT_V1', state: 'unknown'}},   // held for review: stays unknown
+    {unitNumber: 'Spotter 230', placement: 'FIELD'},
+  ];
+  const places = [{name: 'HELIOS 001', placement: 'SHOP', zip: null}, {name: 'HELIOS 002', placement: 'FIELD', zip: '77001'},
+    {name: 'HELIOS 011', placement: 'FIELD', zip: '77493'}, {name: 'HELIOS 012', placement: 'SHOP', zip: null}];
+  const merged = withMhelpPlacement(saved, places);
+  assert.equal(merged.length, 5);
+  assert.deepEqual(['HELIOS 001', 'HELIOS 002', 'HELIOS 011', 'HELIOS 012', 'HELIOS 013'].map(n => heliosPlacement(n, merged)), ['field', 'unknown', 'field', 'shop', 'unknown']);
+  assert.deepEqual(['HELIOS 011', 'HELIOS 012'].map(n => heliosPlacement(n, saved)), ['unknown', 'unknown']);   // what the page did before
+  // A Field unit placed by mHelp gets its ZIP-area forecast; a Shop unit gets none.
+  assert.equal(heliosSpots(saved).size, 0); assert.equal(heliosSpots(merged).size, 1); assert.match([...heliosSpots(merged).keys()][0], /^HELIOS\|0*11$/);
+  // Nothing from mHelp: the saved list is returned untouched. No saved list at all: mHelp still places every Helios.
+  assert.equal(withMhelpPlacement(saved, null), saved); assert.equal(withMhelpPlacement(saved, []), saved); assert.equal(withMhelpPlacement(null, null), null);
+  assert.deepEqual(['HELIOS 001', 'HELIOS 012'].map(n => heliosPlacement(n, withMhelpPlacement(null, places))), ['shop', 'shop']);
 });
