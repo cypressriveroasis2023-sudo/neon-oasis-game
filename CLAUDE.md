@@ -65,6 +65,33 @@ Newest first. One line: date, what changed, what to watch.
   the down alert's fixed advice line; `cos_router_details_v1` adds `nightDrops`. All anchored
   replaces. No audit row, no cron change. Record in
   `tech-checks/docs/db-changes/20261127_router_power_drops.sql`.
+- **2026-11-27** — **Sweep not publishing since 08:45 UTC**, cause outside the sweep: mHelpDesk
+  rejected the saved authorization at 08:01 (`cos-mhelp-readiness` 409 `reconnect_required`),
+  `cos-mhelp-inventory-sync` has returned 503 since 08:05, and from 08:45
+  `cos-sheets-placement-publish/endpoint-source` answers 503 `inventory_not_current`, so the
+  direct collector holds all 44 Snipers / CAM Vs ("Native source refused" in the sweep log;
+  published 0, unverified 44). It clears when someone with the login reconnects mHelpDesk in
+  the app; no code change is involved and none should be made to get around it.
+- **2026-11-27** — `public.cos_sweep_watchdog_check_v1()` **crashes whenever it has a reason to
+  record** (`text[] || 'literal'` → malformed array literal), so it logged nothing through the
+  26 Nov refusal or today's hold. Fix **prepared, not applied** (needs James's go):
+  `tech-checks/docs/db-changes/20261127_sweep_watchdog_reasons_fix.md`. Until then do not
+  trust `cos_sweep_watchdog_recent_v1` showing `ok`; check `cron.job_run_details` for job 15.
+- **2026-11-27** — Deployed `cos-unit-camera-status/last-direct-check-v25` (#572, 15:20 UTC,
+  James's go): live now **v26 `d1136141`** (pins updated). Each IP-checked unit carries
+  `directCheck`, so the board's router second witness (`boardData.routerWitness`) is now
+  **on**: a Sniper or CAM V whose own check has no current reading may read Up or Down on a
+  single fresh InHand report that agrees with what the check last found. Rollback
+  `rollback-to-v25-entry` turns it off again. A next patch to this function must start from v26.
+- **2026-11-27** — Router as a second witness for Snipers / CAM Vs (board client merged; the
+  function patch was **prepared**, now deployed, see above). Operations patch
+- **2026-11-27** — Operations: Helios Field/Shop from mHelp's own list. New read-only
+  `public.cos_vrm_placement_read()` (service role only) and `cos-vrm-mppt-read` **v2**, whose answer
+  now also carries `placements`. Why: `equipment_units` only holds HELIOS 001-010, so the Victron
+  page could not place 011-020. The saved list still decides; mHelp answers only for a Helios the
+  saved list has no record of (`withMhelpPlacement`). Watch: if HELIOS 011-020 are ever added to
+  `equipment_units`, the saved answer takes over for them. Record and rollback:
+  `tech-checks/docs/db-changes/20261127_cos_vrm_placement_read.md`.
 - **2026-11-26** — Tech Check: router signal history **live** (#561). New
   `inhand_private.signal_history` (8 days), filled once per pull by
   `public.cos_router_signal_record_v1()`, which `cos_router_down_alerts_v1` now calls first

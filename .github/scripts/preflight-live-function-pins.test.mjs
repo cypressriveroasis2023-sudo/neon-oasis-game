@@ -6,10 +6,10 @@ import {LIVE_FUNCTION_PINS, livePinsMatch} from './preflight-live-function-pins.
 
 const source = readFileSync(new URL('./preflight-live-function-pins.mjs', import.meta.url));
 
-test('the live archive pins record camera v25 and operations-pages v170 and the file writes nothing', () => {
-  assert.equal(createHash('sha256').update(source).digest('hex'), 'cf718bb9497b4e7ffe7af4dce2c23076cbcf59f2b39859cfa2a1def3e38be280');
-  assert.equal(LIVE_FUNCTION_PINS['cos-unit-camera-status'].version, 25);
-  assert.equal(LIVE_FUNCTION_PINS['cos-unit-camera-status'].ezbr_sha256, '2927fdeb1804593b7420fae10289dd5daf1e5377845f895b7e1e3d3c12eca38e');
+test('the live archive pins record camera v26 and operations-pages v170 and the file writes nothing', () => {
+  assert.equal(createHash('sha256').update(source).digest('hex'), '0b50c71f9c4a9eaa3263dbc71315b0b992179240f5d2f4ae3d163af771e24c18');
+  assert.equal(LIVE_FUNCTION_PINS['cos-unit-camera-status'].version, 26);
+  assert.equal(LIVE_FUNCTION_PINS['cos-unit-camera-status'].ezbr_sha256, 'd113614175d7a4f6633f562650b12a8f16c22f14655c41b211597b18b88a784f');
   assert.equal(LIVE_FUNCTION_PINS['cos-operations-pages'].version, 170);
   assert.equal(LIVE_FUNCTION_PINS['cos-operations-pages'].ezbr_sha256, '69802c4effb4fcee77d2bfbe0e117356f3834e102ff98aa8e723e24f82b99c8e');
   assert.equal(source.includes('fetch('), false);
