@@ -1,8 +1,9 @@
 -- Refresh runs the camera checks now.
 --
--- PREPARED, NOT APPLIED. Tech Check (goqrnolcvqnirjmzaeyk). Applying it needs James's go.
--- Apply this before deploying the Operations patch cos-unit-camera-status/check-now-v26:
--- that route calls this function and answers 503 until it exists.
+-- APPLIED 2026-11-27 ~21:59 UTC on Tech Check (goqrnolcvqnirjmzaeyk), James's go, as migration
+-- cos_check_now_v1, text exactly as below. Checked: anonymous call refused (42501); as the Owner
+-- at 22:00:04 UTC (rolled back) it answered scheduled_check_running, waitSeconds 71, twice.
+-- Operations patch cos-unit-camera-status/check-now-v26 deployed after it (live v27 81a7a8a5).
 --
 -- James, 27 Nov 2026: "I want to be able to click refresh and it will refresh and update
 -- for me. Can it be faster?" Until now the board's Refresh only re-read what the timer had

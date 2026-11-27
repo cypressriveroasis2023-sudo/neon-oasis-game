@@ -65,6 +65,13 @@ Newest first. One line: date, what changed, what to watch.
   adds `inventorySyncedAt`/`inventoryCurrent`, logs when it does. `/camera-snapshot-source` stays 45 min.
   Source and rollback: `tech-checks/docs/endpoint-source-inventory-grace-20261127/`. A next change to
   this function must start from that source once deployed.
+- **2026-11-27** — **Refresh runs the camera checks now: live** (James's go, ~22:00 UTC). Tech Check
+  `public.cos_check_now_v1()` + `app_private.cos_check_now_log` applied (migration `cos_check_now_v1`,
+  text as in `20261127_cos_check_now.sql`); then `cos-unit-camera-status/check-now-v26` deployed: live now
+  **v27 `81a7a8a5`** (pins updated, source record `tech-checks/docs/cos-unit-camera-status-v27-entry`).
+  A Refresh tap can start the same three calls as cron jobs 2, 4 and 5 (never within 75 s after a
+  quarter hour, 20 s before one, or 2 min after another tap). Rollback `rollback-to-v26-entry`, then drop
+  the function and table. A next patch to this function must start from v27.
 - **2026-11-27** — Refresh runs the camera checks now (**prepared, nothing applied or deployed**;
   each step needs James's go). Order: (1) Tech Check `public.cos_check_now_v1()` and
   `app_private.cos_check_now_log`, `tech-checks/docs/db-changes/20261127_cos_check_now.sql`: Owner
