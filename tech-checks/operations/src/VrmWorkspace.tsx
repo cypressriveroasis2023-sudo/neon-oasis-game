@@ -52,6 +52,18 @@ function readableTime(value:string|null) {
   return Number.isFinite(date.getTime()) ? date.toLocaleString(undefined, {timeZoneName:'short'}) : null;
 }
 
+const TILE_ICONS: Record<string, string> = {
+  sun: 'M12 7.5a4.5 4.5 0 1 0 0 9a4.5 4.5 0 0 0 0-9ZM12 2v2.2M12 19.8V22M2 12h2.2M19.8 12H22M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6',
+  moon: 'M20 14.2A8 8 0 0 1 9.8 4a8 8 0 1 0 10.2 10.2Z',
+  alert: 'M12 4 2.8 19.5h18.4L12 4ZM12 10v4.5M12 17.2v.3',
+  plug: 'M9 3v5M15 3v5M6.5 8h11v3.5a5.5 5.5 0 0 1-11 0V8ZM12 17v4',
+  bolt: 'M13 2.5 5 13.5h6l-1 8 8-11h-6l1-8Z',
+};
+/** Fine line icons for the tiles, drawn in the text colour. Decorative: the tile's reading is already hidden from screen readers. */
+function TileIcon({name}: {name: keyof typeof TILE_ICONS}) {
+  return <svg className='vrm-ico' viewBox='0 0 24 24' aria-hidden='true' focusable='false'><path d={TILE_ICONS[name]}/></svg>;
+}
+
 export default function VrmWorkspace({initialUnit,initialInstallationId,onSelectInstallation,canDiscover=true}:{canDiscover?:boolean;initialUnit?:number;initialInstallationId?:number;onSelectInstallation?:(installationId:number)=>void}) {
   const [privateInvalidated, setPrivateInvalidated] = useState(false);
   const valid = useRef(true);
@@ -205,22 +217,28 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
     {!loaded && loading && <p role='status'>Loading your Victron installations…</p>}
     {loaded && units.length === 0 && <div className='vrm-awaiting' role='status'><h3>No installations in the saved fleet</h3><p>{canDiscover ? 'Refresh the fleet to check the connected Victron account.' : 'No saved installations are available. Ask an Owner to check the fleet sync.'} No installation IDs or dashboards are assumed.</p></div>}
     {units.length > 0 && <nav className='tabs vrm-unit-grid' aria-label='Helios installations'>{ordered.map(item => <Fragment key={item.installationId}>
+      {placed > 0 && ordered[0]?.installationId === item.installationId && !inShop(item) && <p className='vrm-shop-divider vrm-field-divider'><b>In the field · {ordered.length - shopUnits.length}</b></p>}
       {shopUnits[0]?.installationId === item.installationId && <p className='vrm-shop-divider'><b>In the shop · {shopUnits.length}</b><span>Not powered is normal here. These are not counted as down.{shopOn.length > 0 ? ' Powered up now: ' + shopOn.map(u => u.name).join(', ') + '. If one is at a site, move it to Field in mHelp so its alerts switch on.' : ''}</span></p>}
       <button className={(selected === item.installationId ? 'selected' : 'secondary') + ' vrm-tone-' + tiles.get(item.installationId)!.tone + (shopOff(item) ? ' vrm-shop-off' : '')} aria-pressed={selected === item.installationId} onClick={() => select(item.installationId)}>
-      <span className='vrm-tile-head'><strong>{item.name}</strong>{heliosPlacement(item.name, inventory) !== 'unknown' && <em aria-hidden='true' className={'vrm-place vrm-place-'+heliosPlacement(item.name, inventory)}>{placementLabel(heliosPlacement(item.name, inventory))}</em>}</span>{(nameCounts.get(item.name) ?? 0) > 1 && <small>Installation {item.installationId}</small>}<small className={item.available === false ? 'vrm-tile-status' : 'vrm-sr-only'}>{item.available === false ? 'Unavailable in latest sync' : item.embedUrl ? 'Dashboard enabled' : 'Read-only power'}</small>
-      {(() => { const tile = tiles.get(item.installationId)!; if (shopOff(item)) return <span className='vrm-tile-reading' aria-hidden='true' title='In the shop and not powered. Not counted as down.'><span className='vrm-tile-idle'>Not powered</span><span className='vrm-tile-solar vrm-tile-seen'>{tile.lastSeen ? 'Last seen ' + shortDate(tile.lastSeen, now) : 'Never connected'}</span></span>; if (tile.tone === 'unavailable') return tile.lastSeen ? <span className='vrm-tile-reading' aria-hidden='true'><span className='vrm-tile-solar vrm-tile-seen'>Last seen {shortDate(tile.lastSeen, now)}</span></span> : null; return <span className='vrm-tile-reading' aria-hidden='true' title={toneLabel[tile.tone]}>
-        <span className='vrm-tile-soc'><i/>{tile.soc ? Math.round(tile.soc.value) + '%' : '—'}</span>
-        <span className='vrm-tile-bar'><b style={{width: (tile.soc ? Math.max(0, Math.min(100, tile.soc.value)) : 0) + '%'}}/></span>
+      <span className='vrm-tile-head'><strong>{item.name}</strong>{placed === 0 && heliosPlacement(item.name, inventory) !== 'unknown' && <em aria-hidden='true' className={'vrm-place vrm-place-'+heliosPlacement(item.name, inventory)}>{placementLabel(heliosPlacement(item.name, inventory))}</em>}</span>{(nameCounts.get(item.name) ?? 0) > 1 && <small>Installation {item.installationId}</small>}<small className={item.available === false ? 'vrm-tile-status' : 'vrm-sr-only'}>{item.available === false ? 'Unavailable in latest sync' : item.embedUrl ? 'Dashboard enabled' : 'Read-only power'}</small>
+      {(() => { const tile = tiles.get(item.installationId)!; const lastReading = tile.soc ? 'Last reading ' + shortDate(tile.soc.observedAt, now) : 'No reading yet';
+        if (shopOff(item)) return <span className='vrm-tile-reading' aria-hidden='true' title='In the shop and not powered. Not counted as down.'>
+          <span className='vrm-ring vrm-ring-off'><svg viewBox='0 0 64 64'><circle className='vrm-ring-track' cx='32' cy='32' r='27'/></svg><span className='vrm-tile-idle'>Off</span></span>
+          <span className='vrm-tile-solar'>Not powered</span><span className='vrm-tile-solar vrm-tile-seen'>{tile.soc ? 'since ' + shortDate(tile.soc.observedAt, now) : 'no reading yet'}</span></span>; if (tile.tone === 'unavailable') return tile.lastSeen ? <span className='vrm-tile-reading' aria-hidden='true'><span className='vrm-tile-solar vrm-tile-seen'>Last seen {shortDate(tile.lastSeen, now)}</span></span> : null; return <span className='vrm-tile-reading' aria-hidden='true' title={toneLabel[tile.tone]}>
+        <span className='vrm-ring'>
+          <svg viewBox='0 0 64 64'><circle className='vrm-ring-track' cx='32' cy='32' r='27'/><circle className='vrm-ring-fill' cx='32' cy='32' r='27' pathLength={100} strokeDasharray={(tile.soc ? Math.max(0, Math.min(100, tile.soc.value)) : 0) + ' 100'}/></svg>
+          <span className={'vrm-tile-soc' + (tile.soc && Math.round(tile.soc.value) >= 100 ? ' vrm-soc-full' : '')}>{tile.soc ? <>{Math.round(tile.soc.value)}<small>%</small></> : '—'}</span>
+        </span>
         {tile.tone === 'stale' || tile.tone === 'none'
-          ? <span className='vrm-tile-solar vrm-tile-seen'>{tile.lastSeen ? 'Last seen ' + shortDate(tile.lastSeen, now) : 'Never connected'}</span>
-          : <span className='vrm-tile-solar'>☀ {tile.solar ? Math.round(tile.solar.value) + ' ' + tile.solar.unit : '—'}</span>}
+          ? <span className='vrm-tile-solar vrm-tile-seen'>{lastReading}</span>
+          : <span className='vrm-tile-solar'><TileIcon name='sun'/>{tile.solar ? Math.round(tile.solar.value) + ' ' + tile.solar.unit : '—'}</span>}
         {tile.alarms.length > 0
-          ? <span className={'vrm-tile-alarm vrm-alarm-' + tile.alarms[0].level}>⚠ {tile.alarms[0].kind}{tile.alarms[0].level === 1 ? ' warning' : ''}</span>
+          ? <span className={'vrm-tile-alarm vrm-alarm-' + tile.alarms[0].level}><TileIcon name='alert'/><span>{tile.alarms[0].kind}</span></span>
           : (t => t && (t.verdict === 'low' || t.verdict === 'tight')
-            ? <span className={'vrm-tile-night vrm-night-' + t.verdict} title={tonightHeadline(t)}>{t.verdict === 'low' ? (t.floorAt !== null ? '🌙 20% by ' + new Date(t.floorAt * 1000).toLocaleTimeString(undefined, {hour: 'numeric', minute: '2-digit'}) : '🌙 Low tonight') : '🌙 Tight tonight'}</span>
+            ? <span className={'vrm-tile-night vrm-night-' + t.verdict} title={tonightHeadline(t)}><TileIcon name='moon'/>{t.verdict === 'low' ? (t.floorAt !== null ? '20% by ' + new Date(t.floorAt * 1000).toLocaleTimeString(undefined, {hour: 'numeric', minute: '2-digit'}) : 'Low tonight') : 'Tight tonight'}</span>
             : null)(tonight.get(item.installationId)) || tile.flow && <span className={'vrm-tile-flow vrm-flow-' + tile.flow.state} title={tile.flow.state === 'charging' ? 'Charging' : tile.flow.state === 'draining' ? 'Draining' : 'Idle'}>{tile.flow.state === 'idle' ? 'Idle' : (tile.flow.state === 'charging' ? '↑ ' : '↓ ') + (tile.flow.watts !== null ? Math.abs(tile.flow.watts) + ' W' : tile.flow.amps !== null ? Math.abs(tile.flow.amps) + ' A' : '') + (tile.flow.state === 'charging' ? ' in' : ' out')}</span>}
-        {(r => r && r.status !== 'none' && <span className={'vrm-tile-low vrm-lvl-' + nightLevel(r)} title={night?.done ? 'Lowest battery last night (5 PM–7 AM)' : 'Lowest battery so far tonight'}>{r.status === 'power' ? '🔌 Plugged in' : '🌙 Low ' + r.low + '%'}</span>)(nightRows.get(item.installationId))}
-        {inShop(item) && tile.fresh && <span className='vrm-tile-shopon' title='Powered up, but mHelp still says Shop. Shop units do not raise alerts.'>⚡ Powered up</span>}
+        {(r => r && r.status !== 'none' && <span className={'vrm-tile-low vrm-lvl-' + nightLevel(r)} title={night?.done ? 'Lowest battery last night (5 PM–7 AM)' : 'Lowest battery so far tonight'}><TileIcon name={r.status === 'power' ? 'plug' : 'moon'}/>{r.status === 'power' ? 'Plugged in' : 'Low ' + r.low + '%'}</span>)(nightRows.get(item.installationId))}
+        {inShop(item) && tile.fresh && <span className='vrm-tile-shopon' title='Powered up, but mHelp still says Shop. Shop units do not raise alerts.'><TileIcon name='bolt'/>Powered up</span>}
       </span>; })()}
     </button></Fragment>)}</nav>}
     {unit && <>

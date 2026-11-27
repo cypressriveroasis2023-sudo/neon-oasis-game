@@ -22,23 +22,24 @@ export default function VrmTechGuide() {
     <div className='vrm-guide-body'>
       <h5>1. Unit tiles</h5>
       <ul className='vrm-guide-keys'>
-        <li><i className='g-good'/>Green — battery 50% or more.</li>
+        <li><i className='g-good'/>The ring is the battery; the number inside is the percent. Green — 50% or more.</li>
         <li><i className='g-fair'/>Amber — battery 20–49%, or a Victron warning.</li>
         <li><i className='g-low'/>Red — battery under 20%, or a Victron alarm.</li>
-        <li><i className='g-stale'/>Grey — no reading in the last 45 minutes. "Last seen" shows when it last reported.</li>
+        <li><i className='g-stale'/>Grey — no reading in the last 45 minutes. "Last reading" shows when it last reported.</li>
         <li><i className='g-off'/>Faded, dashed — not in the latest Victron sync.</li>
-        <li><i className='g-shop'/>"Not powered", under "In the shop" — mHelp says the unit is in the shop and it is switched off. That is normal. It is not counted as down and never raises an alert. When it goes to a site and mHelp says Field, it joins the alerts by itself.</li>
-        <li><i className='g-shop'/>"⚡ Powered up" on a Shop tile — the unit is running but mHelp still says Shop. If it is at a site, move it to Field in mHelp so its alerts switch on.</li>
+        <li><i className='g-shop'/>A dotted ring marked OFF, under "In the shop" — mHelp says the unit is in the shop and it is switched off. That is normal. "Not powered since" shows its last reading. It is not counted as down and never raises an alert. When it goes to a site and mHelp says Field, it joins the alerts by itself.</li>
+        <li><i className='g-shop'/>"Powered up" on a Shop tile — the unit is running but mHelp still says Shop. If it is at a site, move it to Field in mHelp so its alerts switch on.</li>
       </ul>
       <ul className='vrm-guide-symbols'>
-        <li><b>☀ 380 W</b> — solar coming in right now.</li>
+        <li><b>Sun · 380 W</b> — solar coming in right now.</li>
         <li><b className='g-in'>↑ 203 W in</b> — battery charging.</li>
         <li><b className='g-out'>↓ 37 W out</b> — battery draining.</li>
-        <li><b>🌙 20% by 3:40 AM</b> — will run low tonight (shown from 5 PM to 7 AM).</li>
-        <li><b>🌙 Low 72%</b> — lowest battery last night (5 PM–7 AM). Green 50%+, yellow 20–49%, red under 20%.</li>
-        <li><b>🔌 Plugged in</b> — stayed full all night on outside power. Nothing to do.</li>
+        <li><b>Moon · 20% by 3:40 AM</b> — will run low tonight (shown from 5 PM to 7 AM).</li>
+        <li><b>Moon · Low 72%</b> — lowest battery last night (5 PM–7 AM). Green 50%+, yellow 20–49%, red under 20%.</li>
+        <li><b>Plug · Plugged in</b> — stayed full all night on outside power. Nothing to do.</li>
         <li><b>Panels line</b> (on a unit's chart) — what the panels made today and yesterday in kWh, today's peak watts, and panel voltage. A healthy sunny day is about 0.8–1.1 kWh. The charger starts counting its next day a few hours after dark; the page still shows the day that just ended as today until midnight.</li>
-        <li><b>FIELD / SHOP</b> — where mHelp says the unit is.</li>
+        <li><b>In the field / In the shop</b> — where the unit is. The saved equipment list decides; for a Helios it does not have, mHelp's own list answers.</li>
+        <li><b>Champagne outline</b> — the unit you have selected. It is not a warning.</li>
       </ul>
       <h5>2. Needs attention</h5>
       <p>Field units only, most urgent at the top. Tap a name to open that unit.</p>

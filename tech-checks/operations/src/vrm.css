@@ -196,3 +196,72 @@ html[data-theme='light'] .vrm-fleet-summary li,html[data-theme='light'] .vrm-wor
 .vrm-fleet-summary .vrm-tone-fair{border-left-color:var(--vt-fair)}.vrm-fleet-summary .vrm-tone-shop{border-left-color:#3b82f6}
 html[data-theme='light'] .vrm-shop-divider{color:#40586c}html[data-theme='light'] .vrm-shop-divider b,html[data-theme='light'] .vrm-tile-idle,html[data-theme='light'] .vrm-tile-shopon{color:#1d4ed8}
 .g-shop{background:#3b82f6}
+/* Unit tiles, refined look (2026-11-27): graphite cards, a fine champagne line, a ring for the battery.
+   Colour still carries the meaning: green, amber, red. Selected is champagne, never red. */
+.vrm-workspace{--vt-lux:#d8bf8a;--vt-lux-soft:rgba(216,191,138,.34);--vt-lux-faint:rgba(216,191,138,.13);--vt-ink:#f6f0e4;--vt-emerald:#52d8a2;--vt-amber:#ecbb62;--vt-ruby:#f25d70;--vt-mute:#8f97a6}
+.vrm-workspace .tabs.vrm-unit-grid{gap:10px}
+#root#root .operations-shell .vrm-workspace .vrm-unit-grid button{align-items:center;justify-content:flex-start;gap:7px;min-height:0;padding:13px 6px 11px!important;text-align:center;border-radius:16px;background:radial-gradient(130% 85% at 50% 0%,#1b202b 0%,#11141b 52%,#0b0d12 100%)!important;border:1px solid var(--vt-lux-faint)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.055),0 8px 20px rgba(0,0,0,.36)!important;color:var(--vt-ink)!important;transition:border-color .2s ease,box-shadow .2s ease}
+#root#root .operations-shell .vrm-workspace .vrm-unit-grid button strong{font-size:10px;font-weight:600;letter-spacing:.17em;color:var(--vt-lux)}
+#root#root .operations-shell .vrm-workspace .vrm-unit-grid button.selected{background:radial-gradient(130% 85% at 50% 0%,#2a2a2c 0%,#17161a 55%,#0e0d10 100%)!important;border-color:var(--vt-lux)!important;box-shadow:0 0 0 1px var(--vt-lux-soft),0 10px 28px rgba(216,191,138,.17),inset 0 1px 0 rgba(255,255,255,.09)!important}
+#root#root .operations-shell .vrm-workspace .vrm-unit-grid button.selected strong{color:#fff1cf}
+#root#root .operations-shell .vrm-workspace .vrm-unit-grid button.vrm-tone-low:not(.selected){border-color:rgba(242,93,112,.42)!important}
+#root#root .operations-shell .vrm-workspace .vrm-unit-grid button.vrm-tone-unavailable{opacity:.62;border-style:dashed!important}
+.vrm-unit-grid .vrm-tile-head{justify-content:center;width:100%}
+.vrm-unit-grid .vrm-tile-reading{align-items:center;gap:5px;width:100%;min-width:0}
+.vrm-unit-grid .vrm-tone-good{--vt-tone:var(--vt-emerald)}.vrm-unit-grid .vrm-tone-fair{--vt-tone:var(--vt-amber)}.vrm-unit-grid .vrm-tone-low{--vt-tone:var(--vt-ruby)}
+.vrm-ring{position:relative;display:grid;place-items:center;width:64px;height:64px;margin:1px 0 3px;flex:none}
+.vrm-ring svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg);overflow:visible}
+.vrm-ring circle{fill:none;stroke-width:3.4}
+.vrm-ring-track{stroke:rgba(255,255,255,.075)}
+.vrm-ring-fill{stroke:var(--vt-tone,var(--vt-stale));stroke-linecap:round}
+.vrm-tone-good .vrm-ring-fill{filter:drop-shadow(0 0 3px rgba(82,216,162,.55))}.vrm-tone-fair .vrm-ring-fill{filter:drop-shadow(0 0 3px rgba(236,187,98,.55))}.vrm-tone-low .vrm-ring-fill{filter:drop-shadow(0 0 3px rgba(242,93,112,.6))}
+.vrm-unit-grid .vrm-tile-soc{position:relative;display:flex;align-items:baseline;gap:1px;font-size:21px;font-weight:300;letter-spacing:-.01em;line-height:1;color:var(--vt-ink)}
+.vrm-unit-grid .vrm-tile-soc small{font-size:10px;font-weight:500;color:var(--vt-lux)}
+.vrm-unit-grid .vrm-tone-stale .vrm-tile-soc,.vrm-unit-grid .vrm-tone-none .vrm-tile-soc{color:var(--vt-mute)}
+.vrm-ico{width:11px;height:11px;flex:none;margin-right:4px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.vrm-unit-grid .vrm-tile-solar,.vrm-unit-grid .vrm-tile-flow,.vrm-unit-grid .vrm-tile-alarm,.vrm-unit-grid .vrm-tile-night,.vrm-unit-grid .vrm-tile-low,.vrm-unit-grid .vrm-tile-shopon{display:flex;align-items:center;justify-content:center;max-width:100%;font-size:10.5px;font-weight:500;letter-spacing:.015em;line-height:1.25}
+.vrm-unit-grid .vrm-tile-solar{color:var(--vt-mute)}
+.vrm-unit-grid .vrm-flow-charging{color:var(--vt-emerald)}.vrm-unit-grid .vrm-flow-draining{color:#c7ad7c}.vrm-unit-grid .vrm-flow-idle{color:var(--vt-mute)}
+.vrm-unit-grid .vrm-tile-alarm{color:var(--vt-ruby);font-weight:650}.vrm-unit-grid .vrm-tile-alarm.vrm-alarm-1{color:var(--vt-amber)}
+.vrm-unit-grid .vrm-tile-night{font-weight:650}.vrm-unit-grid .vrm-night-low{color:var(--vt-ruby)}.vrm-unit-grid .vrm-night-tight{color:var(--vt-amber)}
+.vrm-unit-grid .vrm-tile-low{width:100%;margin-top:3px;padding-top:7px;border-top:1px solid rgba(255,255,255,.06);font-weight:600;font-variant-numeric:tabular-nums}
+.vrm-unit-grid .vrm-tile-low.vrm-lvl-good{color:var(--vt-emerald)}.vrm-unit-grid .vrm-tile-low.vrm-lvl-mid{color:var(--vt-amber)}.vrm-unit-grid .vrm-tile-low.vrm-lvl-low{color:var(--vt-ruby)}
+.vrm-unit-grid .vrm-tile-shopon{color:var(--vt-lux)}
+.vrm-unit-grid .vrm-tile-seen{white-space:normal;text-align:center;font-size:10px;opacity:.8}
+/* In the shop, not powered: the same card, at rest. */
+#root#root .operations-shell .vrm-workspace .vrm-unit-grid button.vrm-shop-off{background:linear-gradient(180deg,#12151c,#0c0e13)!important;border-color:rgba(255,255,255,.06)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.03)!important}
+#root#root .operations-shell .vrm-workspace .vrm-unit-grid button.vrm-shop-off:not(.selected) strong{color:#9b917a}
+.vrm-ring-off .vrm-ring-track{stroke:rgba(255,255,255,.06);stroke-dasharray:2 4}
+.vrm-unit-grid .vrm-tile-idle{position:relative;font-size:10px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--vt-mute)}
+/* Section lines: In the field, In the shop. */
+.vrm-shop-divider{align-items:center;gap:4px 12px;margin:12px 0 0;padding:0 2px;border-top:0;color:var(--vt-mute)}
+.vrm-shop-divider:first-child{margin-top:2px}
+.vrm-shop-divider b{display:flex;align-items:center;gap:10px;flex:1 0 100%;font-size:10.5px;font-weight:600;letter-spacing:.2em;color:var(--vt-lux)}
+.vrm-shop-divider b::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--vt-lux-soft),transparent)}
+.vrm-shop-divider span{font-size:11.5px}
+/* The four numbers on top, in the same hand. */
+.vrm-fleet-summary li{position:relative;padding:13px 14px 12px;border:1px solid var(--vt-lux-faint);border-left-width:1px;border-radius:14px;background:radial-gradient(130% 90% at 0% 0%,#1a1f29 0%,#10131a 60%,#0b0d12 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+.vrm-fleet-summary li::before{content:'';position:absolute;top:14px;right:14px;width:7px;height:7px;border-radius:50%;background:var(--vt-mute)}
+.vrm-fleet-summary .vrm-tone-good::before{background:var(--vt-emerald);box-shadow:0 0 8px rgba(82,216,162,.7)}.vrm-fleet-summary .vrm-tone-low::before{background:var(--vt-ruby)}.vrm-fleet-summary .vrm-tone-fair::before{background:var(--vt-amber);box-shadow:0 0 8px rgba(236,187,98,.7)}.vrm-fleet-summary .vrm-tone-shop::before{background:var(--vt-lux)}
+.vrm-fleet-summary strong{font-size:25px;font-weight:300;letter-spacing:-.01em;color:var(--vt-ink)}
+.vrm-fleet-summary span{font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--vt-mute)}
+html[data-theme='light'] #root#root .operations-shell .vrm-workspace .vrm-unit-grid button{background:linear-gradient(180deg,#fff,#f6f2ea)!important;border-color:#e2d6bd!important;box-shadow:0 4px 12px rgba(40,30,10,.07)!important;color:#1d232c!important}
+html[data-theme='light'] #root#root .operations-shell .vrm-workspace .vrm-unit-grid button strong,html[data-theme='light'] .vrm-shop-divider b,html[data-theme='light'] .vrm-unit-grid .vrm-tile-soc small{color:#8a6d2f}
+html[data-theme='light'] #root#root .operations-shell .vrm-workspace .vrm-unit-grid button.selected{background:linear-gradient(180deg,#fffaf0,#f3e9d2)!important;border-color:#b8964a!important;box-shadow:0 0 0 1px #d8bf8a,0 8px 20px rgba(184,150,74,.2)!important}
+html[data-theme='light'] .vrm-unit-grid .vrm-tile-soc,html[data-theme='light'] .vrm-fleet-summary strong{color:#1d232c}html[data-theme='light'] .vrm-ring-track{stroke:rgba(0,0,0,.09)}
+html[data-theme='light'] .vrm-fleet-summary li{background:linear-gradient(180deg,#fff,#f6f2ea);border-color:#e2d6bd}html[data-theme='light'] .vrm-unit-grid .vrm-tile-low{border-top-color:rgba(0,0,0,.08)}
+#root#root .operations-shell .vrm-workspace .vrm-unit-grid button .vrm-tile-head strong{color:var(--vt-lux)}
+#root#root .operations-shell .vrm-workspace .vrm-unit-grid button.selected .vrm-tile-head strong{color:#fff1cf}
+#root#root .operations-shell .vrm-workspace .vrm-unit-grid button.vrm-shop-off:not(.selected) .vrm-tile-head strong{color:#9b917a}
+.vrm-unit-grid .vrm-tile-soc.vrm-soc-full{font-size:18px}
+.vrm-unit-grid .vrm-tile-alarm span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#root#root .operations-shell .vrm-workspace .vrm-unit-grid button .vrm-tile-head strong{color:var(--vt-lux)!important}
+#root#root .operations-shell .vrm-workspace .vrm-unit-grid button.selected .vrm-tile-head strong{color:#fff1cf!important}
+#root#root .operations-shell .vrm-workspace .vrm-unit-grid button.vrm-shop-off:not(.selected) .vrm-tile-head strong{color:#9b917a!important}
+.vrm-workspace .vrm-unit-grid .vrm-shop-divider b{color:var(--vt-lux)}
+.vrm-workspace .vrm-fleet-summary li,.vrm-workspace .vrm-fleet-summary li[class*='vrm-tone-']{border-left-color:var(--vt-lux-faint)}
+html[data-theme='light'] .vrm-workspace{--vt-lux:#8a6d2f;--vt-lux-soft:rgba(138,109,47,.42);--vt-lux-faint:rgba(138,109,47,.24);--vt-ink:#1d232c;--vt-emerald:#12936a;--vt-amber:#a8700c;--vt-ruby:#d23a4f;--vt-mute:#667085}
+html[data-theme='light'] #root#root .operations-shell .vrm-workspace .vrm-unit-grid button.selected .vrm-tile-head strong{color:#5c4514!important}
+html[data-theme='light'] #root#root .operations-shell .vrm-workspace .vrm-unit-grid button.vrm-shop-off{background:linear-gradient(180deg,#f7f5f0,#efece4)!important;border-color:#e0d9c8!important}
+html[data-theme='light'] #root#root .operations-shell .vrm-workspace .vrm-unit-grid button.vrm-shop-off:not(.selected) .vrm-tile-head strong{color:#8b826d!important}
+html[data-theme='light'] .vrm-unit-grid .vrm-flow-draining{color:#8a6d2f}html[data-theme='light'] .vrm-ring-off .vrm-ring-track{stroke:rgba(0,0,0,.14)}
