@@ -53,6 +53,11 @@ export type BoardUnit = {
   hp?: [number, number];
   ad?: string;
   rs: string; rt: number; rr: string; ro: number; rm: string; ri: ''; rp: '';
+  /**
+   * Set when COS's own check has gone quiet and the router's own report is what this
+   * line shows: `t` is then the router report's time and `wt` the check's last answer.
+   */
+  w?: 'r'; wt?: number;
   /** Helios only: the Victron battery and solar reading for this unit, matched by exact Helios number. */
   pw?: BoardPower;
 };
@@ -143,6 +148,47 @@ function notOnline(feed: UnitCameraStatus, place: 'field' | 'shop', now: number)
   return names.map(name => line(name).replace(/;/g, ',')).filter(Boolean).join(';');
 }
 
+/**
+ * The router's own cloud report. InHand is pulled every 30 minutes and does not
+ * go through COS's checker, so it still arrives when the checker cannot reach a
+ * carrier. No other router source counts: the rest are COS's own probe or imports.
+ */
+export const ROUTER_WITNESS_SOURCE = 'InHand live pull';
+/** A pull every 30 minutes, so a report older than 45 is no longer current. */
+export const ROUTER_WITNESS_FRESH_MS = 45 * 60 * 1000;
+/** How long a router report may stand in for a check that has gone quiet. */
+export const ROUTER_WITNESS_MAX_GAP_MS = 6 * 60 * 60 * 1000;
+
+export type RouterWitness = {state: 'online' | 'offline'; at: string; checkAt: string};
+
+/**
+ * COS's own check of a Sniper or CAM V can go quiet while the unit is fine: on
+ * 26 Nov 2026 the carrier refused the checker for three and a half hours and the
+ * routers reported online throughout. When that check is no longer current, the
+ * unit's router may speak for it, but only to agree with what the check last found:
+ *
+ *   the check last said Online, and the router now reports online   -> Up
+ *   the check last confirmed an outage, and the router reports offline -> Down
+ *
+ * Everything else stays Not verified: no saved check, no router or more than one
+ * on the name, a report from any source but InHand's own, an old report, a report
+ * no newer than the check, a check quiet for more than six hours, a single
+ * unconfirmed miss, or the router and the check disagreeing. A router that is
+ * online does not prove the cameras are, which is why it can only uphold a
+ * reading the check itself made, and why the card says which one it is showing.
+ */
+export function routerWitness(feed: UnitCameraStatus, routers: readonly RouterRow[], now: number): RouterWitness | null {
+  const check = feed.directCheck;
+  if (feed.source !== 'ip_check' || !line(feed.publicIp) || !check || routers.length !== 1) return null;
+  const checked = Date.parse(check.at), router = routers[0], reported = router.reportedAt ? Date.parse(router.reportedAt) : NaN;
+  if (!Number.isFinite(checked) || checked > now || now - checked > ROUTER_WITNESS_MAX_GAP_MS) return null;
+  if (router.reportedSource !== ROUTER_WITNESS_SOURCE || !Number.isFinite(reported) || reported > now || now - reported > ROUTER_WITNESS_FRESH_MS || reported <= checked) return null;
+  const says = line(router.reportedStatus).toLowerCase();
+  if (check.status === 'online' && says === 'online') return {state: 'online', at: router.reportedAt!, checkAt: check.at};
+  if (check.status === 'offline' && check.confirmed === true && says === 'offline') return {state: 'offline', at: router.reportedAt!, checkAt: check.at};
+  return null;
+}
+
 /** A router reading is reference only. An old or missing reading is Unknown, never Offline. */
 function routerFields(row: RouterRow | undefined, now: number) {
   if (!row) return {rs: '', rt: 0, rr: '', ro: 0, rm: ''};
@@ -229,14 +275,26 @@ export function boardData({feed, census, now, routers, upload, addresses, power}
     const key = exactUnitName(router.unitKey), held = routerByUnit.get(key);
     if (!held || seconds(router.checkedAt) > seconds(held.checkedAt)) routerByUnit.set(key, router);
   }
+  const routersByUnit = new Map<string, RouterRow[]>();
+  for (const router of routers || []) {
+    const key = exactUnitName(router.unitKey);
+    routersByUnit.set(key, [...routersByUnit.get(key) || [], router]);
+  }
   const cameras: Record<string, BoardCamera[]> = {};
   const changes: BoardChange[] = [];
   let newestStar = 0;
   const units = feed.map((unit, index): BoardUnit => {
     const counted = census[index] && census[index].name === unit.unit ? census[index] : undefined;
-    const decided = call(unit, counted, now);
+    const own = call(unit, counted, now);
+    // Only a counted field unit whose own check has no current reading can be
+    // spoken for by its router. A current reading always wins.
+    const witness = counted?.placement === 'field' && own.place === 'field' && own.verdict === 'unknown'
+      ? routerWitness(unit, routersByUnit.get(exactUnitName(unit.unit)) || [], now) : null;
+    const decided: Call = witness
+      ? {...own, verdict: witness.state === 'online' ? 'up' : 'down', online: witness.state === 'online' ? 1 : 0, offline: witness.state === 'offline' ? 1 : 0, cameras: 1}
+      : own;
     const source = unit.source === 'ip_check' ? 'a' : unit.source === 'reconeyez' ? 'r' : 'v';
-    const observed = seconds(unit.observedAt);
+    const observed = witness ? seconds(witness.at) : seconds(unit.observedAt);
     if (source === 'v' && observed > newestStar) newestStar = observed;
     const list = cameraRows(unit, now);
     if (list.length) cameras[unit.unit] = list;
@@ -258,7 +316,7 @@ export function boardData({feed, census, now, routers, upload, addresses, power}
       n: decided.cameras, on: decided.online, off: decided.offline,
       t: observed, lo: 0,
       ip: line(unit.publicIp),
-      bad: notOnline(unit, decided.place, now),
+      bad: witness?.state === 'online' ? '' : notOnline(unit, decided.place, now),
       pid: line(unit.productId),
       fl: counted?.doNotUse === true || counted?.exception === true ? 'x' : '',
       vd: decided.verdict,
@@ -272,6 +330,7 @@ export function boardData({feed, census, now, routers, upload, addresses, power}
       ...(point && decided.place === 'field' ? {hp: point} : {}),
       ...(typed ? {ad: typed} : {}),
       ...routerFields(routerByUnit.get(exactUnitName(unit.unit)), now),
+      ...(witness ? {w: 'r' as const, wt: seconds(witness.checkAt)} : {}),
       ri: '', rp: '',
       ...((pw => pw ? {pw} : {})(boardPowerFor(power, unit.unit) ?? boardPowerFor(power, line(unit.displayName)))),
     };

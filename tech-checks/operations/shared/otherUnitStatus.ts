@@ -63,6 +63,13 @@ const fresh = (at: unknown, now: number, maxAgeMs: number) => {
   return Number.isFinite(time) && now - time >= -60000 && now - time <= maxAgeMs;
 };
 
+/** What the saved check last found, whatever its age. Null when there is no usable check. */
+function lastCheck(check: DeviceHealthRow | null | undefined, said: string) {
+  const at = Date.parse(text(check?.checked_at));
+  if ((said !== 'online' && said !== 'offline') || !Number.isFinite(at)) return null;
+  return {status: said as 'online' | 'offline', at: new Date(at).toISOString(), confirmed: check?.confirmed_outage === true};
+}
+
 /**
  * Snipers and CAMVs: one line per unit from the saved direct IP check. A check
  * that is missing or older than three sweeps is Not verified, never Down.
@@ -98,6 +105,10 @@ export function projectIpCheckUnits(
       publicIp: ip,
       observedAt: text(check?.checked_at) || null,
       source: 'ip_check',
+      // The saved check as it stands, current or not. A check that has gone quiet
+      // reads Not verified above; this says what it last found and when, so the
+      // board can weigh it against the router's own report. It is never a status.
+      ...(lastCheck(check, said) ? {directCheck: lastCheck(check, said)!} : {}),
     });
   }
   return units;

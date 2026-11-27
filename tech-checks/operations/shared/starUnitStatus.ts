@@ -62,6 +62,9 @@ export type UnitCameraStatus = {
   onlineInShop: boolean;
   publicIp: string | null;
   observedAt: string | null;
+  // IP-checked units only: what COS's own check last found and when, whatever its
+  // age. `confirmed` is a confirmed outage (three misses). Never a status by itself.
+  directCheck?: {status: 'online' | 'offline'; at: string; confirmed: boolean};
   providerPlacement?: 'FIELD' | 'SHOP';
   providerSite?: string | null;
   providerPublicIp?: string | null;

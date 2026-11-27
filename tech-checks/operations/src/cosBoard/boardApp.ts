@@ -620,7 +620,7 @@ const WORD = { ok:"OK", warn:"Check", bad:"Problem", unk:"Unknown" }, RW = { on:
 function diagnose(v){
   const u=v.u, fs=v.fs, r=routerRead(u), ck=[];
   let cam;
-  if(u.s==="a") cam = u.t && v.last ? "COS checked this unit's address · "+v.last+" · "+when(u.t) : (u.ip ? "No check on record" : "No IP address saved, so COS has never checked it");
+  if(u.s==="a") cam = u.w && v.last ? "Router reports "+v.last+" (InHand) · "+when(u.t)+". COS's own check last read this unit "+when(u.wt)+" and cannot reach it now." : u.t && v.last ? "COS checked this unit's address · "+v.last+" · "+when(u.t) : (u.ip ? "No check on record" : "No IP address saved, so COS has never checked it");
   else cam = (u.s==="r" ? "Recon cloud" : "Star4Live")+": "+u.on+" of "+u.n+" online"+(u.off ? ", "+u.off+" offline" : "")+(v.unk ? ", "+v.unk+" no reading" : "");
   ck.push({k:"Cameras", s: fs==="up"?"ok":fs==="issues"?"warn":fs==="down"?"bad":"unk", t:cam});
   if(u.rs) ck.push({k:"Router, COS check", s: u.rs==="on"?"ok":u.rs==="of"?"bad":"unk", t:(RW[u.rs]||u.rs)+(u.rt ? " · "+when(u.rt) : "")});
@@ -1100,9 +1100,9 @@ function drawPanel(){
   const v = S.vmap && S.vmap[S.openId]; if(!v){ closeUnit(); return; }
   if(v.mhOnly){ drawMhPanel(v); return; }
   const u=v.u, P=$("panel");
-  const src = u.s==="v" ? "Star4Live" : u.s==="a" ? "COS's own check" : "Recon cloud";
+  const src = u.s==="v" ? "Star4Live" : u.s==="a" ? (u.w ? "Router (InHand)" : "COS's own check") : "Recon cloud";
   let reading;
-  if(u.s==="a") reading = u.t && v.last ? (v.last==="online"?"Online":"Offline")+" · checked "+when(u.t) : "No check on record";
+  if(u.s==="a") reading = u.w && v.last ? (v.last==="online"?"Online":"Offline")+" · reported "+when(u.t)+" · COS's own check last read it "+when(u.wt) : u.t && v.last ? (v.last==="online"?"Online":"Offline")+" · checked "+when(u.t) : "No check on record";
   else reading = u.on+" of "+u.n+" online"+(u.off?" · "+u.off+" offline":"")+(v.unk?" · "+v.unk+" no reading":"")+(u.s==="r"&&u.t?" · last heard "+when(u.t):"");
   const kv=[["Where", (v.place==="field" ? "Field" : "Shop")+(v.hand.place ? " · set by hand" : v.mh ? " · per mHelp" : "")],["Site", v.site|| (v.place==="field"?"No site on record":"—")],["Type", v.type+" · "+v.fam],[src, reading]];
   if(v.srcDiff) kv.splice(2,0,[SRC(v)+" says", (v.feedPlace==="field"?"Field":"Shop")+(v.feedSite?" at "+v.feedSite:"")]);
