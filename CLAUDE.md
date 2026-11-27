@@ -96,6 +96,11 @@ Newest first. One line: date, what changed, what to watch.
   `rollback-to-v25-entry` turns it off again. A next patch to this function must start from v26.
 - **2026-11-27** — Router as a second witness for Snipers / CAM Vs (board client merged; the
   function patch was **prepared**, now deployed, see above). Operations patch
+- **2026-11-27 (later)** — Operations: `public.cos_vrm_placement_read()` now reads the **active mHelp
+  upload** (`upload_control` -> `upload_batches.records`), not `census_mhelp_current_coverage`.
+  Watch, for everyone: that view is **empty for a while after every mHelp upload** (it waits for the
+  address job), so anything reading it sees no units in that window. Record:
+  `tech-checks/docs/db-changes/20261127_cos_vrm_placement_read.md`.
 - **2026-11-27** — Operations: Helios Field/Shop from mHelp's own list. New read-only
   `public.cos_vrm_placement_read()` (service role only) and `cos-vrm-mppt-read` **v2**, whose answer
   now also carries `placements`. Why: `equipment_units` only holds HELIOS 001-010, so the Victron

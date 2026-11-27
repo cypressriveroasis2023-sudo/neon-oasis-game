@@ -4,6 +4,7 @@ const ALERTS: [string, string, string][] = [
   ['Low battery', 'Under 20% right now.', 'Check its cameras on the COS Board and plan a visit or swap.'],
   ['Will run low tonight', 'At the rate it is draining, it reaches 20% before 7 AM.', 'Open the unit and follow "What to do" under Tonight.'],
   ['Getting low', 'Between 20% and 34%.', 'Keep an eye on it. Look again later in the day.'],
+  ['Battery monitors disagree', 'A Helios has more than one battery monitor. On these units they are more than 10 points apart, and the page cannot tell which is right. It goes by the lower one, to be safe.', 'Not urgent. Ask whoever set up the Helios batteries which monitor to trust, and have the other one corrected. Until then, treat the lower number as the real one.'],
   ['Dropped to N% overnight', 'Last night it went under 30% before sunrise.', 'The battery is not lasting the night. Check panels, the load and battery age.'],
   ["Didn't fill up today · best was N%", 'The sun is done and the battery never got to 95% today.', 'It will start the night short. Check for dirty or shaded panels, a loose solar cable, or a cloudy day. Two days in a row = tell the manager.'],
   ['Using more power than usual', 'At night it is pulling much more than its normal (1.5x and 10 W or more).', 'Something new is drawing power: a camera rebooting over and over, a heater, or extra gear plugged in. Check its cameras on the COS Board.'],
@@ -35,6 +36,7 @@ export default function VrmTechGuide() {
         <li><b className='g-in'>↑ 203 W in</b> — battery charging.</li>
         <li><b className='g-out'>↓ 37 W out</b> — battery draining.</li>
         <li><b>Moon · 20% by 3:40 AM</b> — will run low tonight (shown from 5 PM to 7 AM).</li>
+        <li><b>system says 100%</b> (amber, under the ring) — the battery monitors on this unit disagree by more than 10 points. The ring shows the lower one. Alerts and tonight's estimate use the lower one too.</li>
         <li><b>Moon · Low 72%</b> — lowest battery last night (5 PM–7 AM). Green 50%+, yellow 20–49%, red under 20%.</li>
         <li><b>Plug · Plugged in</b> — stayed full all night on outside power. Nothing to do.</li>
         <li><b>Panels line</b> (on a unit's chart) — what the panels made today and yesterday in kWh, today's peak watts, and panel voltage. A healthy sunny day is about 0.8–1.1 kWh. The charger starts counting its next day a few hours after dark; the page still shows the day that just ended as today until midnight.</li>
