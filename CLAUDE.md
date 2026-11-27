@@ -59,6 +59,13 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-27** — Operations: Helios Field/Shop from mHelp's own list. New read-only
+  `public.cos_vrm_placement_read()` (service role only) and `cos-vrm-mppt-read` **v2**, whose answer
+  now also carries `placements`. Why: `equipment_units` only holds HELIOS 001-010, so the Victron
+  page could not place 011-020. The saved list still decides; mHelp answers only for a Helios the
+  saved list has no record of (`withMhelpPlacement`). Watch: if HELIOS 011-020 are ever added to
+  `equipment_units`, the saved answer takes over for them. Record and rollback:
+  `tech-checks/docs/db-changes/20261127_cos_vrm_placement_read.md`.
 - **2026-11-27** — Router as a second witness for Snipers / CAM Vs (**board client merged, inert;
   function patch prepared, not deployed**). Operations patch
   `cos-unit-camera-status/last-direct-check-v25` (starts from live v25 `2927fdeb`) adds

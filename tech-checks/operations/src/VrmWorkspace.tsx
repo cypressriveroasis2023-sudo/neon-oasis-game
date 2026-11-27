@@ -1,13 +1,13 @@
-import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, OperationsApiError } from './api';
 import { getVrmFleet } from './vrmFleetApi';
 import { readVrmFleetConfig, type VrmUnit } from '../../supabase/functions/cos-operations-pages/vrm';
 import './vrm.css';
 import VrmReadOnlyDashboard from './VrmReadOnlyDashboard';
 import { readDashboardPower, shortDate, unitTileSummary } from './vrmReadOnlyModel';
-import { heliosPlacement, placementLabel, victronFleetView, victronNeedsAttention } from './victronAttention';
+import { heliosPlacement, placementLabel, victronFleetView, victronNeedsAttention, withMhelpPlacement } from './victronAttention';
 import { canonicalCameraUnit } from './fieldCameraHealth';
-import { mpptLine, readVrmMppt, type Mppt } from './vrmMppt';
+import { mpptLine, readVrmExtras, type MhelpPlace, type Mppt } from './vrmMppt';
 import { cloudyWarning, heliosSpots, outlookLine, readSunForecast, sunOutlook, type SunDay } from './vrmWeather';
 import { dayPeak, historyFlags, isNightForecastTime, nightLoad, last24h, overnightLow, readVrmHistory, solarVsYesterday, tonightBasis, tonightForecast, tonightHeadline, tonightSteps, type HistoryPoint, type Tonight } from './vrmHistory';
 import VrmTechGuide from './VrmTechGuide';
@@ -66,7 +66,10 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
   const [revision, setRevision] = useState(0);
   const [expanded, setExpanded] = useState(false);
   // Field or Shop per mHelp, read once. Until it loads (or if it fails) every unit stays "Placement unknown" and nothing is flagged.
-  const [inventory, setInventory] = useState<{unitNumber?: string}[] | null>(null);
+  const [savedInventory, setInventory] = useState<{unitNumber?: string}[] | null>(null);
+  // The saved list does not hold every Helios, so mHelp's own current list fills in the ones it lacks.
+  const [places, setPlaces] = useState<MhelpPlace[] | null>(null);
+  const inventory = useMemo(() => withMhelpPlacement(savedInventory, places) as {unitNumber?: string}[] | null, [savedInventory, places]);
   // Sun forecast for Field Helios units (best-effort, every 3 hours). Nothing is stored.
   const [sky, setSky] = useState<Map<string, SunDay[]> | null>(null);
   const spotsKey = inventory ? [...heliosSpots(inventory)].map(([k, v]) => k + '@' + v.lat + ',' + v.lon).join(';') : '';
@@ -141,10 +144,10 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
       setInventory(items ? items.filter((item): item is {unitNumber?: string} => Boolean(item) && typeof item === 'object') : null);
     }).catch(() => { if (active) setInventory(null); });
     const readHistory = () => { void readVrmHistory().then(units => { if (active && units) setHistory(new Map(units.map(u => [u.installationId, u.points]))); }); };
-    const readMppt = () => { void readVrmMppt().then(map => { if (active && map) setMppt(map); }); };
+    const readMppt = () => { void readVrmExtras().then(extra => { if (!active) return; if (extra.mppt) setMppt(extra.mppt); if (extra.places) setPlaces(extra.places); }); };
     readHistory(); readMppt();
     const historyTimer = window.setInterval(() => { if (workspaceVisible()) { readHistory(); readMppt(); } }, 15 * 60_000);
-    const dropHistory = () => { setHistory(null); setMppt(null); };
+    const dropHistory = () => { setHistory(null); setMppt(null); setPlaces(null); };
     window.addEventListener('cos-private-data-invalidated', dropHistory);
     const timer = window.setInterval(() => {
       setNow(Date.now());
