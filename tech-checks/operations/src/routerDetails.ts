@@ -11,6 +11,8 @@ export type RouterDetail = {
   unit: string; serial: string; model?: string; status?: 'online' | 'offline'; at?: string;
   ip?: string; ipFrom?: 'inhand' | 'cos'; cosDiffers?: boolean; port: number;
   sig?: RouterSignal; carrier?: string; fw?: string; gps?: {lat: number; lng: number; t?: string}; detailsAt?: string;
+  /** Recent days (last 7) this router dropped overnight and came back in daylight: two or more means power, not the router. */
+  nightDrops?: number;
 };
 export type UnmatchedRouter = {serial: string; name: string | null; model: string | null; online: boolean; lastSeen: string | null; at: string};
 export type RouterDetails = {routers: RouterDetail[]; unmatched: UnmatchedRouter[]; units: string[]};
@@ -40,6 +42,7 @@ export function parseRouterDetails(value: unknown): RouterDetails {
       ip: typeof r.ip === 'string' && IPV4.test(r.ip) ? r.ip : undefined,
       ipFrom: r.ipFrom === 'inhand' || r.ipFrom === 'cos' ? r.ipFrom : undefined, cosDiffers: r.cosDiffers === true,
       port: 8080, sig, carrier: str(r.carrier, 24), fw: str(r.fw, 24), gps, detailsAt: time(r.detailsAt),
+      nightDrops: typeof r.nightDrops === 'number' && r.nightDrops > 0 && r.nightDrops <= 7 ? Math.round(r.nightDrops) : undefined,
     }];
   });
   const unmatched = (v.unmatched as any[]).flatMap((u): UnmatchedRouter[] => {
@@ -131,4 +134,11 @@ export function trendWords(t: RouterTrend | null): string {
     case 'young': return 'Signal history started ' + (t.since ? new Date(t.since).toLocaleDateString() : 'recently') + '; the week fills in day by day.';
     default: return 'No signal history yet.';
   }
+}
+
+/** The power advice for a router that drops overnight (James, 26 Nov: bring a battery, not a router). */
+export function powerHint(nightDrops: number | undefined): string {
+  return nightDrops && nightDrops >= 2
+    ? 'Dropped overnight on ' + nightDrops + ' of the last 7 days and came back after sunrise: almost always power (a weak battery or a dirty or shaded solar panel), not the router. Bring a charged battery and check the panel.'
+    : '';
 }

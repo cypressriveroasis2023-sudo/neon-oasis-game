@@ -12,7 +12,7 @@
 import mapData from './boardMap.json';
 import {BOARD_CSS} from './boardStyle';
 import {troubleWalk, troubleKnown, troubleNote, TROUBLE_CSS} from './boardTrouble';
-import {ROUTER_DETAIL_FRESH_MS, signalWord, milesBetween, unitKeyOf, trendWords} from '../routerDetails';
+import {ROUTER_DETAIL_FRESH_MS, signalWord, milesBetween, unitKeyOf, trendWords, powerHint} from '../routerDetails';
 
 /* The router box on a unit card: the open-router button, signal bars and the warnings. */
 const ROUTER_CSS = `
@@ -300,7 +300,7 @@ const PSEC = [["place","Placed differently","mHelp is official, so the board sho
   ["swap","Router swapped","A unit still linked to its old router, which is offline, while InHand has a newer router named for that unit online and linked to nothing. Use the new router moves the unit's link, so the card and the morning list read the router that is really there. Its reading shows after the next InHand pull, within 30 minutes."],
   ["vcc","Moved in VCC","Camera records in COS that no longer match VCC: a camera VCC names for another unit, a camera VCC has that COS has never recorded, or one VCC stopped listing. VCC is right about its own cameras. Fix one with its button, or fix the name in VCC when there is no button."],
   ["far","Router far from site","Field units whose router's cell tower is more than 25 miles from where COS has the unit. The unit may have moved, the router may be on a different unit, or the pin may be wrong. Cell-tower spots are rough, so check before changing anything."],
-  ["routers","Router problems","Field units whose InHand router is offline, has poor signal, or reports a different IP than COS. A router reading is a hint only: it never proves the cameras work. Tap a unit to see its Router box, or copy the list for the IT sheet."],
+  ["routers","Router problems","Field units whose InHand router is offline, has poor signal, drops overnight (a power sign), or reports a different IP than COS. A router reading is a hint only: it never proves the cameras work. Tap a unit to see its Router box, or copy the list for the IT sheet."],
   ["done","Fixed by hand","Set by hand in COS, so these are off the list and stay off. mHelp still shows them differently: make the same change there when you can."]];
 /* The answers James added for the punch list: where each unit really is, what record to fix, and who fixes it. */
 function normName(n){ return String(n||"").toUpperCase().replace(/SOLAR\s*SPOTTER/,"SS").replace(/RECON\s*(II|2)/,"RII").replace(/CAM[\s-]*V/,"CAMV").replace(/[^A-Z0-9.]/g,""); }
@@ -369,6 +369,7 @@ function routerProblems(vs){
     const r=ih.r, word=signalWord(r.sig), why=[];
     let rank=9, first="";
     if(ih.st==="of"){ rank = v.status==="down" ? 0 : 1; why.push("Router offline (InHand read "+when(secOf(r.at))+")"); first="Check power at the unit first, then the SIM and antenna."; }
+    if(powerHint(r.nightDrops)){ rank=Math.min(rank,ih.st==="of"?rank:4); why.push("Drops overnight ("+r.nightDrops+" of 7 days)"); first=powerHint(r.nightDrops); }
     if(ih.st==="on" && word==="Poor"){ rank=Math.min(rank,2); why.push("Poor signal"+(r.sig && typeof r.sig.rsrp==="number" ? " ("+r.sig.rsrp+" dBm)" : "")); first = first || "Check the antenna and its cable; a higher mount or a different carrier SIM may help."; }
     if(r.cosDiffers){ rank=Math.min(rank,3); why.push("InHand IP "+r.ip+" differs from the COS record"); first = first || "Check which address the cameras answer on before changing the COS record."; }
     if(rank<9) out.push({v, r, rank, why, first});
@@ -726,6 +727,7 @@ function routerBox(v){
   kids.push(trendBox(r.unit || v.k));
   if(r.cosDiffers) kids.push(h("p",{class:"note warn",text:"InHand reports a different public IP than the COS record. The button uses InHand's, which is newer. Correct the COS record if the cameras use the same address."}));
   if(far) kids.push(far);
+  if(powerHint(r.nightDrops)) kids.push(h("p",{class:"note warn power",text:"Power, not the router: "+powerHint(r.nightDrops)}));
   kids.push(h("p",{class:"note",text:"Router status is a hint, not camera health. A connected router with offline cameras is still a camera problem."}));
   if(goScreen) kids.push(h("div",{class:"links"},goScreen));
   return h("div",{class:"box rtr",id:"rtrBox"},kids);
