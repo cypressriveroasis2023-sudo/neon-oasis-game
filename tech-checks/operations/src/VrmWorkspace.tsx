@@ -156,7 +156,7 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
       setInventory(items ? items.filter((item): item is {unitNumber?: string} => Boolean(item) && typeof item === 'object') : null);
     }).catch(() => { if (active) setInventory(null); });
     const readHistory = () => { void readVrmHistory().then(units => { if (active && units) setHistory(new Map(units.map(u => [u.installationId, u.points]))); }); };
-    const readMppt = () => { void readVrmExtras().then(extra => { if (!active) return; if (extra.mppt) setMppt(extra.mppt); if (extra.places) setPlaces(extra.places); }); };
+    const readMppt = () => { void readVrmExtras().then(extra => { if (!active) return; if (extra.mppt) setMppt(extra.mppt); /* An empty placement answer keeps the last list. */ if (extra.places?.length) setPlaces(extra.places); }); };
     readHistory(); readMppt();
     const historyTimer = window.setInterval(() => { if (workspaceVisible()) { readHistory(); readMppt(); } }, 15 * 60_000);
     const dropHistory = () => { setHistory(null); setMppt(null); setPlaces(null); };

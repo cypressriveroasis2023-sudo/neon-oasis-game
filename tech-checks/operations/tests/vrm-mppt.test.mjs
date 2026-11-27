@@ -165,22 +165,34 @@ test('late evening, units are compared on the same day and against that day\'s b
 // The saved equipment list only holds HELIOS 001-010. mHelp's own current list places the rest.
 const place = (n, placement, zip = null) => ({installationId: 7000 + n, name: 'HELIOS ' + String(n).padStart(3, '0'), placement, zip});
 
-test('database read: Field/Shop from mHelp for each Helios with exactly one current record, service role only', async () => {
+test('database read: Field/Shop from the active mHelp upload for each Helios with exactly one record, service role only', async () => {
   const db = new PGlite();
+  const rec = (unitNumber, placement, zip) => ({unitNumber, placement, sourceAddress: {street: '1 Main', city: 'Katy', state: 'TX', zip}});
   await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
     create schema cos_vrm_private; create schema cos_mhelp_placement_private;
     create table cos_vrm_private.installations(installation_id bigint primary key, name text not null);
-    create table cos_mhelp_placement_private.census_mhelp_current_coverage(product_id text, unit_number text, placement text, zip text);
+    create table cos_mhelp_placement_private.upload_control(singleton boolean primary key, active_sha256 text);
+    create table cos_mhelp_placement_private.upload_batches(source_sha256 text, payload_sha256 text, receipt jsonb, records jsonb, admitted_at timestamptz);
     insert into cos_vrm_private.installations values(7011,'HELIOS 011'),(7012,'HELIOS 012'),(7013,'HELIOS 013'),(7014,'HELIOS 014'),(7015,'HELIOS 015'),(7099,'Shop bench');
-    insert into cos_mhelp_placement_private.census_mhelp_current_coverage values
-      ('1','Helios 011','FIELD','77493-1234'),('2','Helios  012','SHOP','77040'),
-      ('3','Helios 013','FIELD','77001'),('4','HELIOS 013','SHOP',null),     -- two records: left out
-      ('5','Helios 014','UNKNOWN',null),                                      -- not Field or Shop: left out
-      ('6','Shop bench','SHOP',null);                                         -- not a Helios: left out`);
+    insert into cos_mhelp_placement_private.upload_control values(true,'new');`);
+  await db.query('insert into cos_mhelp_placement_private.upload_batches values($1,$2,$3,$4,$5)', ['old', 'p0', {}, JSON.stringify([rec('Helios 011', 'SHOP', null), rec('Helios 015', 'FIELD', '77001')]), '2026-11-27T07:35:00Z']);
+  await db.query('insert into cos_mhelp_placement_private.upload_batches values($1,$2,$3,$4,$5)', ['new', 'p1', {}, JSON.stringify([
+    rec('Helios 011', 'FIELD', '77493-1234'), rec('Helios  012', 'SHOP', '77040'),
+    rec('Helios 013', 'FIELD', '77001'), rec('HELIOS 013', 'SHOP', null),     // two records: left out
+    rec('Helios 014', 'UNKNOWN', null),                                        // not Field or Shop: left out
+    rec('Shop bench', 'SHOP', null), rec('Spotter 230', 'FIELD', '77002'),     // not a Helios: left out
+  ]), '2026-11-27T21:21:00Z']);
   await db.exec(readFileSync(new URL('../db/20261127_cos_vrm_placement_read.sql', import.meta.url), 'utf8'));
-  const out = (await db.query('select public.cos_vrm_placement_read() v')).rows[0].v;
-  assert.deepEqual(out, {units: [{installationId: 7011, name: 'HELIOS 011', placement: 'FIELD', zip: '77493'}, {installationId: 7012, name: 'HELIOS 012', placement: 'SHOP', zip: null}]});
-  assert.equal(safeVrmPlacement(out).units.length, 2);
+  const read = async () => (await db.query('select public.cos_vrm_placement_read() v')).rows[0].v;
+  // Only the ACTIVE upload counts: HELIOS 015 is in the old one only, and 011 is Field now, not Shop.
+  assert.deepEqual(await read(), {units: [{installationId: 7011, name: 'HELIOS 011', placement: 'FIELD', zip: '77493'}, {installationId: 7012, name: 'HELIOS 012', placement: 'SHOP', zip: null}]});
+  assert.equal(safeVrmPlacement(await read()).units.length, 2);
+  // It needs nothing but the upload itself: no census tables exist in this database at all.
+  // No active upload, or records that are not a list: an empty answer, not an error.
+  await db.exec(`update cos_mhelp_placement_private.upload_control set active_sha256 = 'missing'`);
+  assert.deepEqual(await read(), {units: []});
+  await db.exec(`update cos_mhelp_placement_private.upload_control set active_sha256 = 'new'; update cos_mhelp_placement_private.upload_batches set records = '{}'::jsonb where source_sha256 = 'new'`);
+  assert.deepEqual(await read(), {units: []});
   for (const role of ['anon', 'authenticated']) { await db.exec('begin; set local role ' + role); await assert.rejects(db.query('select public.cos_vrm_placement_read()'), /permission denied/); await db.exec('rollback'); }
 });
 
