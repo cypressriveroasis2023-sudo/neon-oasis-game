@@ -59,6 +59,12 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-27** — Camera checks keep the last good mHelp inventory for 24 h (**prepared, not
+  deployed**; needs James's go). Operations `cos-sheets-placement-publish` (live v24, loader pinned to
+  `d962b03`): `/endpoint-source` accepts an inventory whose last mHelp sync is up to 24 h old (was 45 min),
+  adds `inventorySyncedAt`/`inventoryCurrent`, logs when it does. `/camera-snapshot-source` stays 45 min.
+  Source and rollback: `tech-checks/docs/endpoint-source-inventory-grace-20261127/`. A next change to
+  this function must start from that source once deployed.
 - **2026-11-27** — Refresh runs the camera checks now (**prepared, nothing applied or deployed**;
   each step needs James's go). Order: (1) Tech Check `public.cos_check_now_v1()` and
   `app_private.cos_check_now_log`, `tech-checks/docs/db-changes/20261127_cos_check_now.sql`: Owner
