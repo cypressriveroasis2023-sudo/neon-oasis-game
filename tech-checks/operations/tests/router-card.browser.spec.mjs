@@ -220,3 +220,18 @@ test('Punch list: Router far from site lists field units whose router is over 25
   expect(rows[0].text).toContain('Is the unit at the COS site?');
   expect(rows[0].map).toContain('https://www.google.com/maps/dir/30.27000,-97.74000/29.76000,-95.37000');
 });
+
+test('a router that drops overnight says power, not the router, on the card and in Router problems', async ({page}, info) => {
+  test.skip(info.project.name !== 'mobile-390', 'the board is the phone Fleet screen');
+  const {app} = await mountFleet(page, false, {cameraStatus: report});
+  const host = app.locator('.cos-board-host');
+  await expect.poll(() => inBoard(host, root => root.querySelectorAll('.tile').length)).toBe(4);
+  await detailsServer(page, {routers: [{unit: 'SPOTTER 002', serial: 'RF6150001', status: 'online', at: fresh, ip: '203.0.113.42', ipFrom: 'inhand', port: 8080, nightDrops: 3}], unmatched: [], units: []});
+  await page.route('**/functions/v1/cos-unit-camera-status', route => route.request().method() === 'OPTIONS'
+    ? route.fulfill({status: 204, headers: {'access-control-allow-origin': '*', 'access-control-allow-headers': '*'}})
+    : route.fulfill({status: 200, headers: {'access-control-allow-origin': '*'}, json: report}));
+  await inBoard(host, root => root.getElementById('refresh').click());
+  await refreshed(host);
+  await openUnit(host, 'Spotter 002');
+  await expect.poll(() => inBoard(host, root => root.querySelector('#rtrBox .note.power')?.textContent || '')).toContain('Power, not the router: Dropped overnight on 3 of the last 7 days');
+});
