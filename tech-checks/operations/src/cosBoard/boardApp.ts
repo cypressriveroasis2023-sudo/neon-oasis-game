@@ -252,7 +252,11 @@ function render(){
   if(TV.on){ drawTv(vs, c); return; }
   /* One count. mHelp is the official list: a unit is in the field, at the site mHelp gives, until mHelp shows it back in the shop or it is moved by hand here. */
   if(S.mh ? S.filter==="excl" : S.filter==="notin") S.filter="field";
-  $("modeRow").replaceChildren(h("span",{class:"hint",text: S.mh ? "One count: mHelp, the official list"+(S.mh.meta.at ? ", read "+when(S.mh.meta.at) : "")+". A unit is in the field, at the site mHelp gives, until mHelp shows it back in the shop or it is moved by hand here."
+  /* James, 27 Nov: mHelpDesk refused COS's saved login at 2 AM and nobody knew until 3 PM, while Snipers and CAM Vs
+     sat at Unknown. mHelp is read every 15 minutes; three missed reads in a row says so in red above the counts. */
+  const mhAge = S.mh && S.mh.meta && S.mh.meta.at ? Date.now()/1000 - S.mh.meta.at : 0;
+  const mhLate = mhAge > 50*60 ? h("p",{class:"mgerr",role:"alert",style:"flex-basis:100%;margin:0 0 4px",text:"mHelpDesk has not been read since "+when(S.mh.meta.at)+". Usually it needs reconnecting: the Owner opens Unit Tracker → Advanced / IT tools → Reconnect mHelpDesk. Until then Snipers and CAM Vs can read Unknown."}) : null;
+  $("modeRow").replaceChildren(...(mhLate ? [mhLate] : []), h("span",{class:"hint",text: S.mh ? "One count: mHelp, the official list"+(S.mh.meta.at ? ", read "+when(S.mh.meta.at) : "")+". A unit is in the field, at the site mHelp gives, until mHelp shows it back in the shop or it is moved by hand here."
     : "The mHelp list has not loaded, so this shows only what the camera systems can see. It is not the official count."}));
   /* James read the board twice within a minute and got two different counts, because the first read came before
      the mHelp list arrived. Both counts were honest: without mHelp the board can only count the camera records
