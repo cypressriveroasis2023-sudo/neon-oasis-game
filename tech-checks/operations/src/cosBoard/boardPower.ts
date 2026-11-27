@@ -28,7 +28,8 @@ const seconds = (value?: string) => {
 /**
  * Victron power by exact Helios number, from the same saved fleet reading the Victron Power page shows.
  * Only HELIOS names are matched. Two installations with the same number match nothing rather than a guess.
- * Separate batteries are never averaged: the system reading wins, otherwise the lowest single monitor.
+ * Separate batteries are never averaged: the system reading wins, otherwise the lowest single monitor;
+ * and when current monitors disagree by more than 10 points, the lowest one wins (see cautiousCharge).
  */
 export function boardPowerByUnit(fleetData: unknown, now: number, history?: ReadonlyMap<number, HistoryPoint[]> | null, weather?: ReadonlyMap<string, OutlookDay[]> | null, mppt?: ReadonlyMap<number, Mppt> | null): Map<string, BoardPower> {
   const out = new Map<string, BoardPower>();
@@ -59,7 +60,7 @@ export function boardPowerByUnit(fleetData: unknown, now: number, history?: Read
       ...((points => {
         if (!points?.length) return {};
         const night = overnightLow(points, now), flags = historyFlags(points, now).map(f => f.line);
-        const t = tile.fresh ? tonightForecast(points, now) : null;
+        const t = tile.fresh ? tonightForecast(points, now, tile.socGap) : null;
         return {...(night ? {nl: night.low} : {}), ...(flags.length ? {hf: flags} : {}),
           ...(t ? {tn: {v: t.verdict, h: tonightHeadline(t), b: tonightBasis(t), s: tonightSteps(t)}} : {})};
       })(history?.get(item.installationId))),

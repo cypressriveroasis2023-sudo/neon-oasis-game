@@ -392,3 +392,8 @@ html:not([data-theme='light']) .vrm-workspace .vrm-native-sources .vrm-native-re
 html:not([data-theme='light']) .vrm-workspace .vrm-native-card .vrm-native-differ{color:var(--vt-amber);font-size:11px}
 html:not([data-theme='light']) .vrm-workspace .vrm-native-agree .vrm-native-value{font-size:34px}
 html:not([data-theme='light']) .vrm-workspace .vrm-native-dashboard .vrm-native-card p.vrm-native-differ{color:var(--vt-amber);font-size:11px}
+/* Battery monitors disagree: the tile shows the lower one and says what the system claims. */
+.vrm-unit-grid .vrm-tile-differ{display:block;max-width:100%;font-size:10px;font-weight:600;line-height:1.25;color:var(--vt-amber,#f5b942);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vrm-attention .vrm-attn-monitors span{color:#f5b942}
+html:not([data-theme='light']) .vrm-workspace .vrm-attention .vrm-attn-monitors span{color:var(--vt-amber)}
+html[data-theme='light'] .vrm-attention .vrm-attn-monitors span,html[data-theme='light'] .vrm-unit-grid .vrm-tile-differ{color:#875900}

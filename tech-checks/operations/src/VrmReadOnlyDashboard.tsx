@@ -40,7 +40,7 @@ export default function VrmReadOnlyDashboard({unit,rows,invalid=false,readFailed
       return <article key={metric} className={'vrm-native-card vrm-native-'+kind+(charge&&!charge.agree?' vrm-native-multi':'')+(charge?.agree?' vrm-native-agree':'')} aria-label={label}>
       <h5>{label}</h5>
       {charge && !charge.agree && <p className='vrm-native-multiple'>Separate source readings · no combined charge</p>}
-      {charge && !charge.agree && charge.lead && <p className='vrm-native-differ'>The sources differ by {Math.round(charge.spread)} points. The tiles and alerts go by the {charge.lead.source} reading ({Math.round(charge.lead.value)}%).</p>}
+      {charge && !charge.agree && charge.lead && <p className='vrm-native-differ'>The sources differ by {Math.round(charge.spread)} points. {charge.cautious ? 'That is a lot, so the tiles and alerts go by the lowest: ' + charge.lead.source + ' · instance ' + charge.lead.instance + ' (' + Math.round(charge.lead.value) + '%).' : 'The tiles and alerts go by the ' + charge.lead.source + ' reading (' + Math.round(charge.lead.value) + '%).'}</p>}
       {charge?.agree && charge.lead
         ? <>{reading(charge.lead, 0)}
             <details className='vrm-native-sources'><summary>All {readings.length} sources agree · show each</summary>{readings.filter(item => item !== charge.lead).map((item, index) => reading(item, index + 1))}</details></>

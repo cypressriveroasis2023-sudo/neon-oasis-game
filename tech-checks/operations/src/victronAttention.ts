@@ -8,7 +8,7 @@ import type {VrmUnit} from '../../supabase/functions/cos-operations-pages/vrm';
 import type {SafeVrmPower} from '../../supabase/functions/cos-operations-pages/vrmSafePower';
 
 export type VictronPlacement = 'field' | 'shop' | 'unknown';
-export type VictronAttention = {installationId: number; name: string; kind: 'alarm' | 'low' | 'tonight' | 'fair' | 'overnight' | 'charger' | 'panel' | 'notfull' | 'load' | 'cloudy' | 'solar' | 'tight' | 'unknown' | 'off'; line: string};
+export type VictronAttention = {installationId: number; name: string; kind: 'alarm' | 'low' | 'tonight' | 'fair' | 'overnight' | 'charger' | 'panel' | 'notfull' | 'load' | 'cloudy' | 'solar' | 'monitors' | 'tight' | 'unknown' | 'off'; line: string};
 type InventoryUnit = {unitNumber?: string; placement?: string; currentLocationType?: string; effectivePlacement?: {contract?: string; state?: string}};
 
 /** Field or Shop from the one mHelp unit with the same Helios number. None or two matches stay unknown. */
@@ -78,10 +78,14 @@ export function victronNeedsAttention(units: readonly VrmUnit[], rows: SafeVrmPo
   const fieldIds = units.filter(unit => heliosPlacement(unit.name, inventory) === 'field').map(unit => unit.installationId);
   // Units are compared on the same calendar day: the chargers do not all start a new day at the same minute.
   const peersOn = {0: peerYield(mppt, fieldIds, now, 0), [-1]: peerYield(mppt, fieldIds, now, -1)} as Record<0 | -1, number | null>;
+  const disagree: {installationId: number; name: string; low: number; usual: number}[] = [];
   for (const unit of units) {
     if (heliosPlacement(unit.name, inventory) !== 'field') continue;
     const tile = unitTileSummary(unit, rows, now);
-    const pct = tile.soc ? Math.round(tile.soc.value) + '%' : '';
+    // When the battery monitors disagree by a lot the page goes by the lower one, and says so wherever the number shows.
+    const differs = tile.socGap > 0 && tile.soc && tile.socUsual ? ' on the lower monitor (system says ' + Math.round(tile.socUsual.value) + '%)' : '';
+    const pct = tile.soc ? Math.round(tile.soc.value) + '%' + differs : '';
+    if (differs && tile.soc && tile.socUsual) disagree.push({installationId: unit.installationId, name: unit.name, low: Math.round(tile.soc.value), usual: Math.round(tile.socUsual.value)});
     const seen = tile.lastSeen ? ' · last connected ' + shortDate(tile.lastSeen, now) : '';
     if (tile.alarms.length) out.push({installationId: unit.installationId, name: unit.name, kind: 'alarm', line: 'Victron ' + (tile.alarms[0].level === 2 ? 'alarm' : 'warning') + ' · ' + tile.alarms.map(a => a.kind).join(', ') + (pct ? ' · ' + pct : '')});
     else if (tile.tone === 'low') out.push({installationId: unit.installationId, name: unit.name, kind: 'low', line: 'Low battery · ' + pct});
@@ -113,6 +117,13 @@ export function victronNeedsAttention(units: readonly VrmUnit[], rows: SafeVrmPo
       if (line) out.push({installationId: unit.installationId, name: unit.name, kind: 'cloudy', line});
     }
   }
-  const rank = {alarm: 0, charger: 1, low: 2, tonight: 3, panel: 4, fair: 5, overnight: 6, notfull: 7, load: 8, cloudy: 9, solar: 10, tight: 11, off: 12, unknown: 13};
+  // One line for all of them, not one per unit: it is a setup question for whoever knows the batteries, and
+  // six rows of it would bury the units that need someone today.
+  if (disagree.length === 1) out.push({installationId: disagree[0].installationId, name: disagree[0].name, kind: 'monitors',
+    line: 'Battery monitors disagree · ' + disagree[0].low + '% and ' + disagree[0].usual + '% · going by the lower'});
+  else if (disagree.length > 1) { disagree.sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true}));
+    out.push({installationId: disagree[0].installationId, name: disagree.length + ' units', kind: 'monitors',
+      line: 'Battery monitors disagree · ' + disagree.map(d => d.name.replace(/^HELIOS\s+/i, '')).join(', ') + ' · going by the lower'}); }
+  const rank = {alarm: 0, charger: 1, low: 2, tonight: 3, panel: 4, fair: 5, overnight: 6, notfull: 7, load: 8, cloudy: 9, solar: 10, tight: 11, monitors: 12, off: 13, unknown: 14};
   return out.sort((a, b) => rank[a.kind] - rank[b.kind] || a.name.localeCompare(b.name, undefined, {numeric: true}));
 }
