@@ -59,8 +59,14 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
-- **2026-11-27** — Router as a second witness for Snipers / CAM Vs (**board client merged, inert;
-  function patch prepared, not deployed**). Operations patch
+- **2026-11-27** — Deployed `cos-unit-camera-status/last-direct-check-v25` (#572, 15:20 UTC,
+  James's go): live now **v26 `d1136141`** (pins updated). Each IP-checked unit carries
+  `directCheck`, so the board's router second witness (`boardData.routerWitness`) is now
+  **on**: a Sniper or CAM V whose own check has no current reading may read Up or Down on a
+  single fresh InHand report that agrees with what the check last found. Rollback
+  `rollback-to-v25-entry` turns it off again. A next patch to this function must start from v26.
+- **2026-11-27** — Router as a second witness for Snipers / CAM Vs (board client merged; the
+  function patch was **prepared**, now deployed, see above). Operations patch
   `cos-unit-camera-status/last-direct-check-v25` (starts from live v25 `2927fdeb`) adds
   `directCheck` to each IP-checked unit: what COS's own check last found, when, and whether it
   is a confirmed outage. Status and counts are unchanged. `src/cosBoard/boardData.ts`
