@@ -1,0 +1,53 @@
+{
+  "slug": "cos-unit-camera-status",
+  "projectRef": "tughscoxralhofrckvxy",
+  "sourceCommit": "5a200541ac24cb95ad2d7656af186a3882362d2b",
+  "deployedFileNames": {
+    "index.ts": "cos-unit-camera-status/index.ts",
+    "deno.json": "cos-unit-camera-status/deno.json"
+  },
+  "entrypointPath": "cos-unit-camera-status/index.ts",
+  "importMapPath": "cos-unit-camera-status/deno.json",
+  "verifyJwt": false,
+  "sourceDir": "tech-checks/docs/cos-unit-camera-status-v26-entry",
+  "description": "Check now. POST /api/unit-camera-status/check-now asks Tech Check (public.cos_check_now_v1, Owner or approved IT) to start the same camera checks the timer runs, unless one is already running or has just run, and returns when the results should be in. The board's Refresh uses it, then re-reads. The route reads and changes nothing itself. Three exact edits to live v26: the route and its two served-path lists.",
+  "authorization": "James, 2026-11-27: 'I want to be able to click refresh and it will refresh and update for me. Can it be faster?' Running the deploy still needs his explicit go for that run, and Tech Check's cos_check_now_v1 must be applied first (tech-checks/docs/db-changes/20261127_cos_check_now.md).",
+  "releaseStatus": "PREPARED",
+  "sourceRecord": "tech-checks/docs/cos-unit-camera-status-v26-entry/index.ts",
+  "requireLiveBeforeDeploy": {
+    "status": "ACTIVE",
+    "version": 26,
+    "ezbr_sha256": "d113614175d7a4f6633f562650b12a8f16c22f14655c41b211597b18b88a784f"
+  },
+  "edits": [
+    {
+      "file": "index.ts",
+      "needle": "      if (path === \"/api/unit-camera-status/troubleshoot-close\") {\n",
+      "replacement": "      if (path === \"/api/unit-camera-status/check-now\") {\n        // Refresh asks for a real check (James, 27 Nov: \"click refresh and it will refresh and update\"). Tech Check checks\n        // the person, starts the same checks the timer runs unless one is already running or has just run, and says when\n        // the results should be in. Nothing is read or changed here.\n        if (method !== \"POST\") fail16(\"Use POST to start a check.\", 405);\n        let kReply, kData = {};\n        try { kReply = await requestFetch(LEGACY_URL + \"/rest/v1/rpc/cos_check_now_v1\", { method: \"POST\", headers: { ...context.headers, \"Content-Type\": \"application/json\" }, body: \"{}\" }); } catch { fail16(\"COS could not start a check. Still showing the last reading.\", 503); }\n        try { kData = await kReply.json(); } catch { kData = {}; }\n        if (!kReply.ok) return json({ error: kData?.code === \"42501\" ? \"Only the Owner or approved IT can start a check.\" : \"COS could not start a check. Still showing the last reading.\" }, kReply.status === 403 || kData?.code === \"42501\" ? 403 : 503);\n        const kTime = (value) => typeof value === \"string\" && Number.isFinite(Date.parse(value)) ? new Date(Date.parse(value)).toISOString() : null;\n        if (kData?.contract !== \"COS_CHECK_NOW_V1\" || typeof kData.started !== \"boolean\" || ![\"started\", \"scheduled_check_running\", \"scheduled_check_due\", \"checked_recently\"].includes(kData.reason) || !kTime(kData.checkStartedAt) || !kTime(kData.resultsBy) || !Number.isInteger(kData.waitSeconds) || kData.waitSeconds < 0 || kData.waitSeconds > 180) fail16(\"COS could not confirm the check started. Still showing the last reading.\", 503);\n        // waitSeconds is Tech Check's own count, so the board does not depend on the phone's clock.\n        return json({ contract: \"COS_CHECK_NOW_STARTED_V1\", started: kData.started, reason: kData.reason, checkStartedAt: kTime(kData.checkStartedAt), resultsBy: kTime(kData.resultsBy), waitSeconds: kData.waitSeconds });\n      }\n      if (path === \"/api/unit-camera-status/troubleshoot-close\") {\n",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "\"/api/unit-camera-status/router-swap\", \"/api/unit-camera-status/troubleshoot-close\"];",
+      "replacement": "\"/api/unit-camera-status/router-swap\", \"/api/unit-camera-status/troubleshoot-close\", \"/api/unit-camera-status/check-now\"];",
+      "occurrences": 1
+    },
+    {
+      "file": "index.ts",
+      "needle": "\"/api/unit-camera-status/router-swap\",\"/api/unit-camera-status/troubleshoot-close\"];",
+      "replacement": "\"/api/unit-camera-status/router-swap\",\"/api/unit-camera-status/troubleshoot-close\",\"/api/unit-camera-status/check-now\"];",
+      "occurrences": 1
+    }
+  ],
+  "expectedBefore": {
+    "index.ts": "d99660f88439f29a29bd43d79ae6f979666b2d487b2a2b470929971949aa7cf1",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "expectedAfter": {
+    "index.ts": "db11ded9f7970cfafee300a2f11606b81a8d26561a6ccd2a46cae3e355f788a9",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "dryRun": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/check-now-v26.json --dry-run",
+  "deploy": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/check-now-v26.json --deploy",
+  "rollback": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/rollback-to-v26-entry.json --deploy"
+}

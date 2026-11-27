@@ -1463,7 +1463,14 @@ async function refresh(){
   btn.disabled=true; btn.textContent="Reading…";
   void loadRouters();
   S.before = S.meta ? S.meta.v : null;
-  try{ await hooks.onRefresh(); S.announce=true; clearTimeout(announceTimer); announceTimer=setTimeout(announce, 1500); }
+  /* Refresh asks COS to run the camera checks now and waits for them (James, 27 Nov). The app says where it is
+     ("Checking… 42s") and whether a live check ran; without one this is the saved reading, and the board says so. */
+  try{
+    const got = await hooks.onRefresh(text => { if(typeof text==="string" && text) btn.textContent=text.slice(0,24); });
+    void loadRouters();
+    S.live = !got || got.live!==false;
+    S.announce=true; clearTimeout(announceTimer); announceTimer=setTimeout(announce, 1500);
+  }
   catch(_){ toast("Couldn't get a new reading. Still showing "+was+".", 12000); }
   btn.disabled=false; btn.textContent="Refresh";
 }
@@ -1472,7 +1479,8 @@ async function refresh(){
 let announceTimer=null;
 function announce(){ if(!S.announce) return; S.announce=false; clearTimeout(announceTimer);
   const at = S.meta && S.meta.v;
-  toast(!at ? "New reading loaded." : at===S.before ? "No newer Star4Live reading yet. Last read "+when(at)+"." : "New reading: Star4Live "+when(at)+".", 5000); }
+  const live = S.live===false ? " COS could not run a live check, so this is the saved reading." : "";
+  toast((!at ? "New reading loaded." : at===S.before ? "No newer Star4Live reading yet. Last read "+when(at)+"." : "New reading: Star4Live "+when(at)+".")+live, live ? 9000 : 5000); }
 /* ---------- manager view ----------
    For the owner sign-in only. One screen of what Tech Check already records: today's truck inspections, what each
    truck carries, and what IT and Service handed to each other. The camera numbers at the top are the board's own.
