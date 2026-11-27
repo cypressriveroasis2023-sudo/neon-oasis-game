@@ -17,6 +17,25 @@ export function chargeReadings(row: SafeVrmPower | undefined, now: number) {
   return (row?.measurements ?? []).filter(reading => reading.metric === 'battery_soc').sort((a,b) =>
     Number(readingIsFresh(b,now))-Number(readingIsFresh(a,now)) || a.source.localeCompare(b.source) || a.instance-b.instance || Date.parse(b.observedAt)-Date.parse(a.observedAt));
 }
+type Charge = ReturnType<typeof chargeReadings>[number];
+/**
+ * The one charge reading the tiles and alerts go by: a current one if there is any, the system's own if it
+ * reports one, otherwise the lowest. Always a real, labeled source; never an average.
+ */
+export function primaryCharge(charges: readonly Charge[], now: number): Charge | undefined {
+  const fresh = charges.filter(reading => readingIsFresh(reading, now));
+  const pool = fresh.length ? fresh : charges;
+  return pool.find(reading => reading.source === 'system') ?? [...pool].sort((a, b) => a.value - b.value)[0];
+}
+/** How the battery monitors compare. They "agree" when all are equally current and within one point of each other. */
+export const CHARGE_AGREE_POINTS = 1;
+export function chargeAgreement(charges: readonly Charge[], now: number): {lead: Charge | undefined; spread: number; agree: boolean} {
+  const lead = primaryCharge(charges, now);
+  if (charges.length < 2) return {lead, spread: 0, agree: false};
+  const values = charges.map(reading => reading.value), spread = Math.max(...values) - Math.min(...values);
+  const sameAge = charges.every(reading => readingIsFresh(reading, now)) || charges.every(reading => !readingIsFresh(reading, now));
+  return {lead, spread, agree: sameAge && spread <= CHARGE_AGREE_POINTS};
+}
 /** Select one labeled non-SOC source, never sum system totals and individual devices. */
 export function selectReading(row: SafeVrmPower | undefined, metric: PowerMetric, now: number) {
   const readings = (row?.measurements ?? []).filter(reading => reading.metric === metric);
@@ -36,9 +55,7 @@ export function unitTileSummary(unit: VrmUnit, rows: SafeVrmPower[], now: number
   if (unit.available === false) return { tone: 'unavailable' as TileTone, soc: undefined, solar: undefined, fresh: false, flow: undefined, alarms: [] as VictronAlarm[], lastSeen: lastConnected(unit, undefined) };
   const row = dashboardPowerFor(unit, rows);
   const charges = chargeReadings(row, now);
-  const fresh = charges.filter(reading => readingIsFresh(reading, now));
-  const pool = fresh.length ? fresh : charges;
-  const soc = pool.find(reading => reading.source === 'system') ?? [...pool].sort((a, b) => a.value - b.value)[0];
+  const soc = primaryCharge(charges, now);
   const solar = selectReading(row, 'solar_power', now);
   const isFresh = Boolean(soc && readingIsFresh(soc, now)) && !row?.errorCode;
   const alarms = victronAlarms(row, now);
