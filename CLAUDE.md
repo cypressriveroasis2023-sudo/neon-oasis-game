@@ -59,6 +59,12 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-27** — Tech Check: "power, not router". `inhand_private.router_night_drops`
+  (refreshed each alert run by `cos_router_night_drops_refresh_v1`, hooked into
+  `cos_router_down_alerts_v1` after the signal record line); `cos_router_down_hint_v1` replaces
+  the down alert's fixed advice line; `cos_router_details_v1` adds `nightDrops`. All anchored
+  replaces. No audit row, no cron change. Record in
+  `tech-checks/docs/db-changes/20261127_router_power_drops.sql`.
 - **2026-11-27** — **Sweep not publishing since 08:45 UTC**, cause outside the sweep: mHelpDesk
   rejected the saved authorization at 08:01 (`cos-mhelp-readiness` 409 `reconnect_required`),
   `cos-mhelp-inventory-sync` has returned 503 since 08:05, and from 08:45
@@ -86,6 +92,12 @@ Newest first. One line: date, what changed, what to watch.
   saved list has no record of (`withMhelpPlacement`). Watch: if HELIOS 011-020 are ever added to
   `equipment_units`, the saved answer takes over for them. Record and rollback:
   `tech-checks/docs/db-changes/20261127_cos_vrm_placement_read.md`.
+- **2026-11-26** — Tech Check: router signal history **live** (#561). New
+  `inhand_private.signal_history` (8 days), filled once per pull by
+  `public.cos_router_signal_record_v1()`, which `cos_router_down_alerts_v1` now calls first
+  (cron job 16; no new job). `public.cos_router_trend_v1(unit)` (service_role) feeds the unit
+  card's 7-day chart through `cos-router-details` **v2** (action `trend`). First record: 278
+  routers; watchdog `ok`. Record in `tech-checks/docs/db-changes/20261126_router_signal_history.sql`.
 - **2026-11-27** — Router as a second witness for Snipers / CAM Vs (**board client merged, inert;
   function patch prepared, not deployed**). Operations patch
   `cos-unit-camera-status/last-direct-check-v25` (starts from live v25 `2927fdeb`) adds

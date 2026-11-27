@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {parseRouterDetails, readRouterDetails, linkRouter, signalWord, milesBetween, suggestUnit, unitKeyOf, parseTrend, readRouterTrend, trendWords} from '../src/routerDetails.ts';
+import {parseRouterDetails, readRouterDetails, linkRouter, signalWord, milesBetween, suggestUnit, unitKeyOf, parseTrend, readRouterTrend, trendWords, powerHint} from '../src/routerDetails.ts';
 
 const reply = (status, body) => async () => new Response(JSON.stringify(body), {status, headers: {'content-type': 'application/json'}});
 
@@ -67,4 +67,11 @@ test('signal trend: parsed safely and said plainly', async () => {
   const read = await readRouterTrend('SPOTTER 100', reply(200, {unit: 'SPOTTER 100', points: [], verdict: 'steady'}), 'tok');
   assert.equal(read.verdict, 'steady');
   assert.equal(await readRouterTrend('SPOTTER 100', reply(403, {error: 'no'}), 'tok'), null);
+});
+
+test('overnight drops: two or more days means power, not the router', () => {
+  const d = parseRouterDetails({routers: [{unit: 'SOLARSPOTTER 050', serial: 'RF1', nightDrops: 3}, {unit: 'X', serial: 'RF2', nightDrops: 99}], unmatched: [], units: []});
+  assert.equal(d.routers[0].nightDrops, 3); assert.equal(d.routers[1].nightDrops, undefined);
+  assert.match(powerHint(3), /almost always power/);
+  assert.equal(powerHint(1), ''); assert.equal(powerHint(undefined), '');
 });
