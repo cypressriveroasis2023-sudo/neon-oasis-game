@@ -59,6 +59,17 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-27** — Refresh runs the camera checks now (**prepared, nothing applied or deployed**;
+  each step needs James's go). Order: (1) Tech Check `public.cos_check_now_v1()` and
+  `app_private.cos_check_now_log`, `tech-checks/docs/db-changes/20261127_cos_check_now.sql`: Owner
+  or approved IT; makes the same three `net.http_post` calls as cron jobs 2, 4 and 5 unless the
+  timer's run is under 75 s old or under 20 s away, or one was started under 2 minutes ago. No
+  cron job or schedule changes. (2) Operations patch `cos-unit-camera-status/check-now-v26`
+  (starts from live v26 `d1136141`): `POST /api/unit-camera-status/check-now`, rollback
+  `rollback-to-v26-entry`. The board client (merged with this) calls it on Refresh, waits the
+  seconds Tech Check gives, then reads; until both are live the route is missing, Refresh reads
+  the saved reading as before and says a live check could not run. If another patch to this
+  function deploys first, rebuild this one.
 - **2026-11-27** — Tech Check: "power, not router". `inhand_private.router_night_drops`
   (refreshed each alert run by `cos_router_night_drops_refresh_v1`, hooked into
   `cos_router_down_alerts_v1` after the signal record line); `cos_router_down_hint_v1` replaces
