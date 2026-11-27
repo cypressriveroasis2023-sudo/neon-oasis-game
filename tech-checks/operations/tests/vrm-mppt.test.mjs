@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {PGlite} from '@electric-sql/pglite';
-import {parseMppt, readVrmMppt, mpptFresh, mpptFlags, mpptLine, peerYield} from '../src/vrmMppt.ts';
+import {parseMppt, readVrmMppt, mpptFresh, mpptFlags, mpptLine, peerYield, solarDays} from '../src/vrmMppt.ts';
 import {victronNeedsAttention} from '../src/victronAttention.ts';
 import {hadRoomYesterday} from '../src/vrmHistory.ts';
 import {safeVrmMppt} from '../../supabase/functions/cos-vrm-mppt-read/read.ts';
@@ -112,4 +112,51 @@ test('"made less than the others" needs a battery that had room yesterday, not o
   const list = victronNeedsAttention(units, rows, inventory, NOW, history, null, null, mppt);
   assert.deepEqual(list.map(i => [i.name, i.kind]), [['HELIOS 001', 'panel']]);
   assert.match(list[0].line, /Panels made 0.14 kWh yesterday · the others made about 0.88 kWh/);
+});
+
+// The charger has no clock: its "today" counter starts over a few hours after dark.
+const at = (ms, over = {}) => parseMppt({units: [unit(1, {observedAt: Math.round(ms / 1000) - 120, ...over})]}, ms).get(1);
+
+test('late evening, after the charger started its new day: its "yesterday" is shown as today', () => {
+  const late = local(26, 22, 5), rolled = at(late, {yieldToday: 0, peakToday: 0, yieldYesterday: 0.81, peakYesterday: 344, panelVolts: 0});
+  assert.deepEqual(solarDays(rolled, late), {today: 0.81, peakToday: 344, yesterday: null, judged: {day: 0, made: 0.81}});
+  assert.equal(mpptLine(rolled, late), '0.81 kWh today · peak 344 W · panels 0 V');
+  // Same hour, a charger that has not started over yet reads as it always did.
+  const same = at(late, {yieldToday: 0.81, peakToday: 344, yieldYesterday: 1.13, panelVolts: 0});
+  assert.deepEqual(solarDays(same, late).judged, {day: -1, made: 1.13});
+  assert.equal(mpptLine(same, late), '0.81 kWh today · 1.13 yesterday · peak 344 W · panels 0 V');
+  // Before 9 PM an empty count is a real zero, not a new day.
+  const dusk = local(26, 18), zero = at(dusk, {yieldToday: 0, peakToday: 0, panelVolts: 0});
+  assert.deepEqual(solarDays(zero, dusk).judged, {day: -1, made: 0.88});
+  assert.match(mpptLine(zero, dusk), /^0 kWh today · 0.88 yesterday/);
+});
+
+test('small hours, before the charger starts its new day: its "today" is shown as yesterday', () => {
+  const small = local(27, 0, 30), still = at(small, {yieldToday: 0.92, peakToday: 360, yieldYesterday: 1.02, panelVolts: 0});
+  assert.deepEqual(solarDays(still, small), {today: null, peakToday: null, yesterday: 0.92, judged: {day: -1, made: 0.92}});
+  assert.equal(mpptLine(still, small), '0.92 kWh yesterday · panels 0 V');
+  const started = at(small, {yieldToday: 0, peakToday: 0, yieldYesterday: 0.92, panelVolts: 0});
+  assert.deepEqual(solarDays(started, small).judged, {day: -1, made: 0.92});
+  assert.equal(mpptLine(started, small), '0 kWh today · 0.92 yesterday · peak 0 W · panels 0 V');
+});
+
+test('late evening, units are compared on the same day and against that day\'s battery', () => {
+  const late = local(26, 22, 5), S2 = Math.round(late / 1000) - 120, sec = ms => Math.round(ms / 1000);
+  const rolled = made => ({observedAt: S2, yieldToday: 0, peakToday: 0, yieldYesterday: made, panelVolts: 0});
+  const notYet = (today, before) => ({observedAt: S2, yieldToday: today, yieldYesterday: before, panelVolts: 0});
+  // Units 1-5 have started the new day; 6 has not, and its "yesterday" (the 25th) must not be mixed in.
+  const mppt = parseMppt({units: [unit(1, rolled(0.2)), unit(2, rolled(0.8)), unit(3, rolled(0.84)), unit(4, rolled(0.9)), unit(5, rolled(0.86)), unit(6, notYet(0.85, 0.1))]}, late);
+  assert.equal(peerYield(mppt, [1, 2, 3, 4, 5, 6], late, 0), 0.84);
+  assert.equal(peerYield(mppt, [1, 2, 3, 4, 5, 6], late, -1), null);   // only one unit still speaks about the 25th
+  const day = (d, soc) => { const pts = []; for (let t = local(d, 7); t <= local(d, 17); t += 1800000) pts.push([sec(t), soc, 100, 50]); return pts; };
+  const m = v => ({metric: 'battery_soc', value: v, unit: '%', source: 'system', instance: 0, observedAt: new Date(late - 60000).toISOString()});
+  const units = [1, 2, 3, 4, 5, 6].map(id => ({installationId: id, name: 'HELIOS 00' + id, portalUrl: 'https://vrm.victronenergy.com/installation/' + id + '/dashboard', embedUrl: null}));
+  const rows = units.map(u => ({installationId: u.installationId, name: u.name, lastAttemptAt: null, errorCode: null, measurements: [m(96)]}));
+  const inventory = units.map(u => ({unitNumber: u.name, placement: 'FIELD'}));
+  // Unit 1 had room today (the 26th): flagged about today. Had it only had room on the 25th, it would not be.
+  const today = victronNeedsAttention(units, rows, inventory, late, new Map([[1, day(26, 70)]]), null, null, mppt).filter(i => i.kind === 'panel');
+  assert.deepEqual(today.map(i => i.name), ['HELIOS 001']);
+  assert.match(today[0].line, /Panels made 0.2 kWh today · the others made about 0.84 kWh/);
+  assert.deepEqual(victronNeedsAttention(units, rows, inventory, late, new Map([[1, day(25, 70)]]), null, null, mppt).filter(i => i.kind === 'panel'), []);
+  assert.equal(hadRoomYesterday(day(26, 70), late, 0), true); assert.equal(hadRoomYesterday(day(26, 70), late), false);
 });

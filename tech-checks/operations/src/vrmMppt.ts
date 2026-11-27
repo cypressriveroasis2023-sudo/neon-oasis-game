@@ -53,25 +53,57 @@ const ERRORS: Record<number, string> = {
 };
 const kwh = (n: number) => (Math.round(n * 100) / 100) + ' kWh';
 
+/**
+ * The charger has no clock. Its "today" counter starts over a few hours after dark: about 9:45 PM in late
+ * November, after midnight in summer. So late in the evening its "today" is already tomorrow's empty count
+ * and its "yesterday" is the day that just ended; and in the small hours of a summer night its "today" is
+ * still the day before. This says which calendar day each counter is really about.
+ */
+export type SolarDays = {
+  today: number | null; peakToday: number | null;   // the calendar day now (null when the charger cannot say)
+  yesterday: number | null;                         // the calendar day before
+  /** The newest finished solar day, for comparing units: which calendar day it is (0 today, -1 yesterday) and what it made. */
+  judged: {day: 0 | -1; made: number | null};
+};
+export function solarDays(m: Mppt, now: number): SolarDays {
+  const hour = new Date(now).getHours();
+  const empty = m.yieldToday !== null && m.yieldToday < 0.005 && !m.peakToday;
+  // Evening, counter already started over: "yesterday" is really today.
+  if (hour >= 21 && empty) return {today: m.yieldYesterday, peakToday: m.peakYesterday, yesterday: null, judged: {day: 0, made: m.yieldYesterday}};
+  // Before sunrise, counter not started over yet: "today" is really yesterday.
+  if (hour < 7 && !empty && m.yieldToday !== null) return {today: null, peakToday: null, yesterday: m.yieldToday, judged: {day: -1, made: m.yieldToday}};
+  return {today: m.yieldToday, peakToday: m.peakToday, yesterday: m.yieldYesterday, judged: {day: -1, made: m.yieldYesterday}};
+}
+const dayWord = (day: 0 | -1) => day === 0 ? 'today' : 'yesterday';
+type ByDay<T> = T | ((day: 0 | -1) => T);
+const forDay = <T,>(value: ByDay<T>, day: 0 | -1): T => typeof value === 'function' ? (value as (day: 0 | -1) => T)(day) : value;
+
 export type MpptFlag = {kind: 'charger' | 'panel'; line: string};
-/** Trouble this unit's own charger readings show. `peerYield` is the middle "yesterday" yield of the other Field units. */
-export function mpptFlags(m: Mppt | null | undefined, now: number, context: {needed?: boolean; peerYield?: number | null} = {}): MpptFlag[] {
+/**
+ * Trouble this unit's own charger readings show. `peerYield` is what the middle Field unit made on the same
+ * day, and `needed` is whether this unit's battery had room to charge that day; each may be a plain value
+ * (about yesterday) or a function of the day being judged.
+ */
+export function mpptFlags(m: Mppt | null | undefined, now: number, context: {needed?: ByDay<boolean | undefined>; peerYield?: ByDay<number | null | undefined>} = {}): MpptFlag[] {
   if (!mpptFresh(m, now)) return [];
   const flags: MpptFlag[] = [];
   if (m.errorCode !== null && m.errorCode > 0) flags.push({kind: 'charger', line: 'Solar charger error · ' + (ERRORS[m.errorCode] ?? 'code ' + m.errorCode)});
   const hour = new Date(now).getHours();
+  const {day, made} = solarDays(m, now).judged;
+  const peers = forDay(context.peerYield, day);
   if (hour >= 9 && hour < 16 && m.panelVolts !== null && m.panelVolts < PANEL_DEAD_VOLTS)
     flags.push({kind: 'panel', line: 'Panels not producing · ' + Math.round(m.panelVolts) + ' V at the charger in daylight'});
   // A unit that stayed full (outside power, light use) makes little because it needed little, so this only
-  // counts when its battery had room to charge yesterday (`needed`).
-  else if (context.needed && m.yieldYesterday !== null && context.peerYield && context.peerYield >= 0.3 && m.yieldYesterday < context.peerYield * LOW_YIELD_SHARE)
-    flags.push({kind: 'panel', line: 'Panels made ' + kwh(m.yieldYesterday) + ' yesterday · the others made about ' + kwh(context.peerYield)});
+  // counts when its battery had room to charge that day (`needed`).
+  else if (forDay(context.needed, day) && made !== null && peers && peers >= 0.3 && made < peers * LOW_YIELD_SHARE)
+    flags.push({kind: 'panel', line: 'Panels made ' + kwh(made) + ' ' + dayWord(day) + ' · the others made about ' + kwh(peers)});
   return flags;
 }
 
-/** Middle "yesterday" yield across the given units' fresh readings (needs 4+), or null. */
-export function peerYield(all: ReadonlyMap<number, Mppt> | null | undefined, ids: readonly number[], now: number): number | null {
-  const ys = ids.map(id => all?.get(id)).filter((m): m is Mppt => mpptFresh(m, now) && m.yieldYesterday !== null).map(m => m.yieldYesterday as number).sort((a, b) => a - b);
+/** What the middle unit made on that calendar day, across the given units' fresh readings (needs 4+), or null. */
+export function peerYield(all: ReadonlyMap<number, Mppt> | null | undefined, ids: readonly number[], now: number, day: 0 | -1 = -1): number | null {
+  const ys = ids.map(id => all?.get(id)).filter((m): m is Mppt => mpptFresh(m, now)).map(m => solarDays(m, now).judged)
+    .filter(j => j.day === day && j.made !== null).map(j => j.made as number).sort((a, b) => a - b);
   if (ys.length < 4) return null;
   const mid = ys.length >> 1;
   return ys.length % 2 ? ys[mid] : (ys[mid - 1] + ys[mid]) / 2;
@@ -80,10 +112,11 @@ export function peerYield(all: ReadonlyMap<number, Mppt> | null | undefined, ids
 /** One compact line for a unit: "0.42 kWh today · 0.88 yesterday · peak 350 W · panels 32 V". */
 export function mpptLine(m: Mppt | null | undefined, now: number): string | null {
   if (!mpptFresh(m, now)) return null;
+  const d = solarDays(m, now);
   const parts = [
-    m.yieldToday !== null ? kwh(m.yieldToday) + ' today' : null,
-    m.yieldYesterday !== null ? kwh(m.yieldYesterday).replace(' kWh', '') + ' yesterday' : null,
-    m.peakToday !== null ? 'peak ' + Math.round(m.peakToday) + ' W' : null,
+    d.today !== null ? kwh(d.today) + ' today' : null,
+    d.yesterday !== null ? (d.today !== null ? kwh(d.yesterday).replace(' kWh', '') : kwh(d.yesterday)) + ' yesterday' : null,
+    d.peakToday !== null ? 'peak ' + Math.round(d.peakToday) + ' W' : null,
     m.panelVolts !== null ? 'panels ' + Math.round(m.panelVolts) + ' V' : null,
   ].filter(Boolean);
   return parts.length ? parts.join(' · ') : null;
