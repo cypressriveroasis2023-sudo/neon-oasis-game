@@ -59,6 +59,18 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-27** — **Sweep not publishing since 08:45 UTC**, cause outside the sweep: mHelpDesk
+  rejected the saved authorization at 08:01 (`cos-mhelp-readiness` 409 `reconnect_required`),
+  `cos-mhelp-inventory-sync` has returned 503 since 08:05, and from 08:45
+  `cos-sheets-placement-publish/endpoint-source` answers 503 `inventory_not_current`, so the
+  direct collector holds all 44 Snipers / CAM Vs ("Native source refused" in the sweep log;
+  published 0, unverified 44). It clears when someone with the login reconnects mHelpDesk in
+  the app; no code change is involved and none should be made to get around it.
+- **2026-11-27** — `public.cos_sweep_watchdog_check_v1()` **crashes whenever it has a reason to
+  record** (`text[] || 'literal'` → malformed array literal), so it logged nothing through the
+  26 Nov refusal or today's hold. Fix **prepared, not applied** (needs James's go):
+  `tech-checks/docs/db-changes/20261127_sweep_watchdog_reasons_fix.md`. Until then do not
+  trust `cos_sweep_watchdog_recent_v1` showing `ok`; check `cron.job_run_details` for job 15.
 - **2026-11-27** — Deployed `cos-unit-camera-status/last-direct-check-v25` (#572, 15:20 UTC,
   James's go): live now **v26 `d1136141`** (pins updated). Each IP-checked unit carries
   `directCheck`, so the board's router second witness (`boardData.routerWitness`) is now
