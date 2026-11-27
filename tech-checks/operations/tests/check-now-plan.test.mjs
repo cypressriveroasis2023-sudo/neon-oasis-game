@@ -1,7 +1,7 @@
 // What the board does with COS's answer when Refresh asks for a live check.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readCheckNowPlan, checkNowWaitMs, CHECK_NOW_MAX_WAIT_MS} from '../src/checkNowPlan.ts';
+import {readCheckNowPlan, checkNowWaitMs, checkNowFailureIsQuiet, CHECK_NOW_MAX_WAIT_MS} from '../src/checkNowPlan.ts';
 
 const answer = (more = {}) => ({contract: 'COS_CHECK_NOW_STARTED_V1', started: true, reason: 'started', checkStartedAt: '2026-11-27T21:30:02.000Z', resultsBy: '2026-11-27T21:31:02.000Z', waitSeconds: 60, ...more});
 
@@ -41,5 +41,13 @@ test('anything that is not COS\'s own answer is refused, so the board falls back
   for (const bad of [null, undefined, 'started', [], {}, answer({contract: 'COS_CHECK_NOW_V1'}), answer({started: 'yes'}), answer({reason: 'soon'}),
     answer({started: false}), answer({started: true, reason: 'checked_recently'}), answer({waitSeconds: '60'}), answer({waitSeconds: 60.5}), answer({waitSeconds: -1}), answer({waitSeconds: 181}), {error: 'Only the Owner or approved IT can start a check.'}]) {
     assert.throws(() => readCheckNowPlan(bad, 0), /could not confirm/, JSON.stringify(bad));
+  }
+});
+
+test('a route that is not live yet, or a sign-in that may not start checks, says nothing; a real failure does', () => {
+  assert.equal(checkNowFailureIsQuiet(Object.assign(new Error('COS endpoint not found.'), {status: 404})), true);
+  assert.equal(checkNowFailureIsQuiet(Object.assign(new Error('Only the Owner or approved IT can start a check.'), {status: 403})), true);
+  for (const error of [Object.assign(new Error('x'), {status: 503}), Object.assign(new Error('x'), {status: 500}), new Error('network'), new Error('COS could not confirm the check started.'), null, undefined, 'x']) {
+    assert.equal(checkNowFailureIsQuiet(error), false);
   }
 });

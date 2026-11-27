@@ -36,3 +36,14 @@ export function checkNowWaitMs(plan: CheckNowPlan, now: number): number {
   const until = plan.receivedAt + Math.min(plan.waitSeconds * 1000, CHECK_NOW_MAX_WAIT_MS);
   return Math.max(0, Math.min(CHECK_NOW_MAX_WAIT_MS, until - now));
 }
+
+/**
+ * A check that could not be started is worth telling the person about, except in
+ * two cases where there is nothing for them to act on: the route is not live yet
+ * (404), or this sign-in may not start checks (403). Those read the saved reading
+ * exactly as Refresh always has.
+ */
+export function checkNowFailureIsQuiet(error: unknown): boolean {
+  const status = error && typeof error === 'object' ? (error as {status?: unknown}).status : undefined;
+  return status === 404 || status === 403;
+}

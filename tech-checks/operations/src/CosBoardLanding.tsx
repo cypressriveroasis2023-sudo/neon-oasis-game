@@ -18,7 +18,7 @@ import {withMhelpPlacement} from './victronAttention';
 import {readRouterDetails, readRouterTrend} from './routerDetails';
 import {boardEditState, handFixRequest, type BoardEditFlags, type BoardEditState, type BoardFixStep} from './cosBoard/boardEdit';
 import {mountCosBoard} from './cosBoard/boardApp';
-import {readCheckNowPlan, checkNowWaitMs, type CheckNowPlan} from './checkNowPlan';
+import {readCheckNowPlan, checkNowWaitMs, checkNowFailureIsQuiet, type CheckNowPlan} from './checkNowPlan';
 import {loadBoardFonts} from './cosBoard/boardFonts';
 import {vendorAccount, vendorAccountSet, vendorCameras, vendorCheck, vendorClose, vendorForm, vendorOpen, vendorPreview, vendorRecent, vendorSend, vendorTemplates} from './vendorRequest';
 import {addSims, managerHost, managerKnown, managerPhoto, markSim, requireSims, readManager, rememberManager, removeTruckExtra, saveTruck, setTruckStandard, takeBoardView, type TruckKit, type TruckType} from './managerBridge';
@@ -212,14 +212,15 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
     loadBoardFonts();
     const mounted: Board = mountCosBoard(element, {
       // The person asked for a new reading (James, 27 Nov: "click refresh and it will refresh and update"). Refresh
-      // first asks COS to run the camera checks now, waits for them, then reads. If a check cannot be started (not
-      // Owner or IT, or the request fails) the saved reading is still read and the board says which one it got.
+      // first asks COS to run the camera checks now, waits for them, then reads. If the request fails the saved
+      // reading is still read and the board says a live check could not run. A sign-in that may not start checks, or
+      // a route that is not live yet, reads the saved reading as Refresh always has, with nothing extra said.
       // A good reading also lifts the hold a failed save left.
       onRefresh: async (say?: (text: string) => void) => {
         if (writing.current) throw new Error('A save is still in progress.');
         const started = generation.current;
-        let plan: CheckNowPlan | null = null;
-        try { plan = readCheckNowPlan((await api.post('/api/unit-camera-status/check-now', {})).data); } catch { plan = null; }
+        let plan: CheckNowPlan | null = null, quiet = false;
+        try { plan = readCheckNowPlan((await api.post('/api/unit-camera-status/check-now', {})).data); } catch (error) { plan = null; quiet = checkNowFailureIsQuiet(error); }
         if (plan) {
           const label = plan.reason === 'started' ? 'Checking' : plan.reason === 'checked_recently' ? 'Just checked' : 'Check running';
           for (let left = checkNowWaitMs(plan, Date.now()); left > 0; left = checkNowWaitMs(plan, Date.now())) {
@@ -230,10 +231,12 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
           say?.('Reading…');
         }
         const result = checked((await api.get('/api/unit-camera-status')).data);
-        if (started !== generation.current) return {live: plan !== null};
+        // live: true a check ran; false one should have and could not; null there was none to run for this sign-in.
+        const live = plan !== null ? true : quiet ? null : false;
+        if (started !== generation.current) return {live};
         take.current(result);
         setLocked(false);
-        return {live: plan !== null};
+        return {live};
       },
       onEdit: (unitKey: string, steps: BoardFixStep[]) => fix.current(unitKey, steps),
       // A tech standing at a unit asks the cameras now rather than waiting for the next sweep. This is the same
