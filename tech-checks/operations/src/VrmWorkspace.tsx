@@ -203,14 +203,20 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
   const lastSuccess = readableTime(sync?.lastSuccessAt ?? null);
   const nextSync = readableTime(sync?.nextSyncAt ?? null);
   return <section className={'panel module vrm-workspace' + (expanded ? ' vrm-expanded' : '')} aria-label='Victron VRM Helios fleet'>
-    <div className='panelhead vrm-fleet-heading'><div><span className='vrm-eyebrow'>HELIOS · ENERGY SYSTEMS</span><h2>Helios power monitoring</h2><span>Victron Remote Management · {loaded ? units.length + (units.length === 1 ? ' installation' : ' installations') : loading ? 'Loading fleet…' : 'Fleet unavailable'}</span></div>
-      <div className='purchase-actions'><a className='operations-reference-link' href='https://vrm.victronenergy.com/installation-overview' target='_blank' rel='noopener noreferrer'>Open VRM fleet ↗</a><button className='secondary' onClick={() => void refresh(canDiscover)} disabled={loading || privateInvalidated}>{loading ? 'Checking fleet…' : canDiscover ? 'Refresh fleet' : 'Reload saved fleet'}</button></div>
+    <div className='panelhead vrm-fleet-heading vrm-hero'>
+      <svg className='vrm-hero-art' viewBox='0 0 200 120' aria-hidden='true' focusable='false'><defs><radialGradient id='vrmHeroSun' cx='50%' cy='100%' r='70%'><stop offset='0' stopColor='currentColor' stopOpacity='.55'/><stop offset='1' stopColor='currentColor' stopOpacity='0'/></radialGradient></defs><circle cx='150' cy='120' r='80' fill='url(#vrmHeroSun)'/>{[0, 1, 2, 3].map(i => <circle key={i} cx='150' cy='120' r={28 + i * 22} fill='none' stroke='currentColor' strokeOpacity={0.32 - i * 0.07} strokeWidth='.8'/>)}{[-70, -45, -20, 5, 30, 55].map(d => <line key={d} x1='150' y1='120' x2={150 + 118 * Math.sin(d * Math.PI / 180)} y2={120 - 118 * Math.cos(d * Math.PI / 180)} stroke='currentColor' strokeOpacity='.12' strokeWidth='.6'/>)}</svg>
+      <div className='vrm-hero-text'><span className='vrm-eyebrow'>HELIOS · ENERGY SYSTEMS</span><h2>Helios power monitoring</h2>
+        <p className='vrm-hero-sub'>Victron Remote Management · {loaded ? units.length + (units.length === 1 ? ' installation' : ' installations') : loading ? 'Loading fleet…' : 'Fleet unavailable'}</p></div>
+      {sync && <div className={'vrm-sync-status vrm-tone-'+syncTone} role='status'>
+      <p className='vrm-sync-line'><i aria-hidden='true'/><strong>{error ? 'Saved sync status, not reverified: ' : ''}{syncDescription(sync)}</strong>{sync.error ? <span> {sync.error}</span> : null}</p>
+      <p className='vrm-sync-times'>{lastSuccess ? <span title={lastSuccess}>Synced {shortTime(sync.lastSuccessAt ?? null)}</span> : <span>No successful sync yet</span>}{nextSync && <span title={nextSync}>Next {shortTime(sync.nextSyncAt ?? null)}</span>}<span>{sync.scheduleActive ? 'Every 15 min' : 'Auto sync off'}</span></p>
+      </div>}
+      <div className='purchase-actions vrm-hero-actions'>
+        <a className='operations-reference-link vrm-hero-btn vrm-hero-primary' href='https://vrm.victronenergy.com/installation-overview' target='_blank' rel='noopener noreferrer'><svg viewBox='0 0 24 24' aria-hidden='true' focusable='false'><path d='M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5'/></svg>Open in VRM</a>
+        <button className='secondary vrm-hero-btn' onClick={() => void refresh(canDiscover)} disabled={loading || privateInvalidated}><svg className={loading ? 'vrm-spin' : ''} viewBox='0 0 24 24' aria-hidden='true' focusable='false'><path d='M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7'/></svg>{loading ? 'Checking fleet…' : canDiscover ? 'Refresh fleet' : 'Reload saved fleet'}</button>
+      </div>
     </div>
     {error && <p role='alert'>{error}{privateInvalidated ? '' : loaded ? ' Showing the last successfully loaded fleet; it may be out of date.' : ' Reload the fleet to try again.'}</p>}
-    {sync && <div className={'vrm-sync-status vrm-tone-'+syncTone} role='status'>
-      <p className='vrm-sync-line'><i aria-hidden='true'/><strong>{error ? 'Saved sync status, not reverified: ' : ''}{syncDescription(sync)}</strong>{sync.error ? <span> {sync.error}</span> : null}</p>
-      <p className='vrm-sync-times'>{lastSuccess ? <span title={lastSuccess}>Synced {shortTime(sync.lastSuccessAt ?? null)}</span> : <span>No successful sync yet</span>}{nextSync && <span title={nextSync}>Next {shortTime(sync.nextSyncAt ?? null)}</span>}<span>{sync.scheduleActive ? 'Auto every 15 min' : 'Auto sync off'}</span></p>
-    </div>}
     {units.length > 0 && <ul className='vrm-fleet-summary' aria-label='Fleet power summary'>{summary.map(item => <li key={item.label} className={'vrm-tone-'+item.key}><strong>{item.value}</strong><span>{item.label}</span></li>)}</ul>}
     {units.length > 0 && placed > 0 && <section className={'vrm-attention' + (attention.length ? '' : ' vrm-attention-clear')} aria-label='Needs attention'>
       <h3>{attention.length ? 'Needs attention · Field units' : 'No Field power issues'}</h3>
