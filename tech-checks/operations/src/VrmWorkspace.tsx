@@ -10,7 +10,7 @@ import { heliosPlacement, placementLabel, victronFleetView, victronNeedsAttentio
 import { canonicalCameraUnit } from './fieldCameraHealth';
 import { mpptLine, readVrmExtras, type MhelpPlace, type Mppt } from './vrmMppt';
 import { cloudyWarning, heliosSpots, outlookLine, readSunForecast, sunOutlook, type SunDay } from './vrmWeather';
-import { dayPeak, historyFlags, isNightForecastTime, nightLoad, last24h, overnightLow, readVrmHistory, solarVsYesterday, systemLead, tonightBasis, tonightForecast, tonightHeadline, tonightSteps, type HistoryPoint, type Tonight } from './vrmHistory';
+import { dayPeak, historyFlags, isNightForecastTime, nightLoad, last24h, overnightLow, cloudyReserve, readVrmHistory, solarVsYesterday, systemLead, tonightBasis, tonightForecast, tonightHeadline, tonightSteps, type HistoryPoint, type Tonight } from './vrmHistory';
 import VrmTechGuide from './VrmTechGuide';
 import VrmNightReport, { nightLevel } from './VrmNightReport';
 import { nightReport } from './vrmNightReport';
@@ -194,10 +194,14 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
   if (sky) for (const [key, days] of sky) { const o = sunOutlook(days, now); if (o.length) weather.set(key, o); }
   const night = units.length > 0 && history ? nightReport(units, history, now, name => heliosPlacement(name, inventory) === 'shop') : null;
   const nightRows = new Map((night?.rows ?? []).map(r => [r.installationId, r]));
+  const RESERVE_SCALE = 4;
   const deploys = newlyDeployed(units, history, name => heliosPlacement(name, inventory) === 'field').map(d => {
     const tile = tiles.get(d.installationId);
     return deployCheck({...d, fresh: !!tile?.fresh, hasBattery: !!tile?.soc, points: history?.get(d.installationId) ?? [], mppt: mppt?.get(d.installationId)}, now);
   });
+  const reserve = units.filter(u => place.get(u.installationId) === 'field').flatMap(u => { const r = cloudyReserve(history?.get(u.installationId), now); return r ? [{...r, installationId: u.installationId, name: u.name}] : []; })
+    .sort((a, b) => a.days - b.days || a.name.localeCompare(b.name, undefined, {numeric: true}));
+  const reserveW = reserve.map(r => r.watts).sort((a, b) => a - b), reserveWatts = reserveW.length ? (reserveW[0] === reserveW[reserveW.length - 1] ? reserveW[0] + ' W' : reserveW[0] + '–' + reserveW[reserveW.length - 1] + ' W') : '';
   const attention = victronNeedsAttention(units, power.rows, inventory, now, history, tonight, weather, mppt, deploys);
   const syncTone = !sync ? 'stale' : error || sync.state === 'error' ? 'low' : sync.state === 'current' ? 'good' : 'stale';
   const lastSuccess = readableTime(sync?.lastSuccessAt ?? null);
@@ -221,6 +225,14 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
     {units.length > 0 && placed > 0 && <section className={'vrm-attention' + (attention.length ? '' : ' vrm-attention-clear')} aria-label='Needs attention'>
       <h3>{attention.length ? 'Needs attention · Field units' : 'No Field power issues'}</h3>
       {attention.length > 0 && <ul>{attention.map((item, index) => <li key={item.installationId + ':' + item.kind + ':' + index}><button type='button' className={'vrm-attn-'+item.kind} onClick={() => select(item.installationId)}><strong>{item.name}</strong><span>{item.line}</span></button></li>)}</ul>}
+    </section>}
+    {reserve.length > 0 && <section className='vrm-reserve' aria-label='If the sun stopped'>
+      <h3>If the sun stopped <span>· days until 20%, Field units</span></h3>
+      <ul>{reserve.map(r => <li key={r.installationId} className={'vrm-reserve-' + (r.days < 1 ? 'low' : r.days < 2 ? 'mid' : 'ok')}>
+        <button type='button' onClick={() => select(r.installationId)}><strong>{r.name.replace(/^HELIOS\s+/i, '')}</strong>
+          <span className='vrm-reserve-bar' aria-hidden='true'><i style={{width: Math.min(100, r.days / RESERVE_SCALE * 100) + '%'}}/></span>
+          <em>{r.days.toFixed(1)} days</em></button></li>)}</ul>
+      <p className='vrm-note'>From each unit's battery now and its own night use ({reserveWatts}), with no sun at all. Cloudy days still give some charge, so this is the worst case.</p>
     </section>}
     {deploys.length > 0 && <section className='vrm-deploy' aria-label='Just set up'>
       <h3>Just set up · first two days</h3>
