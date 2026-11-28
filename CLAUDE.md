@@ -59,6 +59,11 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-28** — **COS look, app screens** (James's go). New `tech-checks/operations/src/cosThemeApp.css`, imported last-but-one
+  in `App.tsx`: dark mode only, everything scoped under `#root#root .operations-shell`, built from the same `--cos-*` values.
+  Panels graphite, main panel buttons gold, tool links graphite with gold titles (Tech Check, More, InHand Routers). The
+  Victron workspace is excluded (it already has the look). Status colours, the red COS mark and red bottom bar unchanged.
+  Not yet: older Fleet health / Map / Camera status tabs, Team. Restyling a screen? Add to that file, not new colours.
 - **2026-11-28** — Operations: Helios battery health trend (James's go, applied ~17:50 UTC, migration
   `cos_vrm_battery_health`). New `cos_vrm_private.battery_health_nights` (one row per Helios per completed night:
   energy out after dark over the charge it took = capacity Wh; kept 400 days), `cos_vrm_private.battery_health_refresh()`
