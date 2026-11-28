@@ -59,6 +59,9 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-28** — `camera_devices` row 609 `SNIPER 318`: `do_not_use` → null, `mhelp_product_id` → `1832148` (James's go;
+  he cleared DO NOT USE in mHelp). One row, no audit row, watchdog `ok`. Still held for `identity_mismatch` until the 2027
+  tracker drops "- DO NOT USE" from its name. Record and rollback `tech-checks/docs/db-changes/20261128_sniper318_check_back_on.md`.
 - **2026-11-28** — Board: **Not monitored** state (`src/cosBoard/boardApp.ts`, James's go). A field unit from mHelp with
   no camera feed reads `nm` (not Unknown) when it is a Wall-E (the stand a Recon goes on) or one of the witness Spotters
   052 / 088 (A# 1713914 / 2036036, `WITNESS_PIDS`). It counts in the field, sits on the map at its mHelp site, is left out
