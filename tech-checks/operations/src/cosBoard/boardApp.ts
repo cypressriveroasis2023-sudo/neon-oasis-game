@@ -660,6 +660,7 @@ function diagnose(v){
   if(u.pw && u.pw.hf) ck.push({k:"Victron history", s:"warn", t:u.pw.hf.join(" · ")});
   if(u.pw && u.pw.sk && u.pw.sk.w) ck.push({k:"Weather, Victron", s:"warn", t:u.pw.sk.w});
   if(u.pw && u.pw.mp && u.pw.mp.w) ck.push({k:"Solar charger, Victron", s:"bad", t:u.pw.mp.w.join(" · ")});
+  if(u.pw && u.pw.bh && u.pw.bh.w) ck.push({k:"Battery, Victron", s:"warn", t:"Battery holds about "+u.pw.bh.k.toFixed(1)+" kWh ("+u.pw.bh.l+" of rated) · plan a replacement"});
   if(u.pw) ck.push({k:"Battery, Victron", s:u.pw.al && u.pw.q!=="stale" && u.pw.q!=="off" ? (u.pw.al.l===2 ? "bad" : "warn") : (PWQ[u.pw.q]||"unk"), t:powerText(u.pw)+(u.pw.t ? " · "+when(u.pw.t) : "")});
   if(fs==="issues"){ const off=offCams(v); if(off.length) ck.unshift({k:"Off now", s:"bad", t:off.map(c=>c.name+(c.since ? " · since "+when(c.since)+" · "+ago(c.since)+" ago" : "")).join(" · ")}); }
   if(u.lo && fs!=="up") ck.push({k:"Last online", s:"info", t:when(u.lo)+" · "+ago(u.lo)+" ago"});
@@ -1120,7 +1121,12 @@ function powerBox(v){
     p.tn.s.length ? h("ol",null,...p.tn.s.map(step => h("li",{text:step}))) : null) : null;
   const sky = p.sk ? h("p",{class:"pwsky"+(p.sk.w ? " flag" : "")},h("span",{text:"Sun ahead "}),h("b",{text:p.sk.o}),p.sk.w ? h("small",{text:p.sk.w}) : null) : null;
   const panels = p.mp ? h("p",{class:"pwsky"+(p.mp.w ? " flag" : "")},h("span",{text:"Panels "}),h("b",{text:p.mp.l}),p.mp.w ? h("small",{text:p.mp.w.join(" · ")}) : null) : null;
-  return h("div",{class:"box pwbox"},h("h3",{text:"Power"}),alarm,tn,tiles,hist,sky,panels,h("p",{class:"note",text:note}),go?h("div",{class:"links"},go):null);
+  const reserve = p.ds || p.bh ? h("p",{class:"pwsky"+(p.bh && p.bh.w ? " flag" : "")},
+    p.ds ? h("span",{text:"Without sun "}) : null, p.ds ? h("b",{text:"about "+p.ds.n.toFixed(1)+" days from now"}) : null,
+    p.ds ? h("small",{text:"("+p.ds.f.toFixed(1)+" from full)"}) : null,
+    p.bh ? h("span",{text:(p.ds ? " · " : "")+"Battery health "}) : null, p.bh ? h("b",{text:p.bh.l+" · "+p.bh.k.toFixed(1)+" kWh"}) : null,
+    p.bh && p.bh.w ? h("small",{text:"Wearing out · plan a replacement"}) : null) : null;
+  return h("div",{class:"box pwbox"},h("h3",{text:"Power"}),alarm,tn,tiles,hist,reserve,sky,panels,h("p",{class:"note",text:note}),go?h("div",{class:"links"},go):null);
 }
 function drawPanel(){
   const v = S.vmap && S.vmap[S.openId]; if(!v){ closeUnit(); return; }

@@ -98,6 +98,7 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
   }, []);
   // Saved Victron history (best-effort, every 15 minutes): last night's low and history flags on Helios cards.
   const [history, setHistory] = useState<Map<number, HistoryPoint[]> | null>(null);
+  const [healthNights, setHealthNights] = useState<ReadonlyMap<number, [string, number][]> | null>(null);
   const [mppt, setMppt] = useState<Map<number, Mppt> | null>(null);
   // mHelp's own Field/Shop for any Helios the saved equipment list does not hold (so its site gets a forecast too).
   const [places, setPlaces] = useState<MhelpPlace[] | null>(null);
@@ -105,11 +106,11 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
     let live = true;
     const read = () => {
       void readVrmHistory().then(units => { if (live && units) setHistory(new Map(units.map(u => [u.installationId, u.points]))); });
-      void readVrmExtras().then(extra => { if (!live) return; if (extra.mppt) setMppt(extra.mppt); if (extra.places?.length) setPlaces(extra.places); });
+      void readVrmExtras().then(extra => { if (!live) return; if (extra.mppt) setMppt(extra.mppt); if (extra.places?.length) setPlaces(extra.places); if (extra.health) setHealthNights(extra.health); });
     };
     read();
     const timer = window.setInterval(() => { if (document.visibilityState === 'visible') read(); }, 15 * 60 * 1000);
-    const drop = () => { setHistory(null); setMppt(null); setPlaces(null); };
+    const drop = () => { setHistory(null); setMppt(null); setPlaces(null); setHealthNights(null); };
     window.addEventListener('cos-private-data-invalidated', drop);
     return () => { live = false; window.clearInterval(timer); window.removeEventListener('cos-private-data-invalidated', drop); };
   }, []);
@@ -134,7 +135,7 @@ export default function CosBoardLanding({feed, recorderRows, now, fieldMap, rout
     if (sky) for (const [key, days] of sky) { const o = sunOutlook(days, now); if (o.length) out.set(key, o); }
     return out;
   }, [sky, now]);
-  const power = useMemo<Map<string, BoardPower> | null>(() => vrm ? boardPowerByUnit(vrm.data, Math.max(vrm.at, now), history, weather, mppt) : null, [vrm, now, history, weather, mppt]);
+  const power = useMemo<Map<string, BoardPower> | null>(() => vrm ? boardPowerByUnit(vrm.data, Math.max(vrm.at, now), history, weather, mppt, healthNights) : null, [vrm, now, history, weather, mppt, healthNights]);
   const data = useMemo(() => {
     if (!feed) return null;
     const clock = cameraFeedClock(feed, now);

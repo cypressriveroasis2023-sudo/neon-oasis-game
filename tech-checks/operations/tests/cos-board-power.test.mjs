@@ -50,3 +50,16 @@ test('the board carries power on the matching Helios unit only', () => {
   // Power never changes the camera verdict.
   assert.equal(data.units[0].vd, boardData({feed, census, now: cameraFeedClock(feed, now)}).units[0].vd);
 });
+
+test('Board power carries days without sun and battery health, from saved nights first', () => {
+  const S = Math.round(now / 1000), points = [];
+  for (let t = S - 40 * 3600; t <= S - 120; t += 1800) { const h = new Date(t * 1000).getHours(), dark = h < 6 || h >= 19, sun = h >= 10 && h < 16;
+    points.push([t, 86, sun ? 300 : 0, dark ? -36 : sun ? 271 : -30]); }
+  const power = boardPowerByUnit(fleet, now, new Map([[1, points]]), null, null, new Map([[1, [['2026-11-22', 3010], ['2026-11-23', 2990]]]]));
+  const p = boardPowerFor(power, 'HELIOS 001');
+  assert.ok(p.ds && p.ds.f > 3 && p.ds.f < 4 && p.ds.n < p.ds.f, JSON.stringify(p.ds));
+  assert.deepEqual(p.bh, {l: '100%+', k: 3, n: 2, w: false});
+  const worn = boardPowerFor(boardPowerByUnit(fleet, now, null, null, null, new Map([[1, [['2026-11-22', 2000], ['2026-11-23', 2050]]]])), 'HELIOS 001');
+  assert.deepEqual(worn.bh, {l: '74%', k: 2.1, n: 2, w: true});
+  assert.equal(worn.ds, undefined);   // no history, no estimate
+});
