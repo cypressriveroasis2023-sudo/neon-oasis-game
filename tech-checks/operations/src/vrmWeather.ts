@@ -100,11 +100,11 @@ const ymd = (d: Date) => d.getFullYear() + '-' + String(d.getMonth() + 1).padSta
 export const isGray = (d: SunDay) => d.mj !== null ? d.mj < GRAY_SUN_MJ : d.cloud !== null && d.cloud >= GRAY_CLOUD_PERCENT;
 
 /** The next two days that still have sun to give: today (before 3 PM) and tomorrow, or tomorrow and the day after. */
-export function sunOutlook(days: readonly SunDay[] | null | undefined, now: number): OutlookDay[] {
+export function sunOutlook(days: readonly SunDay[] | null | undefined, now: number, count = 2): OutlookDay[] {
   if (!days?.length) return [];
   const d = new Date(now), start = new Date(d.getFullYear(), d.getMonth(), d.getDate() + (d.getHours() >= 15 ? 1 : 0));
   const out: OutlookDay[] = [];
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < count; i++) {
     const day = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i), key = ymd(day);
     const hit = days.find(x => x.date === key);
     if (!hit || (hit.mj === null && hit.cloud === null)) return out;
@@ -130,3 +130,44 @@ export function cloudyWarning(outlook: readonly OutlookDay[], battery: number | 
 export function outlookLine(outlook: readonly OutlookDay[]): string {
   return outlook.map(d => (d.gray ? '☁ ' : '☀ ') + d.label).join(' · ');
 }
+
+/** What a day's sun should put into a Helios battery. GAGO DD3 with its ~420 W panel kit (GG-DD3-VBWA-420S;
+ * the best unit hit 450 W): sunlight in MJ/m² / 3.6 = kWh/m² = full-sun hours, times the panel watts, times 0.7
+ * for heat, dust, angle and charger losses. Rough by design: it only has to tell a 0.2 kWh day from a 1 kWh day. */
+export const PANEL_W = 420, PANEL_DERATE = 0.7;
+export const harvestWh = (mj: number | null) => mj === null ? null : Math.round(mj / 3.6 * PANEL_W * PANEL_DERATE);
+
+/** Fleet sun strip: the middle forecast across Field Helios for each of the next days. */
+export function fleetSky(sky: ReadonlyMap<string, readonly SunDay[]> | null | undefined, keys: readonly string[], now: number, count = 4): OutlookDay[] {
+  const per = keys.map(k => sunOutlook(sky?.get(k), now, count)).filter(o => o.length);
+  if (!per.length) return [];
+  const out: OutlookDay[] = [];
+  for (let i = 0; i < count; i++) {
+    const day = per.map(o => o[i]).filter(Boolean);
+    if (!day.length) break;
+    const mid = (v: (number | null)[]) => { const x = v.filter((n): n is number => n !== null).sort((a, b) => a - b); return x.length ? x[Math.floor(x.length / 2)] : null; };
+    const mj = mid(day.map(d => d.mj)), cloud = mid(day.map(d => d.cloud));
+    out.push({date: day[0].date, label: day[0].label, mj, cloud, gray: isGray({date: day[0].date, mj, cloud})});
+  }
+  return out;
+}
+
+/** Dark spell: walk the coming days with this unit's battery and use. Each night takes ~60% of a day's use before
+ * dawn (the low point), the day adds the forecast sun and takes the rest. Only gray stretches can warn. */
+export const DARK_SPELL_LOW = 20;
+export type DarkSpell = {low: number; by: string; grayDays: number};
+export function darkSpell(outlook: readonly OutlookDay[], batteryWh: number, usedWh: number, capacityWh: number): DarkSpell | null {
+  if (!outlook.length || usedWh <= 0 || capacityWh <= 0) return null;
+  const grayDays = outlook.filter(d => d.gray).length;
+  if (!grayDays) return null;
+  let b = batteryWh, low = b, by = '';
+  for (const d of outlook) {
+    if (d.label !== 'Today') b -= usedWh * 0.6;   // this morning's low has already passed
+    if (b < low) { low = b; by = d.label; }
+    const sun = harvestWh(d.mj) ?? (d.gray ? usedWh * 0.2 : usedWh * 1.3);
+    b = Math.min(capacityWh, b + sun - usedWh * 0.4);
+  }
+  const pct = Math.max(0, Math.round(low / capacityWh * 100));
+  return pct < DARK_SPELL_LOW ? {low: pct, by, grayDays} : null;
+}
+export const sayDay = (label: string) => label === 'Today' ? 'this morning' : label === 'Tomorrow' ? 'tomorrow morning' : label.slice(0, 3) + ' morning';

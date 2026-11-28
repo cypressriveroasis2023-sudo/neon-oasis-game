@@ -543,3 +543,15 @@ html[data-theme='light'] .cos-energy-story{color:#3b4656}html[data-theme='light'
 .vrm-sun-lede b{font-weight:600;color:#e9d5a5}
 .vrm-sun-even dd{color:#7fe3ad!important}.vrm-sun-short dd{color:#f5c76a!important}
 @media(max-width:700px){.vrm-sun-facts div:nth-child(3){grid-column:1/-1}}
+
+/* Sun forecast strip on the Without sun card. */
+.vrm-sky-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:16px 0 0}
+.vrm-sky-day{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px 9px;border:1px solid rgba(255,255,255,.07);border-radius:12px;background:rgba(255,255,255,.025);text-align:center}
+.vrm-sky-name{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:#8d97a6}
+.vrm-sky-day svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.vrm-sky-day.is-sunny svg{color:#f5c76a;filter:drop-shadow(0 0 6px rgba(245,185,66,.45))}.vrm-sky-day.is-mixed svg{color:#d8bf8a}.vrm-sky-day.is-gray svg{color:#8d97a6}
+.vrm-sky-day b{font-size:15px;font-weight:400;color:#eef2f7;font-variant-numeric:tabular-nums}.vrm-sky-day em{font-style:normal;font-size:11px;color:#8d97a6}
+.vrm-sky-day.is-gray{border-color:rgba(255,107,122,.22);background:rgba(255,107,122,.04)}.vrm-sky-day.is-gray b{color:#c9d1db}
+.vrm-sky-caption{margin:8px 2px 0;font-size:11.5px;line-height:1.45;color:#8d97a6}
+.vrm-attention .vrm-attn-darkspell span{color:#ff8a95;font-weight:600}
+html[data-theme='light'] .vrm-sky-day{background:#fff;border-color:#e6d8b8}html[data-theme='light'] .vrm-sky-day b{color:#1e2430}

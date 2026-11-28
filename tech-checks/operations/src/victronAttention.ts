@@ -9,7 +9,7 @@ import type {VrmUnit} from '../../supabase/functions/cos-operations-pages/vrm';
 import type {SafeVrmPower} from '../../supabase/functions/cos-operations-pages/vrmSafePower';
 
 export type VictronPlacement = 'field' | 'shop' | 'unknown';
-export type VictronAttention = {installationId: number; name: string; kind: 'alarm' | 'deploy' | 'low' | 'tonight' | 'fair' | 'overnight' | 'charger' | 'panel' | 'notfull' | 'load' | 'cloudy' | 'solar' | 'monitors' | 'tight' | 'unknown' | 'off'; line: string};
+export type VictronAttention = {installationId: number; name: string; kind: 'alarm' | 'deploy' | 'darkspell' | 'low' | 'tonight' | 'fair' | 'overnight' | 'charger' | 'panel' | 'notfull' | 'load' | 'cloudy' | 'solar' | 'monitors' | 'tight' | 'unknown' | 'off'; line: string};
 type InventoryUnit = {unitNumber?: string; placement?: string; currentLocationType?: string; effectivePlacement?: {contract?: string; state?: string}};
 
 /** Field or Shop from the one mHelp unit with the same Helios number. None or two matches stay unknown. */
@@ -126,6 +126,6 @@ export function victronNeedsAttention(units: readonly VrmUnit[], rows: SafeVrmPo
   else if (disagree.length > 1) { disagree.sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true}));
     out.push({installationId: disagree[0].installationId, name: disagree.length + ' units', kind: 'monitors',
       line: 'Second battery monitor reads low · ' + disagree.map(d => d.name.replace(/^HELIOS\s+/i, '')).join(', ') + ' · needs a re-sync'}); }
-  const rank = {alarm: 0, deploy: 0.5, charger: 1, low: 2, tonight: 3, panel: 4, fair: 5, overnight: 6, notfull: 7, load: 8, cloudy: 9, solar: 10, tight: 11, monitors: 12, off: 13, unknown: 14};
+  const rank = {alarm: 0, deploy: 0.5, darkspell: 0.8, charger: 1, low: 2, tonight: 3, panel: 4, fair: 5, overnight: 6, notfull: 7, load: 8, cloudy: 9, solar: 10, tight: 11, monitors: 12, off: 13, unknown: 14};
   return out.sort((a, b) => rank[a.kind] - rank[b.kind] || a.name.localeCompare(b.name, undefined, {numeric: true}));
 }

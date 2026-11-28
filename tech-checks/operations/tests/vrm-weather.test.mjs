@@ -97,3 +97,28 @@ test('the live forecast shape parses: three sites, MJ/m² and cloud %', () => {
   assert.deepEqual(d.map(isGray), [false, false, false, true]);
   assert.deepEqual(sunOutlook(d, local(26, 18)).map(x => [x.label, x.gray]), [['Tomorrow', false], ['Saturday', true]]);
 });
+
+import {darkSpell, fleetSky, harvestWh, sayDay} from '../src/vrmWeather.ts';
+test('panel harvest: sunlight MJ/m² → about what a 420 W DD3 kit makes', () => {
+  assert.equal(harvestWh(12), 980);   // a clear November day ≈ 1 kWh (the fleet made 0.77–0.92 kWh while full by noon)
+  assert.equal(harvestWh(3), 245);    // a gray day ≈ a quarter of that
+  assert.equal(harvestWh(null), null);
+});
+test('dark spell: three dark days from 82% at 0.79 kWh a day runs a DD3 under 20%; lighter gray or sun does not', () => {
+  const day = (label, mj) => ({date: label, label, mj, cloud: null, gray: mj < 7});
+  const gray = [day('Tomorrow', 2), day('Monday', 2), day('Tuesday', 2)];
+  assert.equal(darkSpell([day('Tomorrow', 3), day('Monday', 3), day('Tuesday', 3.5)], 2772 * 0.82, 793, 2772), null);   // ~25% at worst: no warning
+  const r = darkSpell(gray, 2772 * 0.82, 793, 2772);
+  assert.ok(r && r.low < 20 && r.grayDays === 3, JSON.stringify(r));
+  assert.equal(r.by, 'Tuesday'); assert.equal(sayDay(r.by), 'Tue morning'); assert.equal(sayDay('Tomorrow'), 'tomorrow morning');
+  assert.equal(darkSpell([day('Tomorrow', 12), day('Monday', 12)], 2772 * 0.5, 793, 2772), null);   // no gray day
+  assert.equal(darkSpell([day('Tomorrow', 3), day('Monday', 12)], 2772 * 0.9, 793, 2772), null);   // one gray day from 90% is fine
+  assert.equal(darkSpell([], 1000, 793, 2772), null);
+});
+test('fleet sky: the middle forecast across units for each day', () => {
+  const now = new Date(2026, 10, 28, 9).getTime();
+  const d = (mj) => [['2026-11-28', mj[0]], ['2026-11-29', mj[1]]].map(([date, m]) => ({date, mj: m, cloud: 50}));
+  const sky = new Map([['A', d([12, 3])], ['B', d([10, 4])], ['C', d([2, 5])]]);
+  assert.deepEqual(fleetSky(sky, ['A', 'B', 'C'], now, 2).map(x => [x.label, x.mj, x.gray]), [['Today', 10, false], ['Tomorrow', 4, true]]);
+  assert.deepEqual(fleetSky(sky, [], now), []);
+});
