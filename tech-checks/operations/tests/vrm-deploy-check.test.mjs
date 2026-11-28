@@ -68,13 +68,15 @@ test('Needs attention lists a failed setup near the top, even when the unit has 
     ['low', 'Low battery · 15%']]);
 });
 
-import {cloudyReserve} from '../src/vrmHistory.ts';
-test('If the sun stopped: days to 20% at the unit\'s own night draw', () => {
-  const now = new Date(2026, 10, 28, 0, 30).getTime(), N = now / 1000, pts = [];
-  for (let t = N - 30 * 3600; t <= N; t += 1800) { const h = new Date(t * 1000).getHours(), night = h < 7 || h >= 18; pts.push([t, 91, night ? 0 : 300, night ? -36 : 150]); }
-  const r = cloudyReserve(pts, now);
-  assert.deepEqual(r, {days: 2.4, watts: 36, soc: 91});          // 36 W × 24 h = 864 Wh ≈ 29%/day; 71 points to 20%
-  assert.equal(cloudyReserve(pts.slice(0, -4), now), null);       // last reading too old
-  assert.equal(cloudyReserve(pts.map(p => [p[0], p[1], 300, 150]), now), null);   // never seen discharging at night
-  assert.equal(cloudyReserve([], now), null);
+import {darkHours, withoutSun} from '../src/vrmHistory.ts';
+test('Without sun: all-day use (night draw after dark, daytime load in daylight), counted to empty', () => {
+  const now = new Date(2026, 10, 28, 7, 30).getTime(), N = now / 1000, pts = [];
+  for (let t = N - 40 * 3600; t <= N; t += 1800) { const h = new Date(t * 1000).getHours(), dark = h < 6 || h >= 19, sun = h >= 10 && h < 16;
+    pts.push([t, 82, sun ? 300 : 0, dark ? -36 : sun ? 271 : -30]); }       // daytime load 300 - 271 = 29 W
+  assert.equal(darkHours(new Date(now)), 13.8);
+  const r = withoutSun(pts, now);
+  assert.deepEqual(r, {fromNow: 3.1, full: 3.7, watts: 33, soc: 82});       // 33 W ≈ 26.9%/day: matches a full unit running ~4 days with a little sun
+  assert.equal(withoutSun(pts.slice(0, -4), now), null);                    // last reading too old
+  assert.equal(withoutSun([], now), null);
+  assert.ok(darkHours(new Date(2026, 5, 21)) < 10.5 && darkHours(new Date(2026, 11, 21)) > 13.5);
 });
