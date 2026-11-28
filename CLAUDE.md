@@ -59,6 +59,11 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-27** — Tech Check: mHelp alert (applied 21:58 UTC). `cos_router_down_alerts_v1` (anchored edit)
+  now appends `cos_mhelp_auth_alerts_safe_v1()` to its alerts, so job 16 pushes "mHelpDesk needs reconnecting"
+  (from the `COS_MHELP_RENEWAL_STATUS_V1` answer of job 10 in `net._http_response`) and "reconnected". State in
+  `app_private.mhelp_auth_watch`. A later replace of `cos_router_down_alerts_v1` must keep that call. Board: red
+  line when mHelp's read is over 50 min old. Record in `tech-checks/docs/db-changes/20261127_mhelp_auth_alert.md`.
 - **2026-11-27** — Camera checks keep the last good mHelp inventory for 24 h (**prepared, not
   deployed**; needs James's go). Operations `cos-sheets-placement-publish` (live v24, loader pinned to
   `d962b03`): `/endpoint-source` accepts an inventory whose last mHelp sync is up to 24 h old (was 45 min),
@@ -98,9 +103,9 @@ Newest first. One line: date, what changed, what to watch.
   the app; no code change is involved and none should be made to get around it.
 - **2026-11-27** — `public.cos_sweep_watchdog_check_v1()` **crashes whenever it has a reason to
   record** (`text[] || 'literal'` → malformed array literal), so it logged nothing through the
-  26 Nov refusal or today's hold. Fix **prepared, not applied** (needs James's go):
-  `tech-checks/docs/db-changes/20261127_sweep_watchdog_reasons_fix.md`. Until then do not
-  trust `cos_sweep_watchdog_recent_v1` showing `ok`; check `cron.job_run_details` for job 15.
+  26 Nov refusal or today's hold. Fix **applied** 17:50 UTC (James's go): the four lines now use
+  `array_append`; first run recorded `alarm` (0 of 44 fresh). Record
+  `tech-checks/docs/db-changes/20261127_sweep_watchdog_reasons_fix.md`.
 - **2026-11-27** — Deployed `cos-unit-camera-status/last-direct-check-v25` (#572, 15:20 UTC,
   James's go): live now **v26 `d1136141`** (pins updated). Each IP-checked unit carries
   `directCheck`, so the board's router second witness (`boardData.routerWitness`) is now
