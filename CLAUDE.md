@@ -59,12 +59,13 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
-- **2026-11-27** — Tech Check: camera-check stopped alert **prepared, not applied** (needs James's
-  go). `public.cos_sweep_watchdog_alerts_v1()` (+ `_safe_v1`, state in
+- **2026-11-27** — Tech Check: camera-check stopped alert **live** (18:45 CT, James's go; first run
+  quiet, state seeded `ok`). `public.cos_sweep_watchdog_alerts_v1()` (+ `_safe_v1`, state in
   `app_private.sweep_watchdog_alert_watch`) reads the watchdog log and alerts Owner + IT when two
   checks in a row are `alarm` (an unknown audit action alerts at once), repeats every 6 h, and says
   when it is back. Pushed by job 16: appended to `cos_router_down_alerts_v1`'s `alerts` after the
-  mHelp login alert, also on its "no fresh InHand pull" early return. Record and rollback in
+  mHelp login alert, also on its "no fresh InHand pull" early return (which now also carries the
+  mHelp login alert). Record and rollback in
   `tech-checks/docs/db-changes/20261127_sweep_watchdog_alert.sql`.
 - **2026-11-27** — Tech Check: "power, not router". `inhand_private.router_night_drops`
   (refreshed each alert run by `cos_router_night_drops_refresh_v1`, hooked into

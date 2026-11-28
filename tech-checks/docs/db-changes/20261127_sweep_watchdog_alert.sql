@@ -16,7 +16,8 @@
 -- login alert. The safe wrapper swallows errors, so a fault here never stops router alerts.
 -- No cron change, no audit row, no edge function change.
 --
--- Status: PREPARED, NOT APPLIED (needs James's go). Tested live inside a rolled-back transaction on
+-- Status: APPLIED 2026-11-27 ~00:45 UTC 28 Nov (18:45 CT 27 Nov, James's go); first run: no alert,
+-- state seeded `ok`, hook present twice in cos_router_down_alerts_v1. Before that, tested live inside a rolled-back transaction on
 -- 2026-11-27: one alarm check -> nothing; second -> "has stopped"; third -> nothing (6 h repeat);
 -- ok -> "is back" with the outage length; unknown audit action -> alerts on the first check; in-app
 -- notifications written to Owner + IT; hook present in cos_router_down_alerts_v1.
