@@ -458,6 +458,19 @@ function morningItems(){
   const byKey={}; for(const v of Object.values(S.vmap||{})) byKey[String(v.k).toUpperCase()]=v;
   return (S.morning ? S.morning.items : []).filter(it=>{ const v=byKey[String(it.unitKey||"").toUpperCase()]; return !v || (v.place!=="shop" && v.status!=="excl" && v.status!=="notin"); });
 }
+/* James, 27 Nov: Helios 016 was "Likely power, check battery first" with Victron reading 100%. Tech Check has no battery
+   readings, so the board corrects the line from the unit's own current Victron reading: a full battery is not a power
+   problem, a low one is. Without a current reading the Tech Check line stands as it is. */
+function morningPower(it){
+  const v=Object.values(S.vmap||{}).find(x=>String(x.k).toUpperCase()===String(it.unitKey||"").toUpperCase());
+  const pw=v && v.u && v.u.pw;
+  if(!pw || pw.q==="off" || pw.q==="stale" || pw.q==="none" || typeof pw.b!=="number") return null;
+  if(pw.b<20) return {b:pw.b, cause:"Victron shows the battery at "+pw.b+"%, so the unit is most likely out of power. Check the panels and the charge controller first.", sheet:"Battery "+pw.b+"% (Victron): likely out of power, check panels and charge controller."};
+  if(pw.b>=50) return {b:pw.b, cause:"Victron shows the battery at "+pw.b+"%, so it is not power. "+(it.router && it.router.status==="offline" ? "The router is offline too, so check the router and the SIM (Coverage map, Downdetector, Simetry)" : "Check the cameras and the NVR")+", then Check this unit now.", sheet:"Battery "+pw.b+"% (Victron), so not power: check "+(it.router && it.router.status==="offline" ? "router and SIM." : "cameras and NVR.")};
+  return null;
+}
+function morningCause(it){ const p=morningPower(it); return p ? p.cause : (it.cause||""); }
+function morningSheet(it){ const p=morningPower(it), line=String(it.sheetLine||""); if(!p) return line; const cut=line.search(/ Likely /); return (cut>0 ? line.slice(0,cut) : line)+" "+p.sheet; }
 function morningWhen(t){ if(!t) return ""; const d=new Date(t); return isNaN(d) ? "" : d.toLocaleString([], {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"}); }
 function drawMorning(){
   const sec=PSEC.find(p=>p[0]==="morning"), items=morningItems(), fresh=items.filter(it=>it.new), old=items.filter(it=>!it.new);
@@ -467,12 +480,12 @@ function drawMorning(){
     const uv=byKey[String(it.unitKey||"").toUpperCase()], r=it.router||{};
     const cams=(it.cameras||[]).map(c=>c.name).join(", ");
     const lines=[["Down: ", it.down+" of "+it.total+" camera"+(it.total===1?"":"s")+(it.downSince ? " since "+morningWhen(it.downSince) : "")], cams ? ["Cameras: ", cams] : null,
-      ["Router: ", r.status ? r.status+(r.carrier ? " · "+r.carrier : "")+(r.bars ? " · "+r.bars+" bars" : "") : "none linked"], ["Likely: ", it.cause||""]].filter(Boolean);
+      ["Router: ", r.status ? r.status+(r.carrier ? " · "+r.carrier : "")+(r.bars ? " · "+r.bars+" bars" : "") : "none linked"], ["Likely: ", morningCause(it)]].filter(Boolean);
     return h("div",{class:"prow"+(uv?" s-"+uv.status:"")},h("button",{class:"pmain",type:"button",disabled:!uv,onclick:()=>{ if(uv) openUnit(uv.id); }},
       h("span",{class:"name",text:(uv && uv.name) || it.unitKey}), lines.map(([a,b])=>h("span",{class:"sub"},h("b",{text:a}),b))));
   };
   const copy = h("button",{class:"fixbtn",type:"button",disabled:!items.length,onclick:async()=>{
-    const text=["New since yesterday:",...(fresh.length?fresh.map(it=>"- "+it.sheetLine):["- none"]),"","Still down:",...(old.length?old.map(it=>"- "+it.sheetLine):["- none"])].join("\n");
+    const text=["New since yesterday:",...(fresh.length?fresh.map(it=>"- "+morningSheet(it)):["- none"]),"","Still down:",...(old.length?old.map(it=>"- "+morningSheet(it)):["- none"])].join("\n");
     try{ await navigator.clipboard.writeText(text); toast("Copied "+items.length+" line"+(items.length===1?"":"s")+" for the IT sheet.", 6000); }
     catch(_){ toast("Copy did not work here. Long-press a line to copy it instead.", 8000); }
   }},"Copy for the IT sheet");
