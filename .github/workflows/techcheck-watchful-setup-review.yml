@@ -1,0 +1,48 @@
+name: TechCheck Watchful setup check review
+on:
+  pull_request:
+    paths:
+      - 'tech-checks/watchful-setup/**'
+      - 'tech-checks/database-maintenance/watchful-setup-*.sql'
+      - 'tech-checks/operations/tests/watchful-setup*'
+      - 'tech-checks/operations/tests/playwright.watchful.config.mjs'
+      - 'tech-checks/index.html'
+      - '.github/workflows/techcheck-watchful-setup-review.yml'
+permissions:
+  contents: read
+jobs:
+  watchful-setup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tech-checks/operations/package-lock.json
+      - name: The change file matches its sources
+        run: node tech-checks/watchful-setup/tools/assemble.mjs --check
+      - name: Screens parse
+        run: node --check tech-checks/watchful-setup/host.js && node --check tech-checks/watchful-setup/client.js && node --check tech-checks/watchful-setup/model.js
+      - name: Install locked review dependencies
+        run: npm ci
+        working-directory: tech-checks/operations
+      - name: Spec acceptance tests on the real change file, screen logic, rollback
+        run: node --test tests/watchful-setup-sql.test.mjs tests/watchful-setup-model.test.mjs tests/watchful-setup-rollback.test.mjs
+        working-directory: tech-checks/operations
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: tech-checks/operations
+      - name: The whole job on a phone screen against the real rules
+        run: npx playwright test --config tests/playwright.watchful.config.mjs
+        working-directory: tech-checks/operations
+        env:
+          WS_SHOTS: test-results-watchful/screens
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: watchful-setup-phone-screens
+          path: tech-checks/operations/test-results-watchful
+          if-no-files-found: ignore
+          retention-days: 14

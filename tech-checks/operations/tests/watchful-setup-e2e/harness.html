@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Watchful setup check — harness</title>
+<style>body{margin:0;background:#000;color:#fff;font:16px system-ui}#appView{padding:12px}</style></head>
+<body><div id="appView"><div id="view-svc"><div id="wlSvcHome"><div class="wl-service-action-list"></div></div></div>
+<div id="wlItHome"><div class="wl-it-command-workspace"></div></div>
+<div id="view-owner" data-owner-route="today"><div id="ownerRouteView"><div class="ownerAppPageHeader"></div></div></div></div>
+<script type="module">
+  // A stand-in for Tech Check's context: the same calls, answered by the harness server.
+  const people = {josh: ['00000000-0000-4000-8000-0000000000a1', 'service', 'Josh Rivera'],
+    teddy: ['00000000-0000-4000-8000-0000000000b1', 'it', 'Teddy'], james: ['00000000-0000-4000-8000-0000000000c1', 'owner', 'James Martin']};
+  const who = new URLSearchParams(location.search).get('as') || 'josh';
+  const [id, role, name] = people[who];
+  const post = async (url, body, raw = false) => (await fetch(url, {method: 'POST', headers: {'x-actor': id}, body: raw ? body : JSON.stringify(body)})).json();
+  const db = {
+    rpc: (fn, args) => new URLSearchParams(location.search).has('nobackend')
+      ? Promise.resolve({error: {message: 'Could not find the function public.' + fn + ' in the schema cache'}}) : post('/rpc/' + fn, args),
+    storage: {from: () => ({
+      upload: async (path, blob) => post('/upload?path=' + encodeURIComponent(path), blob, true),
+      createSignedUrl: async path => ({data: {signedUrl: '/object?path=' + encodeURIComponent(path)}}),
+    })},
+  };
+  window.TechCheckContext = Object.freeze({db, getSession: () => ({user: {id}}), getRole: () => role,
+    getProfile: () => ({user_id: id, role, active: true, archived_at: null, full_name: name})});
+  await import('/watchful-setup/host.js?v=ws-v1');
+  window.harnessReady = true;
+</script></body></html>
