@@ -200,7 +200,10 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
   });
   const reserve = units.filter(u => place.get(u.installationId) === 'field').flatMap(u => { const r = withoutSun(history?.get(u.installationId), now); return r ? [{...r, installationId: u.installationId, name: u.name}] : []; })
     .sort((a, b) => a.fromNow - b.fromNow || a.name.localeCompare(b.name, undefined, {numeric: true}));
-  const fulls = reserve.map(r => r.full).sort((a, b) => a - b), fleetFull = fulls.length ? fulls[Math.floor(fulls.length / 2)] : null;
+  const mid = (v: number[]) => { const x = [...v].sort((a, b) => a - b); return x.length ? x[Math.floor(x.length / 2)] : null; };
+  const fleetFull = mid(reserve.map(r => r.full)), fleetSafe = mid(reserve.map(r => r.safe)), fleetUsed = mid(reserve.map(r => r.usedWh));
+  // Yesterday's sun against a day's use, from the solar charger's own daily total (kWh), Field units only.
+  const sunYesterday = mid(reserve.flatMap(r => { const y = mppt?.get(r.installationId)?.yieldYesterday; return y != null && y > 0 ? [y * 1000] : []; }));
   const watts = reserve.map(r => r.watts).sort((a, b) => a - b);
   const attentionAll = victronNeedsAttention(units, power.rows, inventory, now, history, tonight, weather, mppt, deploys);
   const attention = attentionAll.filter(item => item.kind !== 'monitors'), monitors = attentionAll.find(item => item.kind === 'monitors');
@@ -229,9 +232,13 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
     </section>}
     {reserve.length > 0 && fleetFull !== null && <section className='vrm-sun' aria-label='Without sun'>
       <div className='vrm-sun-head'>
-        <div><span className='vrm-eyebrow'>Without sun</span><p className='vrm-sun-big'><strong>{fleetFull.toFixed(1)}</strong> days</p>
-          <p className='vrm-sun-lede'>A full Helios runs about this long on its battery alone, with no sun at all. Cloudy days still add some charge, so real runs go longer.</p></div>
-        <dl className='vrm-sun-facts'><div><dt>Shortest from now</dt><dd>{reserve[0].name.replace(/^HELIOS\s+/i, '')} · {reserve[0].fromNow.toFixed(1)} days</dd></div><div><dt>Use per unit</dt><dd>{watts[0] === watts[watts.length - 1] ? watts[0] : watts[0] + '–' + watts[watts.length - 1]} W all day</dd></div></dl>
+        <div><span className='vrm-eyebrow'>Without sun · GAGO DD3 battery</span><p className='vrm-sun-big'><strong>{fleetFull.toFixed(1)}</strong> days</p>
+          <p className='vrm-sun-lede'>How long a full Helios runs on its 2.8 kWh battery (22.2 V · 126 Ah) with no sun at all, at its real use. {fleetSafe !== null && <>Keeping to the maker's 80% safe limit: <b>{fleetSafe.toFixed(1)} days</b>. </>}Cloudy days still add some charge, so real runs go longer.</p></div>
+        <dl className='vrm-sun-facts'>
+          <div><dt>Shortest from now</dt><dd>{reserve[0].name.replace(/^HELIOS\s+/i, '')} · {reserve[0].fromNow.toFixed(1)} days</dd></div>
+          <div><dt>Use per day</dt><dd>{fleetUsed !== null ? (fleetUsed / 1000).toFixed(2) + ' kWh' : '—'} · {watts[0] === watts[watts.length - 1] ? watts[0] : watts[0] + '–' + watts[watts.length - 1]} W</dd></div>
+          {sunYesterday !== null && fleetUsed !== null && <div className={sunYesterday >= fleetUsed ? 'vrm-sun-even' : 'vrm-sun-short'}><dt>Sun yesterday</dt><dd>{(sunYesterday / 1000).toFixed(2)} kWh {sunYesterday >= fleetUsed ? '· covered the day' : '· short by ' + ((fleetUsed - sunYesterday) / 1000).toFixed(2)}</dd></div>}
+        </dl>
       </div>
       <ul className='vrm-sun-grid' aria-label='Days on battery from now, Field units'>{reserve.map(r => <li key={r.installationId} className={'vrm-sun-' + (r.fromNow < 1.5 ? 'low' : r.fromNow < 2.5 ? 'mid' : 'ok')}>
         <button type='button' onClick={() => select(r.installationId)} aria-label={r.name + ': ' + r.fromNow.toFixed(1) + ' days on battery from now'}>

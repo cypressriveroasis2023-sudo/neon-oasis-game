@@ -540,3 +540,6 @@ html[data-theme='light'] .cos-energy-story{color:#3b4656}html[data-theme='light'
 .cos-energy-flow{grid-template-columns:minmax(64px,auto) minmax(18px,1fr) minmax(84px,auto) minmax(18px,1fr) minmax(64px,auto)!important;align-items:start!important}
 .cos-energy-line{margin-top:31px}
 @media(max-width:480px){.cos-energy-flow{grid-template-columns:minmax(58px,auto) minmax(12px,1fr) minmax(78px,auto) minmax(12px,1fr) minmax(58px,auto)!important}.cos-energy-line{margin-top:27px}}
+.vrm-sun-lede b{font-weight:600;color:#e9d5a5}
+.vrm-sun-even dd{color:#7fe3ad!important}.vrm-sun-short dd{color:#f5c76a!important}
+@media(max-width:700px){.vrm-sun-facts div:nth-child(3){grid-column:1/-1}}
