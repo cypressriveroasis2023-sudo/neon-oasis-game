@@ -75,7 +75,7 @@ test('Without sun: all-day use (night draw after dark, daytime load in daylight)
     pts.push([t, 82, sun ? 300 : 0, dark ? -36 : sun ? 271 : -30]); }       // daytime load 300 - 271 = 29 W
   assert.equal(darkHours(new Date(now)), 13.8);
   const r = withoutSun(pts, now);
-  assert.deepEqual(r, {fromNow: 3.1, full: 3.7, watts: 33, soc: 82});       // 33 W ≈ 26.9%/day: matches a full unit running ~4 days with a little sun
+  assert.deepEqual(r, {fromNow: 2.9, full: 3.5, safe: 2.8, watts: 33, soc: 82, usedWh: 793});   // GAGO DD3 2772 Wh at 33 W all day
   assert.equal(withoutSun(pts.slice(0, -4), now), null);                    // last reading too old
   assert.equal(withoutSun([], now), null);
   assert.ok(darkHours(new Date(2026, 5, 21)) < 10.5 && darkHours(new Date(2026, 11, 21)) > 13.5);

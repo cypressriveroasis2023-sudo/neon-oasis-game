@@ -264,7 +264,11 @@ export function tonightSteps(t: Tonight): string[] {
  * from the last 48 h. 29.5 Wh per 1% (measured on the Field units). Counts to empty: when the cameras go dark.
  * fromNow starts at the battery now (less any amount the system number ran ahead); full starts at 100%.
  * Cloudy days still give some charge, so real runs are longer: this is the floor. Null without enough data. */
-export type WithoutSun = {fromNow: number; full: number; watts: number; soc: number};
+/** The battery in every Helios: GAGO DD3 solar box, 22.2 V / 126 Ah ternary lithium = 2772 Wh (maker's spec).
+ * The maker rates runtime at 80% depth of discharge. Measured on the fleet: ~29.5 Wh per 1%, within 6% of spec. */
+export const DD3_BATTERY_WH = 2772;
+export const DD3_SAFE_DOD = 0.8;
+export type WithoutSun = {fromNow: number; full: number; safe: number; watts: number; soc: number; usedWh: number};
 export function withoutSun(points: readonly HistoryPoint[] | null | undefined, now: number): WithoutSun | null {
   if (!points?.length) return null;
   const nowS = now / 1000, last = [...points].reverse().find(p => p[1] !== null);
@@ -275,10 +279,11 @@ export function withoutSun(points: readonly HistoryPoint[] | null | undefined, n
   const day = median(recent.filter(p => hour(p) >= 10 && hour(p) < 16 && (p[2] ?? 0) > 50).map(p => (p[2] as number) - (p[3] as number)).filter(w => w > 0));
   if (night === null || recent.filter(p => (p[3] as number) < 0).length < 6) return null;
   const hoursDark = darkHours(new Date(now)), watts = (night * hoursDark + (day ?? night) * (24 - hoursDark)) / 24;
-  const perDay = watts * 24 / WH_PER_POINT;
-  if (perDay <= 0) return null;
-  const soc = Math.max(0, (last[1] as number) - systemLead(points, now));
-  return {fromNow: Math.round(soc / perDay * 10) / 10, full: Math.round(100 / perDay * 10) / 10, watts: Math.round(watts), soc: Math.round(soc)};
+  const usedWh = watts * 24;
+  if (usedWh <= 0) return null;
+  const soc = Math.max(0, (last[1] as number) - systemLead(points, now)), days = (wh: number) => Math.round(wh / usedWh * 10) / 10;
+  return {fromNow: days(DD3_BATTERY_WH * soc / 100), full: days(DD3_BATTERY_WH), safe: days(DD3_BATTERY_WH * DD3_SAFE_DOD),
+    watts: Math.round(watts), soc: Math.round(soc), usedWh: Math.round(usedWh)};
 }
 /** Hours without useful sun in a day at this time of year (Texas): ~14 in winter, ~10 in summer. */
 export function darkHours(d: Date): number {
