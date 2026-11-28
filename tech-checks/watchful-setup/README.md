@@ -41,6 +41,12 @@ screen logic, rollback) and `watchful-setup.browser.spec.mjs` (the whole job on 
 real rules; `WS_SHOTS=dir` saves screenshots). Local harness: `node tests/watchful-setup-e2e/server.mjs`,
 then open `http://127.0.0.1:4180/?as=josh` (or `teddy`, `james`).
 
+## Live test (safe, leaves nothing behind)
+
+`tools/live-smoke.sql` runs the whole job on the live Tech Check database as the test accounts
+("Test Service" does the steps, "Test IT" signs off) on SOLARSPOTTER 058, then rolls back. Run it as one batch;
+the last result lists PASS/FAIL per step. First run 2026-11-28: 10 of 10 PASS, nothing left behind.
+
 ## Follow-ups (not in this change)
 
 - A template/catalog editor screen (S8); today the owner fills placeholders with two SQL calls (see the db-change record).
