@@ -67,3 +67,16 @@ test('Needs attention lists a failed setup near the top, even when the unit has 
     ['deploy', 'Just set up · panels producing (nothing in 4 h of daylight), solar charger (not seen)'],
     ['low', 'Low battery · 15%']]);
 });
+
+import {darkHours, withoutSun} from '../src/vrmHistory.ts';
+test('Without sun: all-day use (night draw after dark, daytime load in daylight), counted to empty', () => {
+  const now = new Date(2026, 10, 28, 7, 30).getTime(), N = now / 1000, pts = [];
+  for (let t = N - 40 * 3600; t <= N; t += 1800) { const h = new Date(t * 1000).getHours(), dark = h < 6 || h >= 19, sun = h >= 10 && h < 16;
+    pts.push([t, 82, sun ? 300 : 0, dark ? -36 : sun ? 271 : -30]); }       // daytime load 300 - 271 = 29 W
+  assert.equal(darkHours(new Date(now)), 13.8);
+  const r = withoutSun(pts, now);
+  assert.deepEqual(r, {fromNow: 3.1, full: 3.7, watts: 33, soc: 82});       // 33 W ≈ 26.9%/day: matches a full unit running ~4 days with a little sun
+  assert.equal(withoutSun(pts.slice(0, -4), now), null);                    // last reading too old
+  assert.equal(withoutSun([], now), null);
+  assert.ok(darkHours(new Date(2026, 5, 21)) < 10.5 && darkHours(new Date(2026, 11, 21)) > 13.5);
+});

@@ -116,16 +116,22 @@ export function projectIpCheckUnits(
 
 /**
  * Recon II: one line per unit, one camera per Reconeyez detector. Detectors
- * report independently of inventory sync. Both the feed and each detector's
- * health observation must be fresh. A fresh inventory pull cannot renew an old
- * online/offline observation; stale or missing evidence is Not verified.
+ * report by event, about once an hour, independently of the inventory sync.
+ * The feed itself must be current (synced within 45 minutes). Then:
+ * - an Online report counts for six hours (the board's own Recon window);
+ * - an Offline report stands until the detector reports again: a detector that
+ *   said it was offline and has gone quiet is Down, not Not verified
+ *   (James, 27 Nov 2026), and the card carries when it was last heard;
+ * - a detector with no report, or an Online report over six hours old, is Not verified.
+ * A fresh inventory pull never renews a detector's own report.
  */
+export const RECON_REPORT_FRESH_MS = 6 * 60 * 60 * 1000;
 export function projectReconUnits(
   devices: OtherDeviceRow[] | null | undefined, health: DeviceHealthRow[] | null | undefined,
-  feed: OtherFeed, now = Date.now(), maxAgeMs = STAR_FEED_FRESH_MS,
+  feed: OtherFeed, now = Date.now(), maxAgeMs = RECON_REPORT_FRESH_MS,
 ): UnitCameraStatus[] {
   const checks = healthById(health), groups = new Map<string, OtherDeviceRow[]>();
-  const feedFresh = feed?.enabled !== false && text(feed?.status) === 'ok' && fresh(feed?.syncedAt, now, maxAgeMs);
+  const feedFresh = feed?.enabled !== false && text(feed?.status) === 'ok' && fresh(feed?.syncedAt, now, STAR_FEED_FRESH_MS);
   for (const row of Array.isArray(devices) ? devices : []) {
     if (!active(row, RECON_SOURCE)) continue;
     const key = (text(row.unit_key) || text(row.device_name)).toUpperCase();
@@ -137,14 +143,17 @@ export function projectReconUnits(
     const cameras = members.map(row => {
       const check = checks.get(String(row.id));
       const said = text(check?.overall_status).toLowerCase();
-      const status: Status = feedFresh && fresh(check?.checked_at, now, maxAgeMs) &&
-        (said === 'online' || said === 'offline') ? said : 'unknown';
       const reportedAt = Date.parse(text(check?.checked_at));
+      const heard = Number.isFinite(reportedAt) && reportedAt - now <= 60000;
+      const status: Status = !feedFresh || !heard ? 'unknown'
+        : said === 'offline' ? 'offline'
+        : said === 'online' && fresh(check?.checked_at, now, maxAgeMs) ? 'online' : 'unknown';
       return {name: text(row.device_name) || unit, status,
-        ...(status === 'unknown' && (said === 'online' || said === 'offline') ? {
+        ...((status === 'unknown' && (said === 'online' || said === 'offline')) || status === 'offline' ? {
           lastReportedStatus: said as 'online' | 'offline',
           lastReportedAt: Number.isFinite(reportedAt) ? new Date(reportedAt).toISOString() : null,
         } : {}),
+        reportedAt,
       };
     });
     const online = cameras.filter(c => c.status === 'online').length, offline = cameras.filter(c => c.status === 'offline').length;
@@ -152,17 +161,21 @@ export function projectReconUnits(
     const organization = text(members.find(row => text(row.organization))?.organization);
     // Reconeyez has no shop folder; the unit's own label says when it is not out.
     const placement: 'FIELD' | 'SHOP' = NOT_DEPLOYED.test(unit) || SHOP_ORGANIZATIONS.has(organization.toLowerCase()) ? 'SHOP' : 'FIELD';
-    // A unit timestamp must not make its older detector observations look newer.
-    const seen = members.map(row => Date.parse(text(checks.get(String(row.id))?.checked_at)));
-    const observedAt = seen.every(at => Number.isFinite(at) && at <= now + 60000)
-      ? new Date(Math.min(...seen)).toISOString() : null;
+    // The time the unit's readings rest on. Up readings need their own reports,
+    // so it is the oldest Online report; an Offline report stands on its own, so a
+    // unit with no Online detector rests on the feed being current. With neither,
+    // it is the oldest report, as before. It never makes an Online report look newer.
+    const onlineAt = cameras.filter(c => c.status === 'online').map(c => c.reportedAt);
+    const observedAt = onlineAt.length ? new Date(Math.min(...onlineAt)).toISOString()
+      : offline > 0 ? new Date(Date.parse(text(feed?.syncedAt))).toISOString()
+      : cameras.every(c => Number.isFinite(c.reportedAt) && c.reportedAt <= now + 60000) ? new Date(Math.min(...cameras.map(c => c.reportedAt))).toISOString() : null;
     units.push({
       unit, placement,
       site: placement === 'FIELD' && organization.toUpperCase() !== unit.toUpperCase() ? organization : null,
       siteNamePending: false,
       state: state(online, offline, unknown),
       cameras: cameras.length, online, offline, unknown,
-      down: cameras.filter(c => c.status !== 'online'),
+      down: cameras.filter(c => c.status !== 'online').map(({reportedAt: _, ...c}) => c),
       onlineInShop: placement === 'SHOP' && online > 0,
       publicIp: null,
       observedAt,

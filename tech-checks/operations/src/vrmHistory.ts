@@ -258,3 +258,30 @@ export function tonightSteps(t: Tonight): string[] {
     'If it cannot make it, plan a battery swap or site visit the way you normally would, and note it on the IT sheet.',
   ];
 }
+
+/** "Without sun": how long a unit runs on its battery alone, at its own all-day use, with no solar at all.
+ * Use = after-dark draw for the night hours plus daytime load (solar in minus battery in) for the daylight hours,
+ * from the last 48 h. 29.5 Wh per 1% (measured on the Field units). Counts to empty: when the cameras go dark.
+ * fromNow starts at the battery now (less any amount the system number ran ahead); full starts at 100%.
+ * Cloudy days still give some charge, so real runs are longer: this is the floor. Null without enough data. */
+export type WithoutSun = {fromNow: number; full: number; watts: number; soc: number};
+export function withoutSun(points: readonly HistoryPoint[] | null | undefined, now: number): WithoutSun | null {
+  if (!points?.length) return null;
+  const nowS = now / 1000, last = [...points].reverse().find(p => p[1] !== null);
+  if (!last || nowS - last[0] > 45 * 60) return null;
+  const recent = points.filter(p => p[0] > nowS - 48 * 3600 && p[3] !== null), hour = (p: HistoryPoint) => new Date(p[0] * 1000).getHours();
+  const median = (v: number[]) => { const s = [...v].sort((a, b) => a - b); return s.length ? s[Math.floor(s.length / 2)] : null; };
+  const night = median(recent.filter(p => (hour(p) < 6 || hour(p) >= 19) && (p[3] as number) < 0 && (p[2] ?? 0) < 5).map(p => -(p[3] as number)));
+  const day = median(recent.filter(p => hour(p) >= 10 && hour(p) < 16 && (p[2] ?? 0) > 50).map(p => (p[2] as number) - (p[3] as number)).filter(w => w > 0));
+  if (night === null || recent.filter(p => (p[3] as number) < 0).length < 6) return null;
+  const hoursDark = darkHours(new Date(now)), watts = (night * hoursDark + (day ?? night) * (24 - hoursDark)) / 24;
+  const perDay = watts * 24 / WH_PER_POINT;
+  if (perDay <= 0) return null;
+  const soc = Math.max(0, (last[1] as number) - systemLead(points, now));
+  return {fromNow: Math.round(soc / perDay * 10) / 10, full: Math.round(100 / perDay * 10) / 10, watts: Math.round(watts), soc: Math.round(soc)};
+}
+/** Hours without useful sun in a day at this time of year (Texas): ~14 in winter, ~10 in summer. */
+export function darkHours(d: Date): number {
+  const day = (Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(d.getFullYear(), 0, 0)) / 864e5;
+  return Math.round((12 + 2 * Math.cos((day + 10) / 365 * 2 * Math.PI)) * 10) / 10;
+}

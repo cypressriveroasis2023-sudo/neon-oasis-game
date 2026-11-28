@@ -62,6 +62,33 @@ Newest first. One line: date, what changed, what to watch.
 - **2026-11-27** — Tech Check: `app_private.cos_router_swaps_compute()` now lists an unlinked router that is online
   in an InHand pull from the last 2 hours (`observed_at`), not by `last_seen` (InHand's last *connect* time). Spotter
   265's swap is listed again; not applied. Record in `tech-checks/docs/db-changes/20261127_router_swap_seen_fix.md`.
+- **2026-11-28** — Board: **Not monitored** state (`src/cosBoard/boardApp.ts`, James's go). A field unit from mHelp with
+  no camera feed reads `nm` (not Unknown) when it is a Wall-E (the stand a Recon goes on) or one of the witness Spotters
+  052 / 088 (A# 1713914 / 2036036, `WITNESS_PIDS`). It counts in the field, sits on the map at its mHelp site, is left out
+  of Down/Issues/Unknown/Up and of the punch list's "Field, no camera feed". Sniper 318 is held by mHelp's own DO NOT USE
+  mark (lifecycle `DO_NOT_USE` → `existing_source_hold`); left for James to clear in mHelp, nothing changed in COS.
+- **2026-11-28** — **Deployed both** (James's go, ~05:44 UTC). (1) Operations `cos-sheets-placement-publish`
+  **v25 `00013c1e`**: loader pinned to `c1733c1`, `tech-checks/docs/endpoint-source-inventory-grace-20261127/source/serve.ts`
+  (24 h mHelp inventory grace + a lone `customer_mismatch` no longer holds). Next sweep published 38 of 44 (was 34):
+  SNIPER 328 and 2-348 online, 227 and 2-347 first miss. Rollback: the v24 loader in that README. A next change to this
+  function must start from that source. (2) `cos-unit-camera-status/recon-window-v27` (run 46113656334): live now
+  **v28 `e1fd4e2f`** (pins updated). Rollback `rollback-to-v27-entry`. A next patch to this function must start from v28.
+- **2026-11-27** — Tech Check: camera-check stopped alert **live** (18:45 CT, James's go; first run
+  quiet, state seeded `ok`). `public.cos_sweep_watchdog_alerts_v1()` (+ `_safe_v1`, state in
+  `app_private.sweep_watchdog_alert_watch`) reads the watchdog log and alerts Owner + IT when two
+  checks in a row are `alarm` (an unknown audit action alerts at once), repeats every 6 h, and says
+  when it is back. Pushed by job 16: appended to `cos_router_down_alerts_v1`'s `alerts` after the
+  mHelp login alert, also on its "no fresh InHand pull" early return (which now also carries the
+  mHelp login alert). Record and rollback in
+  `tech-checks/docs/db-changes/20261127_sweep_watchdog_alert.sql`.
+- **2026-11-27** — Unknowns on the board (**prepared, not deployed**; each deploy needs James's go).
+  (1) Same pending `cos-sheets-placement-publish` source as the 24 h grace below: `/endpoint-source` drops a
+  lone `customer_mismatch` review reason, so SNIPER 227 / 328 / 2-347 / 2-348 are checked again.
+  (2) `cos-unit-camera-status/recon-window-v27` (starts from live v27 `81a7a8a5`): a Recon Online report
+  counts 6 h (was 45 min); a detector whose last report was Offline and went quiet reads Down with when it
+  was last heard (was Not verified), only while the Reconeyez feed is current. Source
+  `tech-checks/operations/shared/otherUnitStatus.ts`; v28 record `cos-unit-camera-status-v28-entry`;
+  rollback `rollback-to-v27-entry`. If another patch to this function deploys first, rebuild this one.
 - **2026-11-27** — Tech Check: mHelp alert (applied 21:58 UTC). `cos_router_down_alerts_v1` (anchored edit)
   now appends `cos_mhelp_auth_alerts_safe_v1()` to its alerts, so job 16 pushes "mHelpDesk needs reconnecting"
   (from the `COS_MHELP_RENEWAL_STATUS_V1` answer of job 10 in `net._http_response`) and "reconnected". State in

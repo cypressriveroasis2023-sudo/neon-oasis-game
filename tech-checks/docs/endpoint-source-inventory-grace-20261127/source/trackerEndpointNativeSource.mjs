@@ -21,6 +21,11 @@ const SCHEDULED_SOURCE_REFUSALS=Object.freeze({'Current complete inventory requi
 // GRACE_MS: how long the camera endpoint source keeps using the last accepted
 // inventory when no newer sync has succeeded. The camera snapshot source keeps 45 min.
 export const CURRENT_MS=2700000,GRACE_MS=86400000;
+// 2026-11-27 (James's go): a customer name that differs between mHelp and the 2027
+// tracker does not stop a check. It held SNIPER 227 and 328 (moved to AT&T sites after
+// the tracker's 4 Nov mHelp copy) and 2-347 / 2-348 (customer respelled in mHelp) on
+// every run. The Product ID, unit name, placement, binding and IP checks are unchanged.
+export const CUSTOMER_NAME_ONLY='customer_mismatch';
 function baseline(value,now,maxAge=CURRENT_MS){
  if(value?.contract!=='COS_MHELP_API_V1'||value.origin!=='mhelpdesk_api'||value.complete!==true||value.reviewed!==true||!H.test(value.sourceSha256)||value.apiSync?.enabled!==true||!Number.isFinite(Date.parse(value.apiSync.lastSuccessAt))||Date.parse(value.apiSync.lastSuccessAt)>now||now-Date.parse(value.apiSync.lastSuccessAt)>maxAge||!Array.isArray(value.records)||!value.records.length||value.records.length>10000)throw Error('Current complete inventory required');
  const proof=value.trackerEndpointMembership;
@@ -42,7 +47,7 @@ export async function readScheduledNativeEndpointSource({readBaseline,readTracke
   const t=tracker.records.find(t=>t.productId===raw.productId),proof=source.trackerEndpointMembership.records.find(p=>p.productId===raw.productId),b=raw.binding;
   if(!ID.test(raw.productId)||!t||!proof||!Array.isArray(t.reviewReasons)||!['FIELD','SHOP'].includes(raw.placement))throw Error('Incomplete Product census');
   const held=!!raw.holdReason||!!raw.placementHeld||!!raw.possibleAliasUnitIds?.length||terminal(raw.unitNumber)||t.placement!==raw.placement||b&&proof.bindingGuard!==b.expectedGuard||b&&proof.trackerId!==b.trackerId;
-  return {productId:raw.productId,placement:raw.placement,lifecycle:raw.lifecycle,support:/(stand|pole|skid)/i.test(raw.category||''),ip:t.publicIp,holds:held?['existing_source_hold']:[],reviewReasons:t.reviewReasons,binding:b?{current:b.guardCurrent===true,nativeUnitId:b.nativeUnitId,trackerId:b.trackerId,guard:b.expectedGuard,state:'linked',readOnlyTracker:proof.readOnlyTracker===true,representedIds:[b.trackerId]}:null};
+  return {productId:raw.productId,placement:raw.placement,lifecycle:raw.lifecycle,support:/(stand|pole|skid)/i.test(raw.category||''),ip:t.publicIp,holds:held?['existing_source_hold']:[],reviewReasons:t.reviewReasons.filter(r=>r!==CUSTOMER_NAME_ONLY),binding:b?{current:b.guardCurrent===true,nativeUnitId:b.nativeUnitId,trackerId:b.trackerId,guard:b.expectedGuard,state:'linked',readOnlyTracker:proof.readOnlyTracker===true,representedIds:[b.trackerId]}:null};
  }).sort((a,b)=>a.productId.localeCompare(b.productId));
  return {contract:'COS_SCHEDULED_TRACKER_ENDPOINT_SOURCE_V1',complete:true,sourceSha256:source.sourceSha256,trackerSha256:tracker.trackerSourceSha256,observedAt:now(),inventorySyncedAt:syncedAt,inventoryCurrent:current,products};
 }
