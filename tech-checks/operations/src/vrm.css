@@ -410,3 +410,47 @@ html[data-theme='light'] .vrm-attention .vrm-attn-monitors span,html[data-theme=
 .vrm-deploy-ok i{color:var(--vt-emerald,#4fd18b)}.vrm-deploy-fail{color:#ffb3ba}.vrm-deploy-fail i{color:var(--vt-ruby,#ff6b7a)}.vrm-deploy-wait{color:var(--vt-mute,#9aa4b2)}
 html[data-theme='light'] .vrm-deploy{background:#fff}
 .vrm-attention .vrm-attn-deploy span{color:#ff6b7a;font-weight:700}
+
+/* Hero header: champagne glow, sun-arc artwork, two proper buttons with line icons (no emoji). */
+#root#root#root .operations-shell .vrm-workspace .vrm-hero{position:relative;overflow:hidden;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:18px 24px;margin:-4px -4px 14px;padding:22px 22px 20px;border:1px solid rgba(216,191,138,.22);border-bottom:1px solid rgba(216,191,138,.22);border-radius:18px;background:radial-gradient(120% 140% at 100% 0%,rgba(216,191,138,.16),rgba(216,191,138,0) 55%),linear-gradient(160deg,#151a24 0%,#0c0f15 100%)!important;box-shadow:inset 0 1px 0 rgba(255,236,196,.08),0 14px 40px rgba(0,0,0,.35)}
+#root#root#root .operations-shell .vrm-workspace .vrm-hero::before{content:'';position:absolute;left:22px;right:22px;top:0;height:1px;background:linear-gradient(90deg,transparent,rgba(233,213,165,.7),transparent)}
+.vrm-hero-art{position:absolute;right:-6px;bottom:0;width:260px;height:156px;color:#e9d5a5;pointer-events:none;opacity:.9}
+.vrm-hero-text{position:relative;min-width:0}
+#root#root#root .operations-shell .vrm-workspace .vrm-hero h2{margin:8px 0 8px!important;font-size:clamp(23px,6.2vw,32px)!important;line-height:1.1;font-weight:300!important;letter-spacing:-.015em;overflow-wrap:anywhere;color:#f4ecdc!important}
+.vrm-hero-sub{display:flex;align-items:center;gap:8px;margin:0;font-size:13px;line-height:1.35;color:#aab5c3;min-width:0}
+.vrm-hero-dot{flex:none;width:7px;height:7px;border-radius:50%;background:#7d8796;box-shadow:0 0 0 3px rgba(125,135,150,.15)}
+.vrm-hero-dot.vrm-tone-good{background:#4fd18b;box-shadow:0 0 0 3px rgba(79,209,139,.16),0 0 10px rgba(79,209,139,.6)}
+.vrm-hero-dot.vrm-tone-low{background:#ff6b7a;box-shadow:0 0 0 3px rgba(255,107,122,.16)}
+#root#root#root .operations-shell .vrm-workspace .vrm-hero-actions{position:relative;display:flex;gap:10px;margin:0;flex-wrap:nowrap}
+#root#root#root .operations-shell .vrm-workspace .vrm-hero-btn{display:inline-flex!important;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:0 18px!important;border-radius:999px!important;font-size:14px!important;font-weight:600!important;letter-spacing:.01em;white-space:nowrap;text-decoration:none!important;transition:transform .15s ease,box-shadow .15s ease,filter .15s ease;border:1px solid rgba(216,191,138,.38)!important;background:rgba(255,255,255,.03)!important;color:#f1e6cf!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)!important}
+#root#root#root .operations-shell .vrm-workspace .vrm-hero-primary{border-color:transparent!important;background:linear-gradient(135deg,#f0dcae 0%,#d8bf8a 48%,#b8965a 100%)!important;color:#17130b!important;box-shadow:0 6px 20px rgba(216,191,138,.28),inset 0 1px 0 rgba(255,255,255,.45)!important}
+#root#root#root .operations-shell .vrm-workspace .vrm-hero-btn:hover{transform:translateY(-1px);filter:brightness(1.06)}
+#root#root#root .operations-shell .vrm-workspace .vrm-hero-btn:active{transform:translateY(0);filter:brightness(.97)}
+#root#root#root .operations-shell .vrm-workspace .vrm-hero-btn:focus-visible{outline:2px solid #f0dcae;outline-offset:3px}
+#root#root#root .operations-shell .vrm-workspace .vrm-hero-btn[disabled]{opacity:.6;transform:none}
+.vrm-hero-btn svg{flex:none;width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.vrm-spin{animation:vrm-spin 1s linear infinite}@keyframes vrm-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.vrm-spin{animation:none}#root#root#root .operations-shell .vrm-workspace .vrm-hero-btn{transition:none}}
+@media(max-width:700px){
+  #root#root#root .operations-shell .vrm-workspace .vrm-hero{grid-template-columns:minmax(0,1fr);padding:20px 16px 16px;margin:-2px 0 14px}
+  .vrm-hero-art{width:220px;height:132px;right:-30px;opacity:.6}
+  #root#root#root .operations-shell .vrm-workspace .vrm-hero-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
+  #root#root#root .operations-shell .vrm-workspace .vrm-hero-btn{padding:0 10px!important;font-size:13.5px!important;min-width:0}
+}
+html[data-theme='light'] #root#root#root .operations-shell .vrm-workspace .vrm-hero{background:radial-gradient(120% 140% at 100% 0%,rgba(184,150,90,.16),rgba(184,150,90,0) 55%),#fffdf8!important;border-color:#e6d8b8;box-shadow:0 10px 28px rgba(60,45,20,.08)}
+html[data-theme='light'] #root#root#root .operations-shell .vrm-workspace .vrm-hero h2{color:#1e2430!important}
+html[data-theme='light'] .vrm-hero-sub{color:#55606e}html[data-theme='light'] .vrm-hero-art{color:#b8965a}
+html[data-theme='light'] #root#root#root .operations-shell .vrm-workspace .vrm-hero-btn:not(.vrm-hero-primary){color:#5a4520!important;border-color:#d8c49a!important;background:#fff!important}
+
+/* Sync status folded into the hero: one quiet line under the title. */
+#root#root#root .operations-shell .vrm-workspace .vrm-hero .vrm-sync-status{grid-column:1/-1;position:relative;margin:0;padding:0;border:0!important;background:none!important;box-shadow:none!important;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+#root#root#root .operations-shell .vrm-workspace .vrm-hero .vrm-sync-line{margin:0;font-size:13px}
+#root#root#root .operations-shell .vrm-workspace .vrm-hero .vrm-sync-line strong{font-weight:500;color:#d9e1ea}
+#root#root#root .operations-shell .vrm-workspace .vrm-hero .vrm-sync-times{display:flex;flex-wrap:wrap;gap:6px;margin:0}
+#root#root#root .operations-shell .vrm-workspace .vrm-hero .vrm-sync-times span{padding:3px 9px;border:1px solid rgba(216,191,138,.2);border-radius:999px;font-size:11.5px;color:#aab5c3;background:rgba(0,0,0,.18)}
+html[data-theme='light'] #root#root#root .operations-shell .vrm-workspace .vrm-hero .vrm-sync-line strong{color:#2a3340}
+html[data-theme='light'] #root#root#root .operations-shell .vrm-workspace .vrm-hero .vrm-sync-times span{color:#55606e;background:#fff;border-color:#e6d8b8}
+#root#root#root .operations-shell .vrm-workspace .vrm-hero-actions{grid-column:2;grid-row:1;align-self:center;justify-content:flex-end}
+#root#root#root .operations-shell .vrm-workspace .vrm-hero .vrm-sync-status{grid-row:2}
+@media(max-width:700px){#root#root#root .operations-shell .vrm-workspace .vrm-hero-actions{grid-column:1;grid-row:3}}
+@media(max-width:380px){#root#root#root .operations-shell .vrm-workspace .vrm-hero-actions{grid-template-columns:minmax(0,1fr)}}

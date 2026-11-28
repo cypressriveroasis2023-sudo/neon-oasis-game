@@ -57,7 +57,7 @@ test('Authorized embedded dashboards follow the selected installation',async({pa
  expect(requests.every(r=>r.method==='GET')).toBeTruthy();
 });
 test('An initial read failure never fabricates fleet installations or dashboards',async({page})=>{
- const {frame}=await mount(page,{failVrm:true});await openVrm(frame);await expect(frame.getByRole('alert')).toContainText('VRM configuration unavailable');await expect(frame.locator('iframe.vrm-dashboard')).toHaveCount(0);await expect(frame.getByRole('navigation',{name:'Helios installations'})).toHaveCount(0);await expect(frame.getByRole('link',{name:'Open VRM fleet ↗',exact:true})).toBeVisible();
+ const {frame}=await mount(page,{failVrm:true});await openVrm(frame);await expect(frame.getByRole('alert')).toContainText('VRM configuration unavailable');await expect(frame.locator('iframe.vrm-dashboard')).toHaveCount(0);await expect(frame.getByRole('navigation',{name:'Helios installations'})).toHaveCount(0);await expect(frame.getByRole('link',{name:'Open in VRM',exact:true})).toBeVisible();
 });
 test('Dashboard controls resize without losing the selected installation or issuing writes',async({page},testInfo)=>{
  const embeds=Object.fromEntries(vrmPortalConfig().items.map(unit=>[unit.installationId,`https://vrm.victronenergy.com/installation/${unit.installationId}/embed/synthetic-only`]));
