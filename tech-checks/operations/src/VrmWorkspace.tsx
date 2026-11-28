@@ -10,7 +10,7 @@ import { heliosPlacement, placementLabel, victronFleetView, victronNeedsAttentio
 import { canonicalCameraUnit } from './fieldCameraHealth';
 import { mpptLine, readVrmExtras, type MhelpPlace, type Mppt } from './vrmMppt';
 import { cloudyWarning, heliosSpots, outlookLine, readSunForecast, sunOutlook, type SunDay } from './vrmWeather';
-import { dayPeak, historyFlags, isNightForecastTime, nightLoad, last24h, overnightLow, cloudyReserve, readVrmHistory, solarVsYesterday, systemLead, tonightBasis, tonightForecast, tonightHeadline, tonightSteps, type HistoryPoint, type Tonight } from './vrmHistory';
+import { dayPeak, historyFlags, isNightForecastTime, nightLoad, last24h, overnightLow, withoutSun, readVrmHistory, solarVsYesterday, systemLead, tonightBasis, tonightForecast, tonightHeadline, tonightSteps, type HistoryPoint, type Tonight } from './vrmHistory';
 import VrmTechGuide from './VrmTechGuide';
 import VrmNightReport, { nightLevel } from './VrmNightReport';
 import { nightReport } from './vrmNightReport';
@@ -194,15 +194,16 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
   if (sky) for (const [key, days] of sky) { const o = sunOutlook(days, now); if (o.length) weather.set(key, o); }
   const night = units.length > 0 && history ? nightReport(units, history, now, name => heliosPlacement(name, inventory) === 'shop') : null;
   const nightRows = new Map((night?.rows ?? []).map(r => [r.installationId, r]));
-  const RESERVE_SCALE = 4;
   const deploys = newlyDeployed(units, history, name => heliosPlacement(name, inventory) === 'field').map(d => {
     const tile = tiles.get(d.installationId);
     return deployCheck({...d, fresh: !!tile?.fresh, hasBattery: !!tile?.soc, points: history?.get(d.installationId) ?? [], mppt: mppt?.get(d.installationId)}, now);
   });
-  const reserve = units.filter(u => place.get(u.installationId) === 'field').flatMap(u => { const r = cloudyReserve(history?.get(u.installationId), now); return r ? [{...r, installationId: u.installationId, name: u.name}] : []; })
-    .sort((a, b) => a.days - b.days || a.name.localeCompare(b.name, undefined, {numeric: true}));
-  const reserveW = reserve.map(r => r.watts).sort((a, b) => a - b), reserveWatts = reserveW.length ? (reserveW[0] === reserveW[reserveW.length - 1] ? reserveW[0] + ' W' : reserveW[0] + '–' + reserveW[reserveW.length - 1] + ' W') : '';
-  const attention = victronNeedsAttention(units, power.rows, inventory, now, history, tonight, weather, mppt, deploys);
+  const reserve = units.filter(u => place.get(u.installationId) === 'field').flatMap(u => { const r = withoutSun(history?.get(u.installationId), now); return r ? [{...r, installationId: u.installationId, name: u.name}] : []; })
+    .sort((a, b) => a.fromNow - b.fromNow || a.name.localeCompare(b.name, undefined, {numeric: true}));
+  const fulls = reserve.map(r => r.full).sort((a, b) => a - b), fleetFull = fulls.length ? fulls[Math.floor(fulls.length / 2)] : null;
+  const watts = reserve.map(r => r.watts).sort((a, b) => a - b);
+  const attentionAll = victronNeedsAttention(units, power.rows, inventory, now, history, tonight, weather, mppt, deploys);
+  const attention = attentionAll.filter(item => item.kind !== 'monitors'), monitors = attentionAll.find(item => item.kind === 'monitors');
   const syncTone = !sync ? 'stale' : error || sync.state === 'error' ? 'low' : sync.state === 'current' ? 'good' : 'stale';
   const lastSuccess = readableTime(sync?.lastSuccessAt ?? null);
   const nextSync = readableTime(sync?.nextSyncAt ?? null);
@@ -226,13 +227,20 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
       <h3>{attention.length ? 'Needs attention · Field units' : 'No Field power issues'}</h3>
       {attention.length > 0 && <ul>{attention.map((item, index) => <li key={item.installationId + ':' + item.kind + ':' + index}><button type='button' className={'vrm-attn-'+item.kind} onClick={() => select(item.installationId)}><strong>{item.name}</strong><span>{item.line}</span></button></li>)}</ul>}
     </section>}
-    {reserve.length > 0 && <section className='vrm-reserve' aria-label='If the sun stopped'>
-      <h3>If the sun stopped <span>· days until 20%, Field units</span></h3>
-      <ul>{reserve.map(r => <li key={r.installationId} className={'vrm-reserve-' + (r.days < 1 ? 'low' : r.days < 2 ? 'mid' : 'ok')}>
-        <button type='button' onClick={() => select(r.installationId)}><strong>{r.name.replace(/^HELIOS\s+/i, '')}</strong>
-          <span className='vrm-reserve-bar' aria-hidden='true'><i style={{width: Math.min(100, r.days / RESERVE_SCALE * 100) + '%'}}/></span>
-          <em>{r.days.toFixed(1)} days</em></button></li>)}</ul>
-      <p className='vrm-note'>From each unit's battery now and its own night use ({reserveWatts}), with no sun at all. Cloudy days still give some charge, so this is the worst case.</p>
+    {reserve.length > 0 && fleetFull !== null && <section className='vrm-sun' aria-label='Without sun'>
+      <div className='vrm-sun-head'>
+        <div><span className='vrm-eyebrow'>Without sun</span><p className='vrm-sun-big'><strong>{fleetFull.toFixed(1)}</strong> days</p>
+          <p className='vrm-sun-lede'>A full Helios runs about this long on its battery alone, with no sun at all. Cloudy days still add some charge, so real runs go longer.</p></div>
+        <dl className='vrm-sun-facts'><div><dt>Shortest from now</dt><dd>{reserve[0].name.replace(/^HELIOS\s+/i, '')} · {reserve[0].fromNow.toFixed(1)} days</dd></div><div><dt>Use per unit</dt><dd>{watts[0] === watts[watts.length - 1] ? watts[0] : watts[0] + '–' + watts[watts.length - 1]} W all day</dd></div></dl>
+      </div>
+      <ul className='vrm-sun-grid' aria-label='Days on battery from now, Field units'>{reserve.map(r => <li key={r.installationId} className={'vrm-sun-' + (r.fromNow < 1.5 ? 'low' : r.fromNow < 2.5 ? 'mid' : 'ok')}>
+        <button type='button' onClick={() => select(r.installationId)} aria-label={r.name + ': ' + r.fromNow.toFixed(1) + ' days on battery from now'}>
+          <span className='vrm-sun-name' aria-hidden='true'>{r.name.replace(/^HELIOS\s+/i, '')}</span>
+          <strong aria-hidden='true'>{r.fromNow.toFixed(1)}<small>d</small></strong>
+          <span className='vrm-sun-bar' aria-hidden='true'><i style={{width: Math.min(100, r.fromNow / Math.max(r.full, 0.1) * 100) + '%'}}/></span>
+        </button></li>)}</ul>
+      <p className='vrm-sun-axis'>Each unit: days on battery from where it is now, shortest first. The bar is how full it is.</p>
+      {monitors && <p className='vrm-sun-maint'><b>Maintenance, not urgent</b> · Second battery monitor reads low on {(m => /^HELIOS/i.test(monitors.name) ? monitors.name + ' (' + m + ')' : m)(monitors.line.replace(/^Second battery monitor reads low · /, '').replace(/ · needs a re-sync$/, ''))}. The page and alerts use the system reading, so nothing is affected.</p>}
     </section>}
     {deploys.length > 0 && <section className='vrm-deploy' aria-label='Just set up'>
       <h3>Just set up · first two days</h3>

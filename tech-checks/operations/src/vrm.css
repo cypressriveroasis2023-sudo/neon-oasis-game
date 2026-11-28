@@ -470,3 +470,39 @@ html[data-theme='light'] .vrm-reserve{background:#fffdf8;border-color:#e6d8b8}ht
 html[data-theme='light'] #root#root#root .operations-shell .vrm-workspace .vrm-reserve button{color:#1e2430!important}html[data-theme='light'] .vrm-reserve em{color:#1e2430}
 #root#root#root .operations-shell .vrm-workspace .vrm-reserve .vrm-note{background:none!important;padding:0!important;border:0!important}
 @media(max-width:700px){#root#root#root .operations-shell .vrm-workspace .vrm-reserve button{min-height:26px;padding:2px 4px!important}}
+
+/* Without sun: one big fleet number, then every Field unit as a dot on a days axis. */
+.vrm-sun{position:relative;overflow:hidden;margin:12px 0;padding:20px 20px 14px;border:1px solid rgba(216,191,138,.2);border-radius:18px;background:radial-gradient(90% 120% at 0% 0%,rgba(245,185,66,.10),rgba(245,185,66,0) 60%),linear-gradient(160deg,#151a24,#0c0f15);box-shadow:inset 0 1px 0 rgba(255,236,196,.06),0 14px 36px rgba(0,0,0,.3)}
+.vrm-sun-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px 28px;align-items:end}
+.vrm-sun .vrm-eyebrow{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--vt-lux,#d8bf8a)}
+.vrm-sun-big{margin:6px 0 4px;font-size:16px;color:#aab5c3}.vrm-sun-big strong{font-size:clamp(44px,12vw,60px);line-height:1;font-weight:200;letter-spacing:-.03em;color:#f4ecdc;margin-right:6px;font-variant-numeric:tabular-nums}
+.vrm-sun-lede{margin:0;max-width:520px;font-size:13px;line-height:1.45;color:#aab5c3}
+.vrm-sun-facts{display:grid;gap:8px;margin:0}.vrm-sun-facts div{padding:8px 12px;border:1px solid rgba(216,191,138,.16);border-radius:12px;background:rgba(0,0,0,.18)}
+.vrm-sun-facts dt{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#8d97a6}.vrm-sun-facts dd{margin:2px 0 0;font-size:14px;color:#eef2f7;font-variant-numeric:tabular-nums}
+.vrm-sun-track{position:relative;height:118px;margin:20px 14px 0;border-bottom:1px solid rgba(216,191,138,.35)}
+.vrm-sun-track::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,rgba(255,107,122,.10) 0 30%,rgba(245,185,66,.07) 30% 50%,rgba(79,209,139,.05) 50%);border-radius:10px 10px 0 0}
+.vrm-sun-tick{position:absolute;bottom:-22px;transform:translateX(-50%);font-size:11px;color:#7f8a99;font-variant-numeric:tabular-nums}
+.vrm-sun-tick::before{content:'';position:absolute;left:50%;bottom:20px;width:1px;height:118px;background:rgba(255,255,255,.05)}
+#root#root#root .operations-shell .vrm-workspace .vrm-sun-dot{position:absolute;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:3px;min-height:0;min-width:0;padding:4px!important;border:0!important;background:none!important;box-shadow:none!important;color:#dfe6ee!important;font-size:11px;font-weight:600;letter-spacing:.05em;border-radius:8px!important;margin-top:8px}
+.vrm-sun-dot i{width:13px;height:13px;border-radius:50%;background:#4fd18b;box-shadow:0 0 0 3px rgba(79,209,139,.18),0 0 12px rgba(79,209,139,.55)}
+.vrm-sun-mid i{background:#f5b942;box-shadow:0 0 0 3px rgba(245,185,66,.18),0 0 12px rgba(245,185,66,.5)}.vrm-sun-low i{background:#ff6b7a;box-shadow:0 0 0 3px rgba(255,107,122,.2),0 0 12px rgba(255,107,122,.55)}
+#root#root#root .operations-shell .vrm-workspace .vrm-sun-dot:hover{background:rgba(255,255,255,.06)!important}
+#root#root#root .operations-shell .vrm-workspace .vrm-sun-dot:focus-visible{outline:2px solid #f0dcae;outline-offset:1px}
+.vrm-sun-axis{margin:28px 0 0;text-align:right;font-size:11px;color:#7f8a99}
+.vrm-sun-maint{margin:12px 0 0;padding-top:10px;border-top:1px solid rgba(255,255,255,.06);font-size:12px;line-height:1.45;color:#8d97a6}.vrm-sun-maint b{color:#c9b58a;font-weight:600}
+@media(max-width:700px){.vrm-sun{padding:18px 14px 12px}.vrm-sun-head{grid-template-columns:minmax(0,1fr)}.vrm-sun-facts{grid-template-columns:1fr 1fr}.vrm-sun-track{margin:18px 10px 0}}
+html[data-theme='light'] .vrm-sun{background:#fffdf8;border-color:#e6d8b8}html[data-theme='light'] .vrm-sun-big strong{color:#1e2430}
+html[data-theme='light'] .vrm-sun-facts div{background:#fff;border-color:#e6d8b8}html[data-theme='light'] .vrm-sun-facts dd{color:#1e2430}
+html[data-theme='light'] #root#root#root .operations-shell .vrm-workspace .vrm-sun-dot{color:#1e2430!important}
+.vrm-sun-grid{list-style:none;margin:16px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+#root#root#root .operations-shell .vrm-workspace .vrm-sun-grid button{display:grid;grid-template-columns:1fr auto;grid-template-rows:auto auto;align-items:baseline;gap:6px 6px;width:100%;min-height:0;padding:10px 11px 11px!important;border:1px solid rgba(255,255,255,.07)!important;border-radius:12px!important;background:rgba(255,255,255,.025)!important;box-shadow:none!important;color:#eef2f7!important;text-align:left}
+#root#root#root .operations-shell .vrm-workspace .vrm-sun-grid button:hover{border-color:rgba(216,191,138,.35)!important;background:rgba(255,255,255,.05)!important}
+.vrm-sun-name{font-size:11px;font-weight:600;letter-spacing:.1em;color:#8d97a6}
+.vrm-sun-grid strong{font-size:20px;font-weight:300;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:#eef2f7}.vrm-sun-grid small{font-size:11px;margin-left:2px;color:#8d97a6;font-weight:400}
+.vrm-sun-bar{grid-column:1/-1;height:4px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden}.vrm-sun-bar i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#2f9e68,#4fd18b)}
+.vrm-sun-grid .vrm-sun-mid .vrm-sun-bar i{background:linear-gradient(90deg,#b47d1e,#f5b942)}.vrm-sun-grid .vrm-sun-mid strong{color:#f5c76a}
+.vrm-sun-grid .vrm-sun-low .vrm-sun-bar i{background:linear-gradient(90deg,#b8323f,#ff6b7a)}.vrm-sun-grid .vrm-sun-low strong{color:#ff8a95}
+#root#root#root .operations-shell .vrm-workspace .vrm-sun-grid .vrm-sun-low button{border-color:rgba(255,107,122,.3)!important}
+.vrm-sun-axis{margin:10px 2px 0;text-align:left}
+@media(max-width:700px){.vrm-sun-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+html[data-theme='light'] #root#root#root .operations-shell .vrm-workspace .vrm-sun-grid button{background:#fff!important;border-color:#e6d8b8!important;color:#1e2430!important}html[data-theme='light'] .vrm-sun-grid strong{color:#1e2430}
