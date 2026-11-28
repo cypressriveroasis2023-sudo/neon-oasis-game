@@ -454,3 +454,19 @@ html[data-theme='light'] #root#root#root .operations-shell .vrm-workspace .vrm-h
 #root#root#root .operations-shell .vrm-workspace .vrm-hero .vrm-sync-status{grid-row:2}
 @media(max-width:700px){#root#root#root .operations-shell .vrm-workspace .vrm-hero-actions{grid-column:1;grid-row:3}}
 @media(max-width:380px){#root#root#root .operations-shell .vrm-workspace .vrm-hero-actions{grid-template-columns:minmax(0,1fr)}}
+
+/* If the sun stopped: days of reserve per Field unit, shortest first. */
+.vrm-reserve{margin:12px 0;padding:14px 14px 10px;border:1px solid rgba(216,191,138,.18);border-radius:14px;background:linear-gradient(160deg,#141922,#0d1016)}
+.vrm-reserve h3{margin:0 0 10px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--vt-lux,#d8bf8a);font-weight:600}.vrm-reserve h3 span{color:var(--vt-mute,#9aa4b2);letter-spacing:.06em;text-transform:none;font-weight:400}
+.vrm-reserve ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:4px 18px}
+#root#root#root .operations-shell .vrm-workspace .vrm-reserve button{display:grid;grid-template-columns:34px minmax(0,1fr) 66px;align-items:center;gap:10px;width:100%;min-height:30px;padding:3px 4px!important;border:0!important;background:none!important;box-shadow:none!important;color:var(--vt-ink,#e6edf7)!important;font-size:12.5px;text-align:left;border-radius:6px!important}
+#root#root#root .operations-shell .vrm-workspace .vrm-reserve button:hover{background:rgba(255,255,255,.04)!important}
+.vrm-reserve strong{font-weight:600;letter-spacing:.06em;color:var(--vt-mute,#9aa4b2)}
+.vrm-reserve-bar{height:6px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden}.vrm-reserve-bar i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#2f9e68,#4fd18b)}
+.vrm-reserve-mid .vrm-reserve-bar i{background:linear-gradient(90deg,#b47d1e,#f5b942)}.vrm-reserve-low .vrm-reserve-bar i{background:linear-gradient(90deg,#b8323f,#ff6b7a)}
+.vrm-reserve em{font-style:normal;text-align:right;font-variant-numeric:tabular-nums;color:var(--vt-ink,#e6edf7)}.vrm-reserve-low em{color:#ff8a95}.vrm-reserve-mid em{color:#f5c76a}
+.vrm-reserve .vrm-note{margin:8px 4px 0;font-size:11.5px;color:var(--vt-mute,#9aa4b2)}
+html[data-theme='light'] .vrm-reserve{background:#fffdf8;border-color:#e6d8b8}html[data-theme='light'] .vrm-reserve-bar{background:#efe7d6}
+html[data-theme='light'] #root#root#root .operations-shell .vrm-workspace .vrm-reserve button{color:#1e2430!important}html[data-theme='light'] .vrm-reserve em{color:#1e2430}
+#root#root#root .operations-shell .vrm-workspace .vrm-reserve .vrm-note{background:none!important;padding:0!important;border:0!important}
+@media(max-width:700px){#root#root#root .operations-shell .vrm-workspace .vrm-reserve button{min-height:26px;padding:2px 4px!important}}

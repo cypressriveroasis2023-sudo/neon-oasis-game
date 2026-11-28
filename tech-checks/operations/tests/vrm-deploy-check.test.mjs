@@ -67,3 +67,14 @@ test('Needs attention lists a failed setup near the top, even when the unit has 
     ['deploy', 'Just set up · panels producing (nothing in 4 h of daylight), solar charger (not seen)'],
     ['low', 'Low battery · 15%']]);
 });
+
+import {cloudyReserve} from '../src/vrmHistory.ts';
+test('If the sun stopped: days to 20% at the unit\'s own night draw', () => {
+  const now = new Date(2026, 10, 28, 0, 30).getTime(), N = now / 1000, pts = [];
+  for (let t = N - 30 * 3600; t <= N; t += 1800) { const h = new Date(t * 1000).getHours(), night = h < 7 || h >= 18; pts.push([t, 91, night ? 0 : 300, night ? -36 : 150]); }
+  const r = cloudyReserve(pts, now);
+  assert.deepEqual(r, {days: 2.4, watts: 36, soc: 91});          // 36 W × 24 h = 864 Wh ≈ 29%/day; 71 points to 20%
+  assert.equal(cloudyReserve(pts.slice(0, -4), now), null);       // last reading too old
+  assert.equal(cloudyReserve(pts.map(p => [p[0], p[1], 300, 150]), now), null);   // never seen discharging at night
+  assert.equal(cloudyReserve([], now), null);
+});
