@@ -877,7 +877,11 @@ test('the morning list shows new and still-down field units with a likely cause,
   const shown = await inBoard(host, root => root.getElementById('viewPunch').textContent);
   expect(shown).toContain('New since yesterday · 1');
   expect(shown).toContain('Still down · 1');
-  expect(shown).toContain('no power or no cell signal');
+  // James, 27 Nov: Helios 016 read "check battery first" at 100%. Helios 001 reads 80% in Victron here, so its line says
+  // it is not power; Spotter 002 has no Victron reading and keeps Tech Check's own line.
+  expect(shown).toContain('Victron shows the battery at 80%, so it is not power');
+  expect(shown).not.toContain('no power or no cell signal');
+  expect(shown).toContain('Check power and battery first.');
   expect(shown).toContain('offline · AT&T · 3 bars');
   expect(await inBoard(host, root => [...root.querySelectorAll('#punchList .fixbtn')].map(b => b.textContent))).toEqual(['Copy for the IT sheet']);
   expect(state.errors).toEqual([]);
