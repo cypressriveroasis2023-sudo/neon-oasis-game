@@ -18,6 +18,8 @@ export const MPPT_PATHS: Record<string, {min: number; max: number}> = {
   '/History/Daily/0/Yield': {min: 0, max: 1000}, '/History/Daily/0/MaxPower': {min: 0, max: 100000},
   '/History/Daily/1/Yield': {min: 0, max: 1000}, '/History/Daily/1/MaxPower': {min: 0, max: 100000},
   '/Yield/User': {min: 0, max: 10000000},
+  // The load output (GAGO DD3: the switchable output), to learn what it feeds. Read only.
+  '/Load/State': {min: 0, max: 10}, '/Load/I': {min: -100, max: 100}, '/Mode': {min: 0, max: 10}, '/DeviceOffReason': {min: 0, max: 100000},
 };
 export type MpptRow = {installationId: number; instance: number; path: string; value: number; observedAt: string};
 const PATH_NAME = /^\/[A-Za-z0-9/]{1,60}$/;

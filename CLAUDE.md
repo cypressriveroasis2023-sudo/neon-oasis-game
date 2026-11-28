@@ -59,6 +59,7 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-28** — Operations: MPPT load output tracked (James's go, migration `cos_vrm_mppt_load_output`). `public.cos_vrm_mppt_save` (anchored edit) now also keeps `/Load/State`, `/Load/I`, `/Mode`, `/DeviceOffReason`; `cos-vrm-mppt-sync` **v2** reads them (read only at Victron; still no writes there). Source of truth `tech-checks/operations/db/20261125_cos_vrm_mppt_readings.sql` updated to match. Purpose: learn whether the DD3 load output feeds the cameras before any remote restart. Record and rollback: `tech-checks/docs/db-changes/20261128_cos_vrm_mppt_load_output.sql`.
 - **2026-11-28** — **COS look, app screens** (James's go). New `tech-checks/operations/src/cosThemeApp.css`, imported last-but-one
   in `App.tsx`: dark mode only, everything scoped under `#root#root .operations-shell`, built from the same `--cos-*` values.
   Panels graphite, main panel buttons gold, tool links graphite with gold titles (Tech Check, More, InHand Routers). The
