@@ -506,3 +506,37 @@ html[data-theme='light'] #root#root#root .operations-shell .vrm-workspace .vrm-s
 .vrm-sun-axis{margin:10px 2px 0;text-align:left}
 @media(max-width:700px){.vrm-sun-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 html[data-theme='light'] #root#root#root .operations-shell .vrm-workspace .vrm-sun-grid button{background:#fff!important;border-color:#e6d8b8!important;color:#1e2430!important}html[data-theme='light'] .vrm-sun-grid strong{color:#1e2430}
+
+/* Energy flow v2: one slow, continuous glow per line (no jumping dashes); battery % ring in the middle;
+   a plain sentence saying what the power is doing. */
+.cos-energy-flow{grid-template-columns:minmax(0,1fr) minmax(22px,52px) minmax(0,1.15fr) minmax(22px,52px) minmax(0,1fr)!important}
+.cos-energy-line{position:relative;height:2px!important;border-radius:2px;overflow:hidden!important;background:rgba(255,255,255,.1)!important}
+.cos-energy-line i{display:none!important}
+.cos-energy-line.is-flowing i{display:block!important;position:absolute!important;top:0!important;left:0!important;width:100%!important;height:100%!important;border-radius:2px;box-shadow:none!important;
+  background:linear-gradient(90deg,transparent 0%,rgba(240,220,174,0) 20%,rgba(240,220,174,.95) 50%,rgba(240,220,174,0) 80%,transparent 100%)!important;
+  animation:cos-energy-glide 3.2s cubic-bezier(.45,.05,.55,.95) infinite!important;transform:translateX(-100%);will-change:transform}
+.cos-energy-in.is-flowing{background:linear-gradient(90deg,rgba(245,185,66,.35),rgba(216,191,138,.35))!important}
+.cos-energy-out.is-flowing{background:rgba(79,209,139,.28)!important}
+.cos-energy-out.is-flowing i{background:linear-gradient(90deg,transparent 0%,rgba(79,209,139,0) 20%,rgba(120,230,170,.95) 50%,rgba(79,209,139,0) 80%,transparent 100%)!important}
+.is-on-battery .cos-energy-out.is-flowing{background:rgba(245,185,66,.3)!important}
+.is-on-battery .cos-energy-out.is-flowing i{background:linear-gradient(90deg,transparent 0%,rgba(245,185,66,0) 20%,rgba(250,205,110,.95) 50%,rgba(245,185,66,0) 80%,transparent 100%)!important}
+@keyframes cos-energy-glide{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+@media(prefers-reduced-motion:reduce){.cos-energy-line.is-flowing i{animation:none!important;transform:none;opacity:.5}}
+/* Battery ring: conic fill by state of charge. */
+#root#root#root .operations-shell .cos-energy-flow .cos-energy-hub>.cos-energy-soc{position:relative;display:flex;align-items:baseline;justify-content:center;width:64px;height:64px;border:0!important;border-radius:50%!important;padding-top:20px;box-sizing:border-box;
+  background:radial-gradient(closest-side,#10141c 78%,transparent 80% 100%),conic-gradient(var(--soc-col,#4fd18b) var(--soc,0%),rgba(255,255,255,.09) 0)!important;color:#f4ecdc!important;box-shadow:0 0 22px rgba(79,209,139,.12)!important}
+.cos-energy-soc b{font-size:20px;font-weight:300;letter-spacing:-.02em;font-variant-numeric:tabular-nums}.cos-energy-soc em{font-style:normal;font-size:10px;color:#9aa4b2;margin-left:1px}
+.cos-energy-hub.is-charging{--soc-col:#4fd18b}.cos-energy-hub.is-full{--soc-col:#4fd18b}.cos-energy-hub.is-on-battery{--soc-col:#f5b942}.cos-energy-hub.is-holding{--soc-col:#d8bf8a}
+.cos-energy-hub.is-charging>.cos-energy-soc,.cos-energy-hub.is-full>.cos-energy-soc{--soc-col:#4fd18b}.cos-energy-hub.is-on-battery>.cos-energy-soc{--soc-col:#f5b942}
+.cos-energy-hub strong{white-space:nowrap}.cos-energy-hub strong em{font-style:normal;font-size:.8em;color:#9aa4b2}
+.cos-energy-hub.is-charging strong{color:#7fe3ad!important}.cos-energy-hub.is-on-battery strong{color:#f5c76a!important}
+.cos-energy-node strong{white-space:nowrap;font-variant-numeric:tabular-nums}
+.cos-energy-story{grid-column:1/-1;margin:14px 6px 0;text-align:center;font-size:13px;line-height:1.45;color:#c7d0db}
+@media(max-width:480px){.cos-energy-flow{grid-template-columns:minmax(0,1fr) minmax(14px,26px) minmax(0,1.1fr) minmax(14px,26px) minmax(0,1fr)!important}.cos-energy-node strong{font-size:14px!important}
+  #root#root#root .operations-shell .cos-energy-flow .cos-energy-hub>.cos-energy-soc{width:56px;height:56px;padding-top:17px}}
+html[data-theme='light'] #root#root#root .operations-shell .cos-energy-flow .cos-energy-hub>.cos-energy-soc{background:radial-gradient(closest-side,#fff 78%,transparent 80% 100%),conic-gradient(var(--soc-col,#2f9e68) var(--soc,0%),rgba(0,0,0,.08) 0)!important;color:#1e2430!important}
+html[data-theme='light'] .cos-energy-story{color:#3b4656}html[data-theme='light'] .cos-energy-line{background:rgba(0,0,0,.1)!important}
+/* Lines stretch between the circles and sit at their middle, at every width. */
+.cos-energy-flow{grid-template-columns:minmax(64px,auto) minmax(18px,1fr) minmax(84px,auto) minmax(18px,1fr) minmax(64px,auto)!important;align-items:start!important}
+.cos-energy-line{margin-top:31px}
+@media(max-width:480px){.cos-energy-flow{grid-template-columns:minmax(58px,auto) minmax(12px,1fr) minmax(78px,auto) minmax(12px,1fr) minmax(58px,auto)!important}.cos-energy-line{margin-top:27px}}
