@@ -59,6 +59,12 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-28** — **Deployed both** (James's go, ~05:44 UTC). (1) Operations `cos-sheets-placement-publish`
+  **v25 `00013c1e`**: loader pinned to `c1733c1`, `tech-checks/docs/endpoint-source-inventory-grace-20261127/source/serve.ts`
+  (24 h mHelp inventory grace + a lone `customer_mismatch` no longer holds). Next sweep published 38 of 44 (was 34):
+  SNIPER 328 and 2-348 online, 227 and 2-347 first miss. Rollback: the v24 loader in that README. A next change to this
+  function must start from that source. (2) `cos-unit-camera-status/recon-window-v27` (run 46113656334): live now
+  **v28 `e1fd4e2f`** (pins updated). Rollback `rollback-to-v27-entry`. A next patch to this function must start from v28.
 - **2026-11-27** — Tech Check: camera-check stopped alert **live** (18:45 CT, James's go; first run
   quiet, state seeded `ok`). `public.cos_sweep_watchdog_alerts_v1()` (+ `_safe_v1`, state in
   `app_private.sweep_watchdog_alert_watch`) reads the watchdog log and alerts Owner + IT when two
