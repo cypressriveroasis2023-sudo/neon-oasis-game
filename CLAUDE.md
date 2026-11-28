@@ -59,6 +59,9 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-28** — Tech Check: routers matched to units (James's go). 17 hand A# links in `cos_mhelp_unit_link`, and
+  5 `camera_unit_routers.unit_key` renames to the unit's own spelling (ids 91, 116, 124, 126, 190) plus SOLARSPOTTER 310's
+  A#. Unplaced router rows 30 → 8. No audit row. Record `tech-checks/docs/db-changes/20261127_router_units_matched.md`.
 - **2026-11-27** — Tech Check: camera-check stopped alert **live** (18:45 CT, James's go; first run
   quiet, state seeded `ok`). `public.cos_sweep_watchdog_alerts_v1()` (+ `_safe_v1`, state in
   `app_private.sweep_watchdog_alert_watch`) reads the watchdog log and alerts Owner + IT when two
