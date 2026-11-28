@@ -47,6 +47,8 @@ on:
           - rollback-to-v25-entry
           - check-now-v26
           - rollback-to-v26-entry
+          - recon-window-v27
+          - rollback-to-v27-entry
           - rollback-to-v22-entry
       confirm:
         description: 'Type the patch name again to confirm. Deploying changes production immediately.'
@@ -147,6 +149,12 @@ jobs:
       - name: Pin the check now rollback file
         if: inputs.patch == 'rollback-to-v26-entry'
         run: printf '%s  %s\n' 'defc1fc3ac2e8a545c0026aae0cbbdc73bf111c4d0a701c88ad26a307dd2641a' '.github/function-patches/cos-unit-camera-status/rollback-to-v26-entry.json' | sha256sum -c -
+      - name: Pin the recon window patch file
+        if: inputs.patch == 'recon-window-v27'
+        run: printf '%s  %s\n' '6854bcb2fde984e59fd1a24fcce76467eaaa8a4584936e91e3fda02faee49c5f' '.github/function-patches/cos-unit-camera-status/recon-window-v27.json' | sha256sum -c -
+      - name: Pin the recon window rollback file
+        if: inputs.patch == 'rollback-to-v27-entry'
+        run: printf '%s  %s\n' 'ea011bfee0854c4d11c4234f09539f0a061e0b6788072db5ad9047eb6d968c1d' '.github/function-patches/cos-unit-camera-status/rollback-to-v27-entry.json' | sha256sum -c -
       - name: Pin the read-only live archive preflight
         run: printf '%s  %s\n' '9a74ce5dc6286384bf39fffc48576d21696bf9497738664ddf1fcc52e73bf59e' '.github/scripts/preflight-live-function-pins.mjs' | sha256sum -c -
       - name: Choose the recorded patch path
@@ -154,7 +162,7 @@ jobs:
         run: |
           name="${{ inputs.patch }}"
           case "$name" in
-            camera-routes-only-v16|rollback-to-v16-entry|troubleshoot-route-v17|rollback-to-v17-entry|camera-ports-v18|rollback-to-v18-entry|a-links-v19|rollback-to-v19-entry|vcc-moves-v20|rollback-to-v20-entry|morning-list-v21|rollback-to-v21-entry|down-needs-two-misses-v22|rollback-to-v22-entry|router-swap-v23|rollback-to-v23-entry|send-to-it-loop-v24|rollback-to-v24-entry|last-direct-check-v25|rollback-to-v25-entry|check-now-v26|rollback-to-v26-entry)
+            camera-routes-only-v16|rollback-to-v16-entry|troubleshoot-route-v17|rollback-to-v17-entry|camera-ports-v18|rollback-to-v18-entry|a-links-v19|rollback-to-v19-entry|vcc-moves-v20|rollback-to-v20-entry|morning-list-v21|rollback-to-v21-entry|down-needs-two-misses-v22|rollback-to-v22-entry|router-swap-v23|rollback-to-v23-entry|send-to-it-loop-v24|rollback-to-v24-entry|last-direct-check-v25|rollback-to-v25-entry|check-now-v26|rollback-to-v26-entry|recon-window-v27|rollback-to-v27-entry)
               echo "file=.github/function-patches/cos-unit-camera-status/${name}.json" >> "$GITHUB_OUTPUT"
               ;;
             *)

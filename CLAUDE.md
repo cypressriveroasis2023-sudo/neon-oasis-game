@@ -59,6 +59,14 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-27** — Unknowns on the board (**prepared, not deployed**; each deploy needs James's go).
+  (1) Same pending `cos-sheets-placement-publish` source as the 24 h grace below: `/endpoint-source` drops a
+  lone `customer_mismatch` review reason, so SNIPER 227 / 328 / 2-347 / 2-348 are checked again.
+  (2) `cos-unit-camera-status/recon-window-v27` (starts from live v27 `81a7a8a5`): a Recon Online report
+  counts 6 h (was 45 min); a detector whose last report was Offline and went quiet reads Down with when it
+  was last heard (was Not verified), only while the Reconeyez feed is current. Source
+  `tech-checks/operations/shared/otherUnitStatus.ts`; v28 record `cos-unit-camera-status-v28-entry`;
+  rollback `rollback-to-v27-entry`. If another patch to this function deploys first, rebuild this one.
 - **2026-11-27** — Tech Check: mHelp alert (applied 21:58 UTC). `cos_router_down_alerts_v1` (anchored edit)
   now appends `cos_mhelp_auth_alerts_safe_v1()` to its alerts, so job 16 pushes "mHelpDesk needs reconnecting"
   (from the `COS_MHELP_RENEWAL_STATUS_V1` answer of job 10 in `net._http_response`) and "reconnected". State in

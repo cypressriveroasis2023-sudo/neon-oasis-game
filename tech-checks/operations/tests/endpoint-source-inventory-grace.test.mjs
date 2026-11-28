@@ -15,7 +15,7 @@ const graceText = readFileSync(gracePath, 'utf8');
 const dir = mkdtempSync(join(tmpdir(), 'grace-'));
 const local = join(dir, 'trackerEndpointNativeSource.mjs');
 writeFileSync(local, graceText.split(RAW).join(pathToFileURL(repo).href));
-const {readScheduledNativeEndpointSource, createScheduledNativeEndpointSourceRuntime, CURRENT_MS, GRACE_MS} = await import(pathToFileURL(local).href);
+const {readScheduledNativeEndpointSource, createScheduledNativeEndpointSourceRuntime, CURRENT_MS, GRACE_MS, CUSTOMER_NAME_ONLY} = await import(pathToFileURL(local).href);
 
 const hash = 'a'.repeat(64), trackerHash = 'b'.repeat(64), now = Date.parse('2026-11-27T22:30:00Z');
 function fixture(ageMs = 60000) {
@@ -101,9 +101,29 @@ test('the grace source is the live v24 reader with only the recorded edits', () 
   let back = graceText
     .replace(/\/\/ 2026-11-27 \(James's go\)[^\n]*\n\/\/[^\n]*\n\/\/[^\n]*\n/, '')
     .replace(RAW + 'tech-checks/docs/fleet-provenance-repair-20261104/source/productTcpRuntime.ts', '../../fleet-provenance-repair-20261104/source/productTcpRuntime.ts')
-    .replace(/\/\/ CURRENT_MS:[^\n]*\n\/\/[^\n]*\n\/\/[^\n]*\nexport const CURRENT_MS=2700000,GRACE_MS=86400000;\nfunction baseline\(value,now,maxAge=CURRENT_MS\)\{/, 'function baseline(value,now){')
+    .replace(/\/\/ CURRENT_MS:[^\n]*\n\/\/[^\n]*\n\/\/[^\n]*\nexport const CURRENT_MS=2700000,GRACE_MS=86400000;\n(?:\/\/[^\n]*\n){4}export const CUSTOMER_NAME_ONLY='customer_mismatch';\nfunction baseline\(value,now,maxAge=CURRENT_MS\)\{/, 'function baseline(value,now){')
+    .replace('reviewReasons:t.reviewReasons.filter(r=>r!==CUSTOMER_NAME_ONLY),', 'reviewReasons:t.reviewReasons,')
     .replace('>maxAge', '>2700000')
     .replace(/ const readAt=now\(\),source=baseline\(await readBaseline\(signal\),readAt,GRACE_MS\);\n const syncedAt=[^\n]*\n if\(!current\)console\.warn\([^\n]*\n/, ' const source=baseline(await readBaseline(signal),now());\n')
     .replace(',inventorySyncedAt:syncedAt,inventoryCurrent:current,products};', ',products};');
   assert.equal(back, original);
+});
+
+// 27 Nov 2026: SNIPER 227 and 328 had moved to AT&T sites after the tracker's 4 Nov mHelp
+// copy, and 2-347 / 2-348 had their customer respelled in mHelp. Each was held on every run.
+test('a customer name difference alone no longer stops a check; every other reason still does', async () => {
+  assert.equal(CUSTOMER_NAME_ONLY, 'customer_mismatch');
+  const f = fixture(); f.tracker.records[0].reviewReasons = ['customer_mismatch'];
+  const {result} = await quiet(() => run(f));
+  assert.deepEqual(result.products[0].reviewReasons, []);
+  assert.deepEqual(result.products[0].holds, []);
+  for (const others of [['placement_mismatch', 'customer_mismatch'], ['customer_mismatch', 'identity_mismatch'], ['tracker_restriction'], ['identity_mismatch']]) {
+    const g = fixture(); g.tracker.records[0].reviewReasons = [...others];
+    const r = (await quiet(() => run(g))).result;
+    assert.deepEqual(r.products[0].reviewReasons, others.filter(x => x !== 'customer_mismatch'));
+    assert.notEqual(r.products[0].reviewReasons.length, 0);
+  }
+  // A tracker placement that disagrees with mHelp is still held, whatever the customer says.
+  const h = fixture(); h.tracker.records[0].reviewReasons = ['customer_mismatch']; h.tracker.records[0].placement = 'SHOP';
+  assert.deepEqual((await quiet(() => run(h))).result.products[0].holds, ['existing_source_hold']);
 });

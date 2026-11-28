@@ -1,0 +1,41 @@
+{
+  "slug": "cos-unit-camera-status",
+  "projectRef": "tughscoxralhofrckvxy",
+  "sourceCommit": "5a200541ac24cb95ad2d7656af186a3882362d2b",
+  "deployedFileNames": {
+    "index.ts": "cos-unit-camera-status/index.ts",
+    "deno.json": "cos-unit-camera-status/deno.json"
+  },
+  "entrypointPath": "cos-unit-camera-status/index.ts",
+  "importMapPath": "cos-unit-camera-status/deno.json",
+  "verifyJwt": false,
+  "sourceDir": "tech-checks/docs/cos-unit-camera-status-v27-entry",
+  "description": "Recons judged on their own clock. A Reconeyez detector's Online report counts for six hours (was 45 minutes; Recons report about hourly and the board already allows six hours). A detector whose last report was Offline and has been quiet since reads Down with when it was last heard, while the Reconeyez feed itself is current (was Not verified). The unit's time is its oldest Online report. One exact edit to live v27: projectReconUnits. Source: tech-checks/operations/shared/otherUnitStatus.ts.",
+  "authorization": "James, 2026-11-27: 'I want my recons and my snipers and others that are not showing ups unknown' and 'Go'. Running the deploy still needs his explicit go for that run.",
+  "releaseStatus": "PREPARED",
+  "sourceRecord": "tech-checks/docs/cos-unit-camera-status-v27-entry/index.ts",
+  "requireLiveBeforeDeploy": {
+    "status": "ACTIVE",
+    "version": 27,
+    "ezbr_sha256": "81a7a8a5f5b662517654e2666b950d229b450d8d0961f6a4466273d4a1341168"
+  },
+  "edits": [
+    {
+      "file": "index.ts",
+      "needle": "function projectReconUnits(devices, health, feed, now = Date.now(), maxAgeMs = STAR_FEED_FRESH_MS) {\n  const checks = healthById(health), groups = /* @__PURE__ */ new Map();\n  const feedFresh = feed?.enabled !== false && text19(feed?.status) === \"ok\" && fresh(feed?.syncedAt, now, maxAgeMs);\n  for (const row2 of Array.isArray(devices) ? devices : []) {\n    if (!active(row2, RECON_SOURCE)) continue;\n    const key2 = (text19(row2.unit_key) || text19(row2.device_name)).toUpperCase();\n    (groups.get(key2) || groups.set(key2, []).get(key2)).push(row2);\n  }\n  const units = [];\n  for (const members of groups.values()) {\n    const unit = text19(members[0].unit_key) || text19(members[0].device_name);\n    const cameras = members.map((row2) => {\n      const check = checks.get(String(row2.id));\n      const said = text19(check?.overall_status).toLowerCase();\n      const status2 = feedFresh && fresh(check?.checked_at, now, maxAgeMs) && (said === \"online\" || said === \"offline\") ? said : \"unknown\";\n      const reportedAt = Date.parse(text19(check?.checked_at));\n      return {\n        name: text19(row2.device_name) || unit,\n        status: status2,\n        ...status2 === \"unknown\" && (said === \"online\" || said === \"offline\") ? {\n          lastReportedStatus: said,\n          lastReportedAt: Number.isFinite(reportedAt) ? new Date(reportedAt).toISOString() : null\n        } : {}\n      };\n    });\n    const online = cameras.filter((c) => c.status === \"online\").length, offline = cameras.filter((c) => c.status === \"offline\").length;\n    const unknown3 = cameras.length - online - offline;\n    const organization = text19(members.find((row2) => text19(row2.organization))?.organization);\n    const placement3 = NOT_DEPLOYED.test(unit) || SHOP_ORGANIZATIONS.has(organization.toLowerCase()) ? \"SHOP\" : \"FIELD\";\n    const seen = members.map((row2) => Date.parse(text19(checks.get(String(row2.id))?.checked_at)));\n    const observedAt2 = seen.every((at) => Number.isFinite(at) && at <= now + 6e4) ? new Date(Math.min(...seen)).toISOString() : null;\n    units.push({\n      unit,\n      placement: placement3,\n      site: placement3 === \"FIELD\" && organization.toUpperCase() !== unit.toUpperCase() ? organization : null,\n      siteNamePending: false,\n      state: state(online, offline, unknown3),\n      cameras: cameras.length,\n      online,\n      offline,\n      unknown: unknown3,\n      down: cameras.filter((c) => c.status !== \"online\"),\n      onlineInShop: placement3 === \"SHOP\" && online > 0,\n      publicIp: null,\n      observedAt: observedAt2,\n      source: \"reconeyez\"\n    });\n  }\n  return units;\n}\n",
+      "replacement": "var RECON_REPORT_FRESH_MS = 6 * 60 * 60 * 1e3;\nfunction projectReconUnits(devices, health, feed, now = Date.now(), maxAgeMs = RECON_REPORT_FRESH_MS) {\n  const checks = healthById(health), groups = /* @__PURE__ */ new Map();\n  const feedFresh = feed?.enabled !== false && text19(feed?.status) === \"ok\" && fresh(feed?.syncedAt, now, STAR_FEED_FRESH_MS);\n  for (const row2 of Array.isArray(devices) ? devices : []) {\n    if (!active(row2, RECON_SOURCE)) continue;\n    const key2 = (text19(row2.unit_key) || text19(row2.device_name)).toUpperCase();\n    (groups.get(key2) || groups.set(key2, []).get(key2)).push(row2);\n  }\n  const units = [];\n  for (const members of groups.values()) {\n    const unit = text19(members[0].unit_key) || text19(members[0].device_name);\n    const cameras = members.map((row2) => {\n      const check = checks.get(String(row2.id));\n      const said = text19(check?.overall_status).toLowerCase();\n      const reportedAt = Date.parse(text19(check?.checked_at));\n      const heard = Number.isFinite(reportedAt) && reportedAt - now <= 6e4;\n      const status2 = !feedFresh || !heard ? \"unknown\" : said === \"offline\" ? \"offline\" : said === \"online\" && fresh(check?.checked_at, now, maxAgeMs) ? \"online\" : \"unknown\";\n      return {\n        name: text19(row2.device_name) || unit,\n        status: status2,\n        ...status2 === \"unknown\" && (said === \"online\" || said === \"offline\") || status2 === \"offline\" ? {\n          lastReportedStatus: said,\n          lastReportedAt: Number.isFinite(reportedAt) ? new Date(reportedAt).toISOString() : null\n        } : {},\n        reportedAt\n      };\n    });\n    const online = cameras.filter((c) => c.status === \"online\").length, offline = cameras.filter((c) => c.status === \"offline\").length;\n    const unknown3 = cameras.length - online - offline;\n    const organization = text19(members.find((row2) => text19(row2.organization))?.organization);\n    const placement3 = NOT_DEPLOYED.test(unit) || SHOP_ORGANIZATIONS.has(organization.toLowerCase()) ? \"SHOP\" : \"FIELD\";\n    const onlineAt = cameras.filter((c) => c.status === \"online\").map((c) => c.reportedAt);\n    const observedAt2 = onlineAt.length ? new Date(Math.min(...onlineAt)).toISOString() : offline > 0 ? new Date(Date.parse(text19(feed?.syncedAt))).toISOString() : cameras.every((c) => Number.isFinite(c.reportedAt) && c.reportedAt <= now + 6e4) ? new Date(Math.min(...cameras.map((c) => c.reportedAt))).toISOString() : null;\n    units.push({\n      unit,\n      placement: placement3,\n      site: placement3 === \"FIELD\" && organization.toUpperCase() !== unit.toUpperCase() ? organization : null,\n      siteNamePending: false,\n      state: state(online, offline, unknown3),\n      cameras: cameras.length,\n      online,\n      offline,\n      unknown: unknown3,\n      down: cameras.filter((c) => c.status !== \"online\").map(({ reportedAt: _, ...c }) => c),\n      onlineInShop: placement3 === \"SHOP\" && online > 0,\n      publicIp: null,\n      observedAt: observedAt2,\n      source: \"reconeyez\"\n    });\n  }\n  return units;\n}\n",
+      "occurrences": 1
+    }
+  ],
+  "expectedBefore": {
+    "index.ts": "db11ded9f7970cfafee300a2f11606b81a8d26561a6ccd2a46cae3e355f788a9",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "expectedAfter": {
+    "index.ts": "ed79dfb348bf75db833c236fe681019051bc5265b9979bbfe9e2668db1d2fe77",
+    "deno.json": "c9c2133a7e174b1092ba12c48275ffebf3f904562cb057072fb01f359e9ca1be"
+  },
+  "dryRun": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/recon-window-v27.json --dry-run",
+  "deploy": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/recon-window-v27.json --deploy",
+  "rollback": "node .github/scripts/deploy-recorded-function.mjs .github/function-patches/cos-unit-camera-status/rollback-to-v27-entry.json --deploy"
+}
