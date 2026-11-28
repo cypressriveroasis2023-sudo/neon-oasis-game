@@ -179,14 +179,20 @@ function reconcile(vs, mh){
     out.items.push({ id:"bd~"+v.id, sec: v.place==="field"?"bdField":"bdShop", unit:v.id, name:v.name, st:v.status,
       text:[[SRC(v)+": ",pl(v.place)+(v.site?" at "+v.site:"")+" · "+v.type],["mHelp: ", dup ? "no second record. Another unit already uses this number. Not counted." : "nothing by this name. Not counted."]] }); }
   mh.recs.forEach((r,i)=>{ if(used.has(i)) return; out.mhOnly.push(r);
+    if(r.place==="field" && notMonitored(r)) return;
     out.items.push({ id:"mh~"+r.id, sec: r.place==="field"?"mhField":"mhShop", unit:"mh~"+r.id, name:r.label, st:null, flag:r.flag,
       text:[["mHelp: ",pl(r.place)+(r.cust?" at "+r.cust:"")+" · "+r.cat+" · A# "+r.id],["Camera feed: ","none under this name"]] }); });
   return out;
 }
 const FAM = { v:"Alibi", a:"Avigilon", r:"Recon II", x:"Other" };
-const LABEL = { down:"Down", issues:"Camera issues", up:"Up", unknown:"Unknown", shop:"In shop", shopOnline:"Online in shop", notin:"Not in mHelp", excl:"Not counted" };
+const LABEL = { down:"Down", issues:"Camera issues", up:"Up", unknown:"Unknown", shop:"In shop", shopOnline:"Online in shop", notin:"Not in mHelp", excl:"Not counted", nm:"Not monitored" };
+/* Field equipment James says is not monitored (28 Nov 2026). It still counts in the field and sits on the map
+   at its mHelp site, but it has no camera status, so it is never Unknown. Wall-E is the stand a Recon goes on;
+   the two Spotters at David Weekley Sunfield are witness cameras that are watched but not monitored. */
+const WITNESS_PIDS = { "1713914":"Spotter 052", "2036036":"Spotter 088" };
+const notMonitored = r => r.cat==="Wall-E" || Object.prototype.hasOwnProperty.call(WITNESS_PIDS, String(r.id));
 const SRC = v => v.hand && v.hand.place ? "COS, by hand" : v.u.s==="v" ? "Star4Live" : v.u.s==="a" ? "COS record" : "Recon cloud";
-const ORDER = { down:0, issues:1, unknown:2, up:3, shopOnline:4, shop:5, notin:6, excl:7 };
+const ORDER = { down:0, issues:1, unknown:2, up:3, nm:3.5, shopOnline:4, shop:5, notin:6, excl:7 };
 
 /* Turn one unit from the app's camera feed into what the board shows. Shop or field, and up or down, are the
    app's own calls: the same ones its shared count makes, so a tile here always equals the headline.
@@ -211,11 +217,12 @@ function view(u){
 
 /* ---------- drawing ---------- */
 /* A unit that is in mHelp but has no camera record. It still counts, because mHelp is the official count. */
-function pseudo(r){ const f=famOfCat(r.cat), place=r.place;
+function pseudo(r){ const f=famOfCat(r.cat), place=r.place, nm = place==="field" && notMonitored(r);
   const fam = ({SP:1,SS:1,RG:1,HE:1}[f]) ? "Alibi" : ({SN:1,S4:1,CV:1,TH:1,RD:1,RSU:1}[f]) ? "Avigilon" : (f==="RC"||f==="Recon") ? "Recon II" : "Other";
   return { id:"mh~"+r.id, k:r.label, name:r.label.replace(/\s*-?\s*DO NOT USE/i,"").trim(), fam, type:r.cat, place, site: place==="field" ? r.cust : "", ip:"", note:"", hand:{}, e:S.edits["mh~"+r.id]||{}, edited:false,
-    mhOnly:true, counted:true, rec:r, fs:"unknown", status: place==="field" ? "unknown" : "shop", side:"",
-    why:"mHelp lists this unit. COS has no camera record under this name, so the board cannot tell whether it is up.",
+    mhOnly:true, nm, counted:true, rec:r, fs: nm ? "nm" : "unknown", status: nm ? "nm" : place==="field" ? "unknown" : "shop", side:"",
+    why: nm ? (r.cat==="Wall-E" ? "Equipment that goes with a Recon. It has no cameras of its own, so there is nothing to check." : "A witness camera: watched, not monitored, so COS does not check it.")
+      : "mHelp lists this unit. COS has no camera record under this name, so the board cannot tell whether it is up.",
     u:{ s:"m", o:"", n:0, on:0, off:0, t:0, lo:0, ip:"", bad:"", pid:r.id, fl:r.flag==="D"?"x":"", rs:"", rt:0, ri:"", rp:"", rr:"", ro:0, rm:"" } }; }
 /* mHelp is the official count: a unit counts only if mHelp has it, and mHelp decides shop or field unless someone set it by hand here. */
 function allViews(){
@@ -572,7 +579,7 @@ function rowEl(v){
   const sub=[h("span",{class:"pill",text:LABEL[v.status]})];
   sub.push(v.place==="field" ? (v.site||"No site on record") : (v.site||(v.retired?"Retired":"Shop")));
   if(v.edited) sub.push(h("span",{class:"tag",text:"By hand"}));
-  if(v.mhOnly) sub.push(h("span",{class:"tag",text:"No camera feed"}));
+  if(v.mhOnly) sub.push(h("span",{class:"tag",text: v.nm ? (v.type==="Wall-E" ? "Equipment" : "Witness") : "No camera feed"}));
   if(v.status==="down"){ const r=routerRead(v.u); if(r.off) sub.push(h("span",{class:"tag",text:"Router down too"})); else if(r.on) sub.push(h("span",{class:"tag",text:"Router up"})); }
   if(v.srcDiff) sub.push(h("span",{class:"tag",text:SRC(v)+": "+v.feedPlace}));
   if(v.u.fl.includes("x")) sub.push(h("span",{class:"tag",text:"Do not use"}));
@@ -588,6 +595,7 @@ function setFilter(k){ S.filter = (S.filter===k && k!=="field") ? "field" : k; r
 function openUnit(id){ S.openId=id; S.form=null; S.ipShown=false; S.tr={unit:id, ans:{}}; $("sheet").classList.add("open"); drawPanel(); $("sheet").scrollTop=0; }
 function closeUnit(){ S.openId=null; S.form=null; S.ipShown=false; $("sheet").classList.remove("open"); }
 function steps(v){
+  if(v.nm) return [v.why, "It counts in the field at the site mHelp gives, and shows on the map there. It is never counted as Down or Unknown.", "If that changes, tell James."];
   if(v.mhOnly) return v.place==="field"
     ? ["mHelp says this unit is in the field. COS has no camera record under this name.","Find out what name its cameras go by in Star4Live, the 2027 tracker or the Recon cloud, and make the names match.","If it is not out there, tell James. James makes any mHelp edit."]
     : ["In the shop per mHelp. No camera record, which is normal for a unit on the shelf."];
@@ -1083,7 +1091,7 @@ async function vendorSend(){
 function histBox(v){ const hist=(v.u && v.u.hx)||[]; return hist.length ? h("div",{class:"box"},h("h3",{text:"Set by hand on this unit"}),h("ul",{class:"hist"},hist.map(x=>histLi(x,null)))) : null; }
 function drawMhPanel(v){
   const P=$("panel"), r=v.rec, dl=h("dl",{class:"kv"});
-  for(const [a,b] of [["Where",(v.place==="field"?"Field":"Shop")+" · per mHelp"],["Site",v.site||"—"],["Type",v.type+" · "+v.fam],["mHelp","A# "+r.id+" · listed as "+r.label+(r.flag==="D"?" · marked DO NOT USE":"")],["Camera feed","None under this name"]]) dl.append(h("dt",{text:a}),h("dd",{text:b}));
+  for(const [a,b] of [["Where",(v.place==="field"?"Field":"Shop")+" · per mHelp"],["Site",v.site||"—"],["Type",v.type+" · "+v.fam],["mHelp","A# "+r.id+" · listed as "+r.label+(r.flag==="D"?" · marked DO NOT USE":"")],["Camera feed",v.nm ? "None. Not monitored" : "None under this name"]]) dl.append(h("dt",{text:a}),h("dd",{text:b}));
   P.className="panel s-"+v.status;
   P.replaceChildren(h("div",{class:"phead"},h("div",null,h("span",{class:"pill s-"+v.status,text:LABEL[v.status]}),h("h2",{id:"pname",text:v.name})),h("button",{class:"close",type:"button",onclick:closeUnit},"Close")),
     h("div",{class:"pbody"}, h("div",{class:"box"},h("h3",{text:"What it says"}),dl,h("p",{class:"note",text:v.why})),
@@ -1275,7 +1283,7 @@ function sv(tag, attrs, ...kids){ const e=document.createElementNS(NS,tag);
   if(attrs) for(const [k,val] of Object.entries(attrs)){ if(val==null||val===false) continue; if(k==="text") e.textContent=val; else if(k.startsWith("on")) e.addEventListener(k.slice(2),val); else e.setAttribute(k,val); }
   for(const kid of kids.flat()){ if(kid) e.append(kid); } return e; }
 const M = { data:null, failed:false, built:false, z:1, tx:0, ty:0, w:0, h:0, f:"all", pts:[], none:[], sel:null, drop:null, focus:null, fitted:false, raf:0, dragged:false };
-const SEV = { down:0, issues:1, unknown:2, up:3 }, PCOL = { down:"var(--down)", issues:"var(--warn)", unknown:"var(--unk)", up:"var(--up)" };
+const SEV = { down:0, issues:1, unknown:2, up:3, nm:4 }, PCOL = { down:"var(--down)", issues:"var(--warn)", unknown:"var(--unk)", up:"var(--up)", nm:"var(--nm)" };
 const ZMAX = 900, clampZ = z => Math.max(zMin(), Math.min(ZMAX, z));
 function sizeMap(){ const r=$("mapWrap").getBoundingClientRect(); if(r.width>50){ M.w=r.width; M.h=r.height; } }
 function centerOn(x,y,z){ M.z=clampZ(z); M.tx=M.w/2-x*M.z; M.ty=M.h/2-y*M.z; paint(); }
@@ -1325,7 +1333,7 @@ function paintNow(){
   const G=[]; M.cl=cl;
   for(let i=cl.length-1;i>=0;i--){ const c=cl[i], n=c.m.length, st=c.m[0].v.status, focus = M.focus && c.m.some(q=>q.v.id===M.focus);
     const by={}; for(const q of c.m) by[q.v.status]=(by[q.v.status]||0)+1;
-    const kinds=["down","issues","unknown","up"].filter(k=>by[k]), mixed=kinds.length>1;
+    const kinds=["down","issues","unknown","up","nm"].filter(k=>by[k]), mixed=kinds.length>1;
     const label = n===1 ? c.m[0].v.name+", "+LABEL[st] : n+" units here: "+kinds.map(k=>by[k]+" "+LABEL[k]).join(", ");
     const R=(n===1?(st==="down"?10:8.5):n>99?17:n>9?15:13.5)*PK, kids=[focus ? sv("circle",{class:"ring",r:(R+5*PK).toFixed(1)}) : null];
     if(!mixed) kids.push(sv("circle",{r:R.toFixed(1),fill:PCOL[st]||"var(--unk)"}), n>1 ? sv("text",{y:4*PK,text:String(n)}) : null);
