@@ -40,6 +40,8 @@ import EquipmentWorkspace from './EquipmentWorkspace';
 import TeamWorkspace from './TeamWorkspace';
 import LegacyInstallEvidence from './LegacyInstallEvidence';
 import './continuation.css';
+// The COS look across the app (28 Nov 2026). Loaded after the other app styles; values in ./cosTheme.ts.
+import './cosThemeApp.css';
 import { workspaces as nav, itWorkspaces, workspaceGroups, workspaceLabel, workspaceGroup, canonicalWorkspace, isRetiredBusinessWorkspace, readWorkspaceRoute, workspaceHash, type WorkspaceRoute } from './workspaceNavigation';
 
 type Row = Record<string, any>;

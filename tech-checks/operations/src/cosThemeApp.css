@@ -1,0 +1,65 @@
+/* COS look for the whole app (James, 28 Nov 2026), from the Victron Power page. Values live in src/cosTheme.ts
+   (COS_THEME_VARS); they are repeated here once as custom properties so plain CSS can use them, and a test keeps the
+   two in step.
+
+   Looks only. Dark theme only; the light theme keeps its own rules. Kept as they were on purpose:
+   - status colours (green / amber / red / grey) and danger buttons;
+   - the COS red mark and the red bottom bar;
+   - the Victron page, which this look is taken from, and the COS Board, which has its own copy in its shadow root.
+   Champagne is chrome (labels, edges, buttons), never a status. */
+html:not([data-theme='light']) #root{--cos-lux:#d8bf8a;--cos-lux-strong:#e6d8b8;--cos-lux-soft:rgba(216,191,138,.34);--cos-lux-faint:rgba(216,191,138,.14);--cos-ink:#f6f0e4;--cos-mute:#98a1b0;--cos-hair:rgba(255,255,255,.07);--cos-card:radial-gradient(130% 90% at 0% 0%,#1a1f29 0%,#10131a 60%,#0b0d12 100%);--cos-card-flat:#10131a;--cos-card-edge:inset 0 1px 0 rgba(255,255,255,.05),0 8px 20px rgba(0,0,0,.28);--cos-gold-button:linear-gradient(180deg,#f0dcae 0%,#d8bf8a 55%,#b99a5c 100%);--cos-gold-button-ink:#1b1408;--cos-radius:16px}
+
+/* Page headings: a small gold label over a light title. */
+html:not([data-theme='light']) #root#root .operations-shell .command-page-header label{color:var(--cos-lux)!important;letter-spacing:.2em}
+html:not([data-theme='light']) #root#root .operations-shell .command-page-header h1{font-weight:400!important;letter-spacing:-.01em;color:var(--cos-ink)!important}
+
+/* Cards and panels: graphite with a fine champagne edge. */
+html:not([data-theme='light']) #root#root .operations-shell :is(.panel,.record,.quote-card,.stats article,.cos-daily-board,.router-detail,.router-notice,.schedule-card,.daily-board-detail>section,.daily-board-status article,.daily-board-person,.daily-board-readiness article,.field-map-list,.field-map-detail,.field-map-kpis article):not(.vrm-workspace):not(.vrm-workspace *){background:var(--cos-card)!important;border-color:var(--cos-lux-faint)!important;border-radius:var(--cos-radius);box-shadow:var(--cos-card-edge)!important}
+html:not([data-theme='light']) #root#root .operations-shell .panel:not(.vrm-workspace):not(.vrm-workspace *) :is(h2,h3){font-weight:400;letter-spacing:-.005em;color:var(--cos-ink)}
+
+/* Main buttons: gold, like Open in VRM. */
+html:not([data-theme='light']) #root#root .operations-shell :where(.panel,.cos-daily-board,.router-workspace,.field-map-workspace,.workspace-overview,.owner-command-home):not(.vrm-workspace):not(.vrm-workspace *) button:not(.workspace-job):not(.daily-board-card):not(.record):not(.secondary):not(.danger):not(.active):not(.selected):not(:has(>b)),
+html:not([data-theme='light']) #root#root .production-assignment-view>header button:not(.secondary):not(.danger){background:var(--cos-gold-button)!important;color:var(--cos-gold-button-ink)!important;border:1px solid rgba(255,240,205,.45)!important;border-radius:12px;box-shadow:0 6px 18px -8px rgba(216,191,138,.55),inset 0 1px 0 rgba(255,255,255,.45)!important}
+
+/* Buttons that open a screen (a title and a line under it): graphite cards with a gold title, like the Victron tiles. */
+html:not([data-theme='light']) #root#root .operations-shell :where(.panel,.workspace-overview,.owner-command-home):not(.vrm-workspace):not(.vrm-workspace *) button:not(.secondary):not(.danger):has(>b),
+html:not([data-theme='light']) #root#root .operations-shell .operations-tool-grid>button{background:var(--cos-card)!important;border:1px solid var(--cos-lux-soft)!important;border-radius:var(--cos-radius)!important;box-shadow:var(--cos-card-edge)!important;color:var(--cos-ink)!important}
+html:not([data-theme='light']) #root#root .operations-shell :where(.panel,.workspace-overview,.owner-command-home):not(.vrm-workspace):not(.vrm-workspace *) button:not(.secondary):not(.danger):has(>b)>b,
+html:not([data-theme='light']) #root#root .operations-shell .operations-tool-grid>button b{color:var(--cos-lux-strong)!important}
+html:not([data-theme='light']) #root#root .operations-shell :where(.panel,.workspace-overview,.owner-command-home):not(.vrm-workspace):not(.vrm-workspace *) button:not(.secondary):not(.danger):has(>b)>span,
+html:not([data-theme='light']) #root#root .operations-shell .operations-tool-grid>button span{color:var(--cos-mute)!important}
+
+/* Second buttons: outlined, like Refresh fleet. */
+html:not([data-theme='light']) #root#root .operations-shell :is(button.secondary,.row-actions button.secondary,.purchase-actions button.secondary,.daily-board-actions button.secondary):not(.vrm-workspace *){background:transparent!important;border:1px solid var(--cos-lux-soft)!important;color:var(--cos-ink)!important;border-radius:12px}
+
+/* What is picked: graphite with a champagne edge, not blue and pink. */
+html:not([data-theme='light']) #root#root .operations-shell :is(button.active,button.selected,.router-list>button.selected):not(.vrm-workspace *){background:var(--cos-card)!important;color:var(--cos-ink)!important;border-color:var(--cos-lux)!important;box-shadow:0 0 0 1px var(--cos-lux-soft)!important}
+html:not([data-theme='light']) #root#root .operations-shell .operations-section-nav button.active{color:var(--cos-lux)!important;border-bottom-color:var(--cos-lux)!important;background:transparent!important;box-shadow:none!important}
+html:not([data-theme='light']) #root#root .operations-sidebar .operations-area-nav button.active,html:not([data-theme='light']) #root#root .operations-sidebar .operations-area-nav button:hover{background:rgba(216,191,138,.08)!important;color:var(--cos-lux)!important}
+
+/* Fields. */
+html:not([data-theme='light']) #root#root .operations-shell :is(input,select,textarea):not([type=checkbox]):not([type=radio]):not(.vrm-workspace *){border-color:var(--cos-lux-faint)!important;border-radius:12px}
+html:not([data-theme='light']) #root#root .operations-shell :is(input,select,textarea):focus{border-color:var(--cos-lux-soft)!important}
+
+/* Screen links in a tool grid (Tech Check, More): every one a graphite card, its title gold, its line muted.
+   Repeated with an extra class so it wins over the second-button rule above. */
+html:not([data-theme='light']) #root#root .operations-shell.operations-shell .operations-tool-grid>button{background:var(--cos-card)!important;border:1px solid var(--cos-lux-faint)!important;border-radius:var(--cos-radius)!important;box-shadow:var(--cos-card-edge)!important;color:var(--cos-ink)!important}
+html:not([data-theme='light']) #root#root .operations-shell.operations-shell .operations-tool-grid>button:not(.secondary){border-color:var(--cos-lux-soft)!important}
+html:not([data-theme='light']) #root#root .operations-shell.operations-shell .operations-tool-grid>button :is(b,strong){color:var(--cos-lux-strong)!important}
+html:not([data-theme='light']) #root#root .operations-shell.operations-shell .operations-tool-grid>button :is(span,small){color:var(--cos-mute)!important}
+
+/* More: the Fleet card, the inventory counts and the shortcut buttons. */
+html:not([data-theme='light']) #root#root .operations-shell .home-field-view>button{background:var(--cos-card)!important;border:1px solid var(--cos-lux-soft)!important;border-radius:var(--cos-radius)!important;box-shadow:var(--cos-card-edge)!important}
+html:not([data-theme='light']) #root#root .operations-shell .home-field-view>button :is(b,strong,h2,h3){color:var(--cos-lux-strong)!important}
+html:not([data-theme='light']) #root#root .operations-shell .home-field-view>button svg{color:var(--cos-lux)!important;stroke:var(--cos-lux)}
+html:not([data-theme='light']) #root#root .operations-shell .cos-inventory-overview{background:var(--cos-card)!important;border-color:var(--cos-lux-faint)!important;border-radius:var(--cos-radius)!important;box-shadow:var(--cos-card-edge)!important}
+html:not([data-theme='light']) #root#root .operations-shell .cos-inventory-overview>header button{background:var(--cos-gold-button)!important;color:var(--cos-gold-button-ink)!important;border:1px solid rgba(255,240,205,.45)!important;box-shadow:0 6px 18px -8px rgba(216,191,138,.55),inset 0 1px 0 rgba(255,255,255,.45)!important}
+html:not([data-theme='light']) #root#root .operations-shell .cos-inventory-totals>button{background:var(--cos-card)!important;border:1px solid var(--cos-lux-faint)!important;border-radius:14px!important;box-shadow:var(--cos-card-edge)!important;color:var(--cos-ink)!important}
+html:not([data-theme='light']) #root#root .operations-shell .cos-inventory-totals>button *{color:inherit!important}
+html:not([data-theme='light']) #root#root .operations-shell .cos-inventory-totals>button :is(span,small){color:var(--cos-mute)!important;letter-spacing:.12em;text-transform:uppercase}
+html:not([data-theme='light']) #root#root .operations-shell .cos-daily-shortcuts>button{background:var(--cos-card)!important;border:1px solid var(--cos-lux-soft)!important;border-radius:var(--cos-radius)!important;box-shadow:var(--cos-card-edge)!important;color:var(--cos-lux-strong)!important}
+html:not([data-theme='light']) #root#root .operations-shell .cos-daily-shortcuts>button *{color:inherit!important}
+html:not([data-theme='light']) #root#root .operations-shell .owner-watchful-action>a{background:transparent!important;border:1px solid var(--cos-lux-soft)!important;color:var(--cos-ink)!important;border-radius:12px}
+/* Tech Check's second-row links had their own dark title colour (made for a white card); on graphite it must be light. */
+html:not([data-theme='light']) #root#root .operations-shell.cos-approved-shell .cos-approved-checks .operations-tool-grid>button.secondary :is(b,strong){color:var(--cos-lux-strong)!important}
+html:not([data-theme='light']) #root#root .operations-shell.cos-approved-shell .cos-approved-checks .operations-tool-grid>button.secondary :is(span,small){color:var(--cos-mute)!important}
