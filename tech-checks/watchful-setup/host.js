@@ -42,7 +42,7 @@ export function openWatchful(context, {onChange = () => {}, start = null} = {}) 
   }
   // screens are functions; go() pushes, goBack() pops
   function show(fn) { screen = fn; body.replaceChildren(); dialog.scrollTop = 0; fn(); back.hidden = !history.length; }
-  function go(fn) { if (screen) history.push(screen); show(fn); }
+  function go(fn) { if (screen) history.push(screen); tell(''); show(fn); }
   function goBack() { if (busy) return; tell(''); const prev = history.pop(); if (prev) show(prev); else close(); }
   // a message that survives the next screen's loading
   function home(message = '') { history.length = 0; flash = message; show(homeScreen); if (message) tell(message, 'ok'); }
@@ -199,7 +199,9 @@ export function openWatchful(context, {onChange = () => {}, start = null} = {}) 
     options = await run('Loading the models…', () => client.options(chk.unitType));
     if (!options) return;
     draft = M.prefill(unit, options, chk.unitType);
-    go(!options.hasRecorder ? camerasScreen : draft.recorder && draft.recorderFromCos ? recorderScreen : recorderPickScreen);
+    // COS already says: cameras but no recorder (a standalone Solar Spotter) -> straight to the cameras
+    const camerasOnly = options.hasRecorder && !draft.recorderFromCos && (unit.cameras || []).length > 0;
+    go(!options.hasRecorder || camerasOnly ? camerasScreen : draft.recorder && draft.recorderFromCos ? recorderScreen : recorderPickScreen);
   }
   const noRecorderButton = () => button('This unit has no recorder (cameras only)', () => { draft.noRecorder = true; draft.recorder = null; draft.recorderNotOnFile = '';
     draft.cameras = draft.cameras.map(c => c.role === 'camera_on_nvr_channel' ? {...c, role: 'camera_standalone', model: null} : c); go(camerasScreen); }, 'ws-big ws-quietbtn');
@@ -243,6 +245,7 @@ export function openWatchful(context, {onChange = () => {}, start = null} = {}) 
     title(draft.system ? 'Cameras on ' + current.unitLabel : draft.noRecorder ? 'The cameras' : 'Cameras plugged into the recorder', current.unitLabel);
     if (draft.system) note(draft.system.brand + ': nothing to set on the device here. Never log in to it. Just list the cameras so each one gets a walk test.');
     else note('One row per camera. Check each model against its label. Tap a row to change it.');
+    if (options.hasRecorder && draft.noRecorder && !draft.system) body.append(button('This unit has a recorder (NVR)', () => { draft.noRecorder = false; go(recorderPickScreen); }, 'ws-small ws-quietbtn'));
     draft.cameras.forEach((c, i) => {
       const box = card(c.model ? '' : 'ws-alert');
       const head = node('div', '', 'ws-row'); head.append(node('h2', M.roleWord(c.role) + ' ' + (i + 1)));
@@ -331,7 +334,9 @@ export function openWatchful(context, {onChange = () => {}, start = null} = {}) 
     if (nextLabel) body.append(button('▶ ' + nextLabel, () => doNext(), 'ws-big ws-go ws-next'));
     for (const s of chk.sections) {
       const d = node('details', '', 'ws-section'); const items = s.items, open = items.filter(i => i.result === 'pending' && i.standardStatus !== 'PLACEHOLDER').length;
-      d.open = open > 0 && chk.canEdit && (chk.status !== 'returned' || items.some(i => i.reopened));
+      // open only where the next step is (or every section that has a step sent back)
+      d.open = chk.status === 'returned' ? items.some(i => i.reopened && i.result === 'pending')
+        : (next.kind === 'item' || next.kind === 'stuck') ? items.some(i => i.id === next.item.id) : false;
       d.append(node('summary', s.title + (open ? ' — ' + open + ' to do' : ' — done ✓')));
       for (const it of items) {
         const row = button('', () => { itemId = it.id; go(itemScreen); }, 'ws-item ws-item-' + (it.standardStatus === 'PLACEHOLDER' ? 'grey' : it.result) + (it.reopened ? ' ws-reopened' : ''));

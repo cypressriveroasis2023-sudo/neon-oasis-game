@@ -154,7 +154,9 @@ test('a Helios fills its cameras and speaker from COS; a model not on the list a
   await dlg.getByRole('button', {name: /Solar Spotter \(SS\).*COS says/}).click();
   await dlg.getByRole('button', {name: 'Next'}).click();
   await dlg.getByRole('button', {name: /New install/}).click();
-  await dlg.getByRole('button', {name: /This unit has no recorder/}).click();
+  // COS has cameras and no recorder for it: no recorder question, straight to the cameras
+  await expect(dlg.getByRole('heading', {name: 'The cameras'})).toBeVisible();
+  await expect(dlg.getByRole('button', {name: /This unit has a recorder/})).toBeVisible();
   await expect(dlg.getByText(/ALI-FB81-LUA-D \(not on the list, label photo needed\)/)).toBeVisible();
   await dlg.getByRole('button', {name: /Next: check the list/}).click();
   await expect(dlg.locator('.ws-status')).toHaveText(/take a photo of the model label/i);
