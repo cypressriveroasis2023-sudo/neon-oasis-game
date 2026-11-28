@@ -57,7 +57,8 @@ returns integer language plpgsql security definer set search_path to '' as $func
 declare
   r jsonb; p jsonb; kept integer := 0; v_id bigint; v_instance integer; v_value numeric; v_at timestamptz;
   known constant text[] := array['/Pv/V','/Pv/I','/Pv/0/V','/Pv/1/V','/Dc/0/Voltage','/Dc/0/Current','/State','/ErrorCode','/MppOperationMode',
-    '/History/Daily/0/Yield','/History/Daily/0/MaxPower','/History/Daily/1/Yield','/History/Daily/1/MaxPower','/Yield/User'];
+    '/History/Daily/0/Yield','/History/Daily/0/MaxPower','/History/Daily/1/Yield','/History/Daily/1/MaxPower','/Yield/User',
+    '/Load/State','/Load/I','/Mode','/DeviceOffReason'];
 begin
   if jsonb_typeof(p_rows) is distinct from 'array' or jsonb_array_length(p_rows) > 2000
     or jsonb_typeof(p_paths) is distinct from 'array' or jsonb_array_length(p_paths) > 150 then
