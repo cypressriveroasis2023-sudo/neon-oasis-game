@@ -1,10 +1,27 @@
-# 2026-11-28 — Tech Check: Watchful setup check (PREPARED, NOT APPLIED)
+# 2026-11-28 — Tech Check: Watchful setup check (APPLIED 2026-11-28 ~15:55 UTC, James's go)
 
 Project: Tech Check `goqrnolcvqnirjmzaeyk`
 File: `tech-checks/database-maintenance/watchful-setup-check-v1.sql`, built from `tech-checks/watchful-setup/sql/*.sql`
 by `node tech-checks/watchful-setup/tools/assemble.mjs`. One transaction: it all applies or nothing does. Run it once
 (a second run stops at the first `create type` and changes nothing).
-Spec: "COS install checklist" v1.0, 2026-11-27 (James Martin). Apply only with James's go.
+Spec: "COS install checklist" v1.0, 2026-11-27 (James Martin).
+
+## How it was applied
+
+James said "Apply watchful setup check" (09:46 CT). The file is 323 KB, so it was not retyped: Tech Check fetched it
+with `net.http_get` from commit `379c81d4999417b653794b1a370623e9dbb1da08` (pg_net request 101705), and migration
+`watchful_setup_check_v1` ran it only after checking its SHA-256 was the tested file's
+(`8ceecdfa991b1d529838421cbbe63c7e5688d3a98a38173346a26a3cb65e6369`), with the file's own begin/commit removed
+(the migration is one transaction). Then migration `watchful_setup_unit_labels_v1` replaced `public.ws_find_units_v1`
+with the text now in `sql/20_app_calls.sql` (real names like "Helios 005 / Cam 001" -> "Helios 005"; a Recon
+detector's "Camera 1: F1DC" -> its unit key), checked on all 301 units with camera records.
+
+Checked after: 23 models, 29 published checklists, 36 catalog rows, 19 placeholders, 24 `public.ws_*_v1` calls,
+0 callable by `anon`, 0 tables readable by `authenticated`, bucket private / 15 MB / JPEG, both policies present.
+As real accounts in rolled-back transactions: a Service tech gets `canTech`, not `canOffice`, and is refused the quiet
+list; IT reads it; the owner reads home as owner. No `camera_inventory_audit` row written; cron jobs 2, 4, 5, 15, 16
+ran on schedule after. (The watchdog log's last row is 04:13 UTC by design: it records only non-ok, recovery and a
+daily heartbeat.)
 
 ## Why
 
@@ -43,8 +60,8 @@ select count(*) from app_private.ws_device_models;                              
 select count(*) from app_private.ws_checklist_templates where status = 'published';  -- 29
 select public.cos_sweep_watchdog_recent_v1(5);                                        -- still ok
 ```
-Then open Tech Check: the "📡 Watchful setup check" button appears for Service, IT and the owner only once these
-functions answer (the screens are safe to publish before this file is applied).
+The "📡 Watchful setup check" button appears in Tech Check once PR #603 is merged (the screens publish with Pages);
+it shows only when these functions answer.
 
 ## Rollback
 

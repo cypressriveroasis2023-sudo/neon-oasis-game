@@ -69,7 +69,9 @@ before(async () => {
       ('SOLARSPOTTER 003','SS003_3','IPC','ALI-PB81-AI-D','Solar Spotter'), ('SOLARSPOTTER 003','SS003_4','IPC','ALI-PB81-AI-D','Solar Spotter'),
       ('HELIOS 005','Helios 005 - Cam 001','IPC','ALI-PB50-LUAIS-D','Helios'), ('HELIOS 005','Helios 005 - Cam 002','IPC','ALI-PB50-LUAIS-D','Helios'),
       ('HELIOS 005','Helios 005 - Cam 003','IPC','ALI-PZ40-UZAI-D','Helios'),
-      ('SNIPER 302','Sniper 302','Sniper','Sniper','Sniper'), ('RANGER 024','Ranger 024','IPC','ALI-PT50-LUAIS-D','Ranger');
+      ('SNIPER 302','Sniper 302','Sniper','Sniper','Sniper'), ('RANGER 024','Ranger 024','IPC','ALI-PT50-LUAIS-D','Ranger'),
+      ('HELIOS 013','Helios 013 / PTZ Cam 003 & Cam 004','IPC','ALI-PZ40-UZAI-D','Helios'), ('HELIOS 013','Helios 013 / Cam 001','IPC','ALI-PB50-LUAIS-D','Helios'),
+      ('RII005 - Newmark/Gembler','Camera 1: F1DC','Reconeyez detector','detector_hdr_xrl','Recon');
   `);
   await db.exec(change);
 });
@@ -103,6 +105,9 @@ test('finding a unit fills in what COS already has on file', async () => {
   const [ss] = await call(josh, 'ws_find_units_v1', 'ss003');
   assert.equal(ss.suggestedType, 'Solar Spotter (SS)'); assert.equal(ss.cameras.length, 4);
   assert.deepEqual(await call(josh, 'ws_find_units_v1', 'x'), []);
+  assert.equal((await call(josh, 'ws_find_units_v1', 'helios 013'))[0].label, 'Helios 013', 'cut at the slash');
+  assert.equal((await call(josh, 'ws_find_units_v1', 'rii005'))[0].label, 'RII005 - Newmark/Gembler', 'a bare camera name is never the unit name');
+  assert.equal((await call(josh, 'ws_find_units_v1', 'sniper 302'))[0].label, 'Sniper 302', 'a unit number is never cut');
 });
 
 let nvrCheck, ssCheck;
@@ -327,7 +332,7 @@ test('37-43 quiet cameras', async () => {
   assert.equal(cam('Spotter 236HD ch2').quietDays, 14); assert.equal(cam('Helios 005 - Cam 001').quietDays, 7);
   // 43 nothing here changes camera_devices
   const devices = (await db.query('select count(*) n from public.camera_devices')).rows[0].n;
-  assert.equal(Number(devices), 10);
+  assert.equal(Number(devices), 13);
 });
 
 test('44 45 no secrets, no fields for them', async () => {

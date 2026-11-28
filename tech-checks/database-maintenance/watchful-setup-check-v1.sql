@@ -1506,9 +1506,11 @@ begin
   return coalesce((select jsonb_agg(u order by u->>'key') from (
     select jsonb_build_object(
       'key', d.unit_key,
-      -- the recorder's name, or the first camera's name without its camera number ("Helios 005 - Cam 001" -> "Helios 005")
-      'label', coalesce(nullif(trim(regexp_replace((array_agg(d.device_name order by (d.device_type = 'NVR') desc, d.device_name))[1],
-                 '(\s*-?\s*(cam(era)?|ch|ptz)\s*\d{1,3}|_\d{1,2})$', '', 'i')), ''), d.unit_key),
+      -- the recorder's name, or the first camera's name cut at "/" and without its camera number
+      -- ("Helios 005 / Cam 001" -> "Helios 005", "SS003_1" -> "SS003"); a bare camera name ("Camera 1: F1DC") -> the unit key
+      'label', (select case when c is null or c = '' or c ~* '^(cam(era)?|ch|ptz)\M' then d.unit_key else c end
+                from (select trim(regexp_replace(regexp_replace((array_agg(d.device_name order by (d.device_type = 'NVR') desc, d.device_name))[1],
+                        '\s*/.*$', ''), '(\s*-?\s*(cam(era)?|ch|ptz)\s*\d{1,3}|_\d{1,2})$', '', 'i')) c) z),
       'family', max(d.tech_check_unit_type),
       'suggestedType', app_private.ws_suggest_type(max(d.tech_check_unit_type), d.unit_key),
       'recorderModel', max(d.device_model) filter (where d.device_type = 'NVR'),

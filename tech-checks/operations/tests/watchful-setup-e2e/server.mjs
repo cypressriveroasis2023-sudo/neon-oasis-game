@@ -32,7 +32,8 @@ export async function start(port = 0) {
       ('SPOTTER 236','Spotter 236HD','NVR','ALI-NR040F-1','NVR'),
       ('HELIOS 005','Helios 005 - Cam 001','IPC','ALI-PB50-LUAIS-D','Helios'), ('HELIOS 005','Helios 005 - Cam 002','IPC','ALI-PB50-LUAIS-D','Helios'),
       ('HELIOS 005','Helios 005 - Cam 003','IPC','ALI-PZ40-UZAI-D','Helios'),
-      ('SOLARSPOTTER 029','SolarSpotter 029_1','IPC','ALI-FB81-LUA-D','Solar Spotter');
+      ('SOLARSPOTTER 029','SolarSpotter 029_1','IPC','ALI-FB81-LUA-D','Solar Spotter'),
+      ('HELIOS 013','Helios 013 / PTZ Cam 003 & Cam 004','IPC','ALI-PZ40-UZAI-D','Helios'), ('RII005 - Newmark/Gembler','Camera 1: F1DC','Reconeyez detector','detector_hdr_xrl','Recon');
   `);
   await db.exec(change);
   const files = new Map();
