@@ -9,8 +9,8 @@ import { readDashboardPower, shortDate, unitTileSummary } from './vrmReadOnlyMod
 import { heliosPlacement, placementLabel, victronFleetView, victronNeedsAttention, withMhelpPlacement } from './victronAttention';
 import { canonicalCameraUnit } from './fieldCameraHealth';
 import { mpptLine, readVrmExtras, type MhelpPlace, type Mppt } from './vrmMppt';
-import { cloudyWarning, heliosSpots, outlookLine, readSunForecast, sunOutlook, type SunDay } from './vrmWeather';
-import { dayPeak, historyFlags, isNightForecastTime, nightLoad, last24h, overnightLow, withoutSun, readVrmHistory, solarVsYesterday, systemLead, tonightBasis, tonightForecast, tonightHeadline, tonightSteps, type HistoryPoint, type Tonight } from './vrmHistory';
+import { cloudyWarning, darkSpell, fleetSky, harvestWh, heliosSpots, outlookLine, readSunForecast, sayDay, sunOutlook, type SunDay } from './vrmWeather';
+import { dayPeak, historyFlags, isNightForecastTime, nightLoad, last24h, overnightLow, withoutSun, DD3_BATTERY_WH, readVrmHistory, solarVsYesterday, systemLead, tonightBasis, tonightForecast, tonightHeadline, tonightSteps, type HistoryPoint, type Tonight } from './vrmHistory';
 import VrmTechGuide from './VrmTechGuide';
 import VrmNightReport, { nightLevel } from './VrmNightReport';
 import { nightReport } from './vrmNightReport';
@@ -200,13 +200,30 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
   });
   const reserve = units.filter(u => place.get(u.installationId) === 'field').flatMap(u => { const r = withoutSun(history?.get(u.installationId), now); return r ? [{...r, installationId: u.installationId, name: u.name}] : []; })
     .sort((a, b) => a.fromNow - b.fromNow || a.name.localeCompare(b.name, undefined, {numeric: true}));
+  const skyStrip = fleetSky(sky, reserve.flatMap(r => { const k = canonicalCameraUnit(r.name); return k ? [k] : []; }), now, 4);
+  const spells = reserve.flatMap(r => { const k = canonicalCameraUnit(r.name), o = k ? sunOutlook(sky?.get(k), now, 4) : [];
+    const d = darkSpell(o, DD3_BATTERY_WH * r.soc / 100, r.usedWh, DD3_BATTERY_WH); return d ? [{...d, installationId: r.installationId, name: r.name}] : []; });
   const mid = (v: number[]) => { const x = [...v].sort((a, b) => a - b); return x.length ? x[Math.floor(x.length / 2)] : null; };
   const fleetFull = mid(reserve.map(r => r.full)), fleetSafe = mid(reserve.map(r => r.safe)), fleetUsed = mid(reserve.map(r => r.usedWh));
   // Yesterday's sun against a day's use, from the solar charger's own daily total (kWh), Field units only.
   const sunYesterday = mid(reserve.flatMap(r => { const y = mppt?.get(r.installationId)?.yieldYesterday; return y != null && y > 0 ? [y * 1000] : []; }));
   const watts = reserve.map(r => r.watts).sort((a, b) => a - b);
   const attentionAll = victronNeedsAttention(units, power.rows, inventory, now, history, tonight, weather, mppt, deploys);
-  const attention = attentionAll.filter(item => item.kind !== 'monitors'), monitors = attentionAll.find(item => item.kind === 'monitors');
+  // Dark spell first among weather lines: it replaces the simpler "cloudy days ahead" line for the same unit.
+  const spellIds = new Set(spells.map(d => d.installationId));
+  // One line per unit when one or two are at risk; one line for all of them when the whole fleet is under the same sky.
+  const gd = (n: number) => n + ' gray day' + (n > 1 ? 's' : '') + ' ahead';
+  const short = (name: string) => name.replace(/^HELIOS\s+/i, '');
+  const sorted = [...spells].sort((a, b) => a.low - b.low || a.name.localeCompare(b.name, undefined, {numeric: true}));
+  const darkLines = sorted.length <= 2
+    ? sorted.map(d => ({installationId: d.installationId, name: d.name, kind: 'darkspell' as const,
+        line: 'Dark spell · ' + gd(d.grayDays) + ' · battery about ' + d.low + '% by ' + sayDay(d.by) + ' · swap, top up or plug into AC'}))
+    : [{installationId: sorted[0].installationId, name: sorted.length + ' units', kind: 'darkspell' as const,
+        line: 'Dark spell · ' + gd(Math.max(...sorted.map(d => d.grayDays))) + ' · under 20% by ' + sayDay(sorted[0].by) + ': ' + sorted.map(d => short(d.name) + ' ' + d.low + '%').join(', ') + ' · lowest first'}];
+  const keep = attentionAll.filter(item => item.kind !== 'monitors' && !(item.kind === 'cloudy' && spellIds.has(item.installationId)));
+  const firstAfter = keep.findIndex(item => item.kind !== 'alarm' && item.kind !== 'deploy');
+  const attention = firstAfter < 0 ? [...keep, ...darkLines] : [...keep.slice(0, firstAfter), ...darkLines, ...keep.slice(firstAfter)];
+  const monitors = attentionAll.find(item => item.kind === 'monitors');
   const syncTone = !sync ? 'stale' : error || sync.state === 'error' ? 'low' : sync.state === 'current' ? 'good' : 'stale';
   const lastSuccess = readableTime(sync?.lastSuccessAt ?? null);
   const nextSync = readableTime(sync?.nextSyncAt ?? null);
@@ -240,6 +257,19 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
           {sunYesterday !== null && fleetUsed !== null && <div className={sunYesterday >= fleetUsed ? 'vrm-sun-even' : 'vrm-sun-short'}><dt>Sun yesterday</dt><dd>{(sunYesterday / 1000).toFixed(2)} kWh {sunYesterday >= fleetUsed ? '· covered the day' : '· short by ' + ((fleetUsed - sunYesterday) / 1000).toFixed(2)}</dd></div>}
         </dl>
       </div>
+      {skyStrip.length > 0 && <div className='vrm-sky-strip' aria-label='Sun forecast for the Field units'>
+        {skyStrip.map(d => { const wh = harvestWh(d.mj), hours = d.mj !== null ? d.mj / 3.6 : null;
+          return <div key={d.date} className={'vrm-sky-day' + (d.gray ? ' is-gray' : (hours ?? 0) >= 4 ? ' is-sunny' : ' is-mixed')}>
+            <span className='vrm-sky-name'>{d.label === 'Today' ? 'Today' : new Date(d.date + 'T12:00:00').toLocaleDateString('en-US', {weekday: 'short'})}</span>
+            <svg viewBox='0 0 24 24' aria-hidden='true' focusable='false'>{d.gray
+              ? <path d='M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.1 11.2 3.5 3.5 0 0 0 7 18Z'/>
+              : (hours ?? 0) >= 4 ? <path d='M12 7.5a4.5 4.5 0 1 0 0 9a4.5 4.5 0 0 0 0-9ZM12 2v2.2M12 19.8V22M2 12h2.2M19.8 12H22M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6'/>
+              : <path d='M8 4.5v1.6M3.2 9.3h1.6M4.6 5.9l1.1 1.1M11.4 5.9l-1.1 1.1M5.2 11a3 3 0 0 1 5.6-1.6M9 19h8a3.5 3.5 0 0 0 .4-6.98A5 5 0 0 0 8.1 13 3 3 0 0 0 9 19Z'/>}</svg>
+            <b>{hours !== null ? hours.toFixed(1) + ' h' : d.cloud !== null ? Math.round(d.cloud) + '%' : '—'}</b>
+            <em>{wh !== null ? '≈' + (wh / 1000).toFixed(1) + ' kWh' : d.gray ? 'gray' : ''}</em>
+          </div>; })}
+      </div>}
+      {skyStrip.length > 0 && <p className='vrm-sky-caption'>Full-sun hours forecast where the Field units are, and about what the panels should make. A unit uses about {fleetUsed !== null ? (fleetUsed / 1000).toFixed(1) : '0.8'} kWh a day.{spells.length ? ' ' + spells.length + (spells.length === 1 ? ' unit' : ' units') + ' could run low in the coming gray days (see Needs attention).' : ''}</p>}
       <ul className='vrm-sun-grid' aria-label='Days on battery from now, Field units'>{reserve.map(r => <li key={r.installationId} className={'vrm-sun-' + (r.fromNow < 1.5 ? 'low' : r.fromNow < 2.5 ? 'mid' : 'ok')}>
         <button type='button' onClick={() => select(r.installationId)} aria-label={r.name + ': ' + r.fromNow.toFixed(1) + ' days on battery from now'}>
           <span className='vrm-sun-name' aria-hidden='true'>{r.name.replace(/^HELIOS\s+/i, '')}</span>
