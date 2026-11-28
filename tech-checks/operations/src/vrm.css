@@ -397,3 +397,16 @@ html:not([data-theme='light']) .vrm-workspace .vrm-native-dashboard .vrm-native-
 .vrm-attention .vrm-attn-monitors span{color:#f5b942}
 html:not([data-theme='light']) .vrm-workspace .vrm-attention .vrm-attn-monitors span{color:var(--vt-amber)}
 html[data-theme='light'] .vrm-attention .vrm-attn-monitors span,html[data-theme='light'] .vrm-unit-grid .vrm-tile-differ{color:#875900}
+
+/* Just set up: a checklist for a Helios in its first two days on site. */
+.vrm-deploy{margin:10px 0 4px;padding:12px;border:1px solid var(--vt-hair,#2a2f3a);border-left:3px solid var(--vt-lux,#d8bf8a);border-radius:10px;background:var(--vt-surface,#11141b)}
+.vrm-deploy h3{margin:0 0 8px;font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--vt-lux,#d8bf8a)}
+#root#root .operations-shell .vrm-workspace .vrm-deploy-unit{display:block;width:100%;text-align:left;margin:0 0 6px;padding:9px 11px!important;border-radius:8px;border:1px solid var(--vt-hair,#2a2f3a)!important;background:transparent!important;color:var(--vt-ink,#e6edf7)!important;box-shadow:none!important;min-height:0}
+#root#root .operations-shell .vrm-workspace .vrm-deploy-unit.vrm-deploy-fail{border-color:#5a2029!important}
+#root#root .operations-shell .vrm-workspace .vrm-deploy-unit.vrm-deploy-done{border-color:#1f4a35!important}
+.vrm-deploy-head{display:flex;justify-content:space-between;gap:10px;margin:0 0 6px;font-size:13px}.vrm-deploy-head span{color:var(--vt-mute,#9aa4b2);font-size:12px}
+.vrm-deploy ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:3px 12px;font-size:12px}
+.vrm-deploy li i{display:inline-block;width:14px;font-style:normal;font-weight:700}.vrm-deploy li em{font-style:normal;color:var(--vt-mute,#9aa4b2)}
+.vrm-deploy-ok i{color:var(--vt-emerald,#4fd18b)}.vrm-deploy-fail{color:#ffb3ba}.vrm-deploy-fail i{color:var(--vt-ruby,#ff6b7a)}.vrm-deploy-wait{color:var(--vt-mute,#9aa4b2)}
+html[data-theme='light'] .vrm-deploy{background:#fff}
+.vrm-attention .vrm-attn-deploy span{color:#ff6b7a;font-weight:700}

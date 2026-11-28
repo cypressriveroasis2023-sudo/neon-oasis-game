@@ -1,3 +1,4 @@
+import { deployCheck, newlyDeployed } from './vrmDeployCheck';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, OperationsApiError } from './api';
 import { getVrmFleet } from './vrmFleetApi';
@@ -193,7 +194,11 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
   if (sky) for (const [key, days] of sky) { const o = sunOutlook(days, now); if (o.length) weather.set(key, o); }
   const night = units.length > 0 && history ? nightReport(units, history, now, name => heliosPlacement(name, inventory) === 'shop') : null;
   const nightRows = new Map((night?.rows ?? []).map(r => [r.installationId, r]));
-  const attention = victronNeedsAttention(units, power.rows, inventory, now, history, tonight, weather, mppt);
+  const deploys = newlyDeployed(units, history, name => heliosPlacement(name, inventory) === 'field').map(d => {
+    const tile = tiles.get(d.installationId);
+    return deployCheck({...d, fresh: !!tile?.fresh, hasBattery: !!tile?.soc, points: history?.get(d.installationId) ?? [], mppt: mppt?.get(d.installationId)}, now);
+  });
+  const attention = victronNeedsAttention(units, power.rows, inventory, now, history, tonight, weather, mppt, deploys);
   const syncTone = !sync ? 'stale' : error || sync.state === 'error' ? 'low' : sync.state === 'current' ? 'good' : 'stale';
   const lastSuccess = readableTime(sync?.lastSuccessAt ?? null);
   const nextSync = readableTime(sync?.nextSyncAt ?? null);
@@ -210,6 +215,13 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
     {units.length > 0 && placed > 0 && <section className={'vrm-attention' + (attention.length ? '' : ' vrm-attention-clear')} aria-label='Needs attention'>
       <h3>{attention.length ? 'Needs attention · Field units' : 'No Field power issues'}</h3>
       {attention.length > 0 && <ul>{attention.map((item, index) => <li key={item.installationId + ':' + item.kind + ':' + index}><button type='button' className={'vrm-attn-'+item.kind} onClick={() => select(item.installationId)}><strong>{item.name}</strong><span>{item.line}</span></button></li>)}</ul>}
+    </section>}
+    {deploys.length > 0 && <section className='vrm-deploy' aria-label='Just set up'>
+      <h3>Just set up · first two days</h3>
+      {deploys.map(d => <button type='button' key={d.installationId} className={'vrm-deploy-unit' + (d.failed.length ? ' vrm-deploy-fail' : d.done ? ' vrm-deploy-done' : '')} onClick={() => select(d.installationId)}>
+        <p className='vrm-deploy-head'><strong>{d.name}</strong><span>on since {shortDate(new Date(d.since * 1000).toISOString(), now)}{d.done ? ' · all checks passed' : d.failed.length ? ' · ' + d.failed.length + ' to fix' : ''}</span></p>
+        <ul>{d.checks.map(c => <li key={c.label} className={'vrm-deploy-' + c.state}><i aria-hidden='true'>{c.state === 'ok' ? '✓' : c.state === 'fail' ? '✕' : '…'}</i>{c.label}{c.note && <em> · {c.note}</em>}</li>)}</ul>
+      </button>)}
     </section>}
     {night && <VrmNightReport report={night}/>}
     {units.length > 0 && <VrmTechGuide/>}

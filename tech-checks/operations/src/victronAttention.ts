@@ -1,3 +1,4 @@
+import {deployAttentionLine, type Deploy} from './vrmDeployCheck';
 import {canonicalCameraUnit} from './fieldCameraHealth';
 import {inventoryPlacement} from './fleetSnapshot';
 import {shortDate, unitTileSummary, type TileTone} from './vrmReadOnlyModel';
@@ -8,7 +9,7 @@ import type {VrmUnit} from '../../supabase/functions/cos-operations-pages/vrm';
 import type {SafeVrmPower} from '../../supabase/functions/cos-operations-pages/vrmSafePower';
 
 export type VictronPlacement = 'field' | 'shop' | 'unknown';
-export type VictronAttention = {installationId: number; name: string; kind: 'alarm' | 'low' | 'tonight' | 'fair' | 'overnight' | 'charger' | 'panel' | 'notfull' | 'load' | 'cloudy' | 'solar' | 'monitors' | 'tight' | 'unknown' | 'off'; line: string};
+export type VictronAttention = {installationId: number; name: string; kind: 'alarm' | 'deploy' | 'low' | 'tonight' | 'fair' | 'overnight' | 'charger' | 'panel' | 'notfull' | 'load' | 'cloudy' | 'solar' | 'monitors' | 'tight' | 'unknown' | 'off'; line: string};
 type InventoryUnit = {unitNumber?: string; placement?: string; currentLocationType?: string; effectivePlacement?: {contract?: string; state?: string}};
 
 /** Field or Shop from the one mHelp unit with the same Helios number. None or two matches stay unknown. */
@@ -73,7 +74,7 @@ export function victronFleetView<U extends {installationId: number; name: string
 }
 
 /** Field units only. Shop units are never an outage. A stale or missing reading is "power unknown", never "dead". */
-export function victronNeedsAttention(units: readonly VrmUnit[], rows: SafeVrmPower[], inventory: readonly InventoryUnit[] | null, now: number, history?: ReadonlyMap<number, HistoryPoint[]> | null, tonight?: ReadonlyMap<number, Tonight> | null, weather?: ReadonlyMap<string, OutlookDay[]> | null, mppt?: ReadonlyMap<number, Mppt> | null): VictronAttention[] {
+export function victronNeedsAttention(units: readonly VrmUnit[], rows: SafeVrmPower[], inventory: readonly InventoryUnit[] | null, now: number, history?: ReadonlyMap<number, HistoryPoint[]> | null, tonight?: ReadonlyMap<number, Tonight> | null, weather?: ReadonlyMap<string, OutlookDay[]> | null, mppt?: ReadonlyMap<number, Mppt> | null, deploys?: readonly Deploy[] | null): VictronAttention[] {
   const out: VictronAttention[] = [];
   const fieldIds = units.filter(unit => heliosPlacement(unit.name, inventory) === 'field').map(unit => unit.installationId);
   // Units are compared on the same calendar day: the chargers do not all start a new day at the same minute.
@@ -116,6 +117,8 @@ export function victronNeedsAttention(units: readonly VrmUnit[], rows: SafeVrmPo
       if (line) out.push({installationId: unit.installationId, name: unit.name, kind: 'cloudy', line});
     }
   }
+  // Just set up and something is not right: listed even when other lines exist for the unit.
+  for (const d of deploys ?? []) if (d.failed.length) out.push({installationId: d.installationId, name: d.name, kind: 'deploy', line: deployAttentionLine(d)});
   // One line for all of them, not one per unit: it is a maintenance job, and six rows of it would bury the
   // units that need someone today.
   if (disagree.length === 1) out.push({installationId: disagree[0].installationId, name: disagree[0].name, kind: 'monitors',
@@ -123,6 +126,6 @@ export function victronNeedsAttention(units: readonly VrmUnit[], rows: SafeVrmPo
   else if (disagree.length > 1) { disagree.sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true}));
     out.push({installationId: disagree[0].installationId, name: disagree.length + ' units', kind: 'monitors',
       line: 'Second battery monitor reads low · ' + disagree.map(d => d.name.replace(/^HELIOS\s+/i, '')).join(', ') + ' · needs a re-sync'}); }
-  const rank = {alarm: 0, charger: 1, low: 2, tonight: 3, panel: 4, fair: 5, overnight: 6, notfull: 7, load: 8, cloudy: 9, solar: 10, tight: 11, monitors: 12, off: 13, unknown: 14};
+  const rank = {alarm: 0, deploy: 0.5, charger: 1, low: 2, tonight: 3, panel: 4, fair: 5, overnight: 6, notfull: 7, load: 8, cloudy: 9, solar: 10, tight: 11, monitors: 12, off: 13, unknown: 14};
   return out.sort((a, b) => rank[a.kind] - rank[b.kind] || a.name.localeCompare(b.name, undefined, {numeric: true}));
 }
