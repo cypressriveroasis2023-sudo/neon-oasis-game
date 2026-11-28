@@ -11,6 +11,7 @@
  */
 import mapData from './boardMap.json';
 import {BOARD_CSS} from './boardStyle';
+import {COS_BOARD_THEME_CSS} from '../cosTheme';
 import {troubleWalk, troubleKnown, troubleNote, TROUBLE_CSS} from './boardTrouble';
 import {ROUTER_DETAIL_FRESH_MS, signalWord, milesBetween, unitKeyOf, trendWords, powerHint} from '../routerDetails';
 
@@ -70,7 +71,7 @@ const VENDOR_CSS = `
 @media (max-width:520px){.ven .vdays{grid-template-columns:1fr 1fr 1fr}.ven .vdays b:first-child,.ven .vday{grid-column:1/-1}.ven .vdays b:first-child{display:none}}
 .ven .vmail{white-space:pre-wrap;font:13.5px/1.5 ui-monospace,Menlo,monospace;background:var(--bg2);border:1px solid var(--line2);border-radius:10px;padding:12px;margin:10px 0;overflow-wrap:anywhere}
 `;
-const style = document.createElement('style'); style.textContent = BOARD_CSS + TROUBLE_CSS + ROUTER_CSS + VENDOR_CSS;
+const style = document.createElement('style'); style.textContent = BOARD_CSS + TROUBLE_CSS + ROUTER_CSS + VENDOR_CSS + COS_BOARD_THEME_CSS;
 const frame = document.createElement('template'); frame.innerHTML = SHELL;
 root.append(style, frame.content);
 const cleanups=[];

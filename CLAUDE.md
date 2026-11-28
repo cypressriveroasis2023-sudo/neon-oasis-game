@@ -59,6 +59,11 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-28** — **COS look** (James: "I want this theme on my entire program"). New `tech-checks/operations/src/cosTheme.ts`:
+  `COS_THEME_VARS` (champagne `--cos-lux`, graphite `--cos-card`, gold main button) is the one source of the look;
+  `COS_BOARD_THEME_CSS` is appended last in the board's shadow style (`boardApp.ts`). Only looks change. Status colours
+  (`--up/--warn/--down/--unk`) are never touched; champagne is chrome, never a status. Next: Tech Check, Team, More, Fleet,
+  each from these values. Restyling a screen? Use the `--cos-*` values, not new colours.
 - **2026-11-28** — Tech Check: **Watchful setup check** (James's spec of 11/27; **applied ~15:55 UTC**, James's go; screens publish when PR #603 merges). New
   `app_private.ws_*` tables, `public.ws_*_v1` functions, private bucket `techcheck-watchful-setup` and its two
   `storage.objects` policies, in `tech-checks/database-maintenance/watchful-setup-check-v1.sql` (built from
