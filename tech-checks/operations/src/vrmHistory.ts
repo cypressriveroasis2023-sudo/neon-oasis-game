@@ -155,9 +155,46 @@ export type Tonight = {
   atMorning: number;        // estimated % at 7 AM (0..100)
   floorAt: number | null;   // epoch s when it reaches 20%, if before 7 AM
   morning: number;          // epoch s of the 7 AM being forecast
+  lowerBy?: number;         // points the system number is running ahead of the energy that actually went in (see systemLead)
 };
 
 const nextSeven = (now: number) => { const d = new Date(now); const t = new Date(d); t.setHours(7, 0, 0, 0); if (d.getHours() >= 7) t.setDate(t.getDate() + 1); return t.getTime() / 1000; };
+
+/**
+ * How far the system's battery number is running AHEAD of the energy that really went in, in points.
+ *
+ * Why: the system number is right once a battery is full, and right on the way down (every Field unit gives
+ * 28-30 Wh per 1% at night). On the way up it runs ahead. HELIOS 004, 009 and 019 jump from about 87% straight
+ * to 100% when the sun comes up and then keep taking 100-300 W for three hours; the others climb about 20% too
+ * fast and take a last 3% after reading 100%. On a sunny day the battery catches up by noon and this is 0 again.
+ * After a cloudy day it is not, and the system would start the night claiming more than is there.
+ *
+ * How: walk the saved readings. On every charging step, add what the number gained and take off what the energy
+ * explains; that covers the jump, the too-fast climb and the catching-up at 100% in one rule. Discharging is left
+ * alone. A battery sitting at 100% around midday and taking nothing for 45 minutes is full: back to 0. Gaps over an
+ * hour are skipped. Anything under SYSTEM_LEAD_MIN points is noise and reads as 0.
+ */
+export const WH_PER_POINT = 29.5;
+export const SYSTEM_LEAD_MIN = 4;
+export const SYSTEM_LEAD_MAX = 40;
+export function systemLead(points: readonly HistoryPoint[] | null | undefined, now: number): number {
+  if (!points?.length) return 0;
+  const pts = points.filter(p => p[1] !== null && p[0] <= now / 1000 + 300);
+  let lead = 0, idleAtTop = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i], hours = (b[0] - a[0]) / 3600;
+    if (hours <= 0 || hours > 1 || a[3] === null || b[3] === null) { idleAtTop = 0; continue; }
+    const watts = (a[3] + b[3]) / 2, real = watts * hours / WH_PER_POINT;   // points the energy explains (+ in, - out)
+    const rise = (b[1] as number) - (a[1] as number);
+    if (real > 0) lead += rise - real;            // charging: ahead by whatever the energy does not explain
+    else if (rise >= 3) lead += rise;             // a jump with no energy behind it at all
+    const hour = new Date(b[0] * 1000).getHours();
+    idleAtTop = (a[1] as number) >= 99.5 && (b[1] as number) >= 99.5 && Math.abs(watts) <= 10 && hour >= 10 && hour < 15 ? idleAtTop + 1 : 0;
+    if (idleAtTop >= 3) lead = 0;                 // at the top at midday and taking nothing: full
+    lead = Math.max(-2, Math.min(SYSTEM_LEAD_MAX, lead));   // a little slack below zero; extra energy is not banked
+  }
+  return lead >= SYSTEM_LEAD_MIN ? Math.round(lead) : 0;
+}
 
 /** True from 5 PM to 7 AM local, when the sun can no longer refill the battery and a forecast means something. */
 export function isNightForecastTime(now: number): boolean { const h = new Date(now).getHours(); return h >= 17 || h < 7; }
@@ -166,7 +203,7 @@ export function isNightForecastTime(now: number): boolean { const h = new Date(n
  * Straight-line forecast from the last 2 hours of battery readings (needs 4+ readings over 45+ minutes,
  * the newest no older than 45 minutes). Only from 5 PM to 7 AM. Returns null when there is not enough to go on.
  */
-export function tonightForecast(points: HistoryPoint[], now: number): Tonight | null {
+export function tonightForecast(points: HistoryPoint[], now: number, lowerBy = 0): Tonight | null {
   if (!isNightForecastTime(now)) return null;
   const nowS = now / 1000;
   const recent = points.filter(p => p[1] !== null && p[0] >= nowS - 2 * 3600 && p[0] <= nowS + 300);
@@ -178,14 +215,17 @@ export function tonightForecast(points: HistoryPoint[], now: number): Tonight | 
   const mx = xs.reduce((a, b) => a + b, 0) / xs.length, my = ys.reduce((a, b) => a + b, 0) / ys.length;
   const den = xs.reduce((a, x) => a + (x - mx) ** 2, 0);
   const rate = den ? xs.reduce((a, x, i) => a + (x - mx) * (ys[i] - my), 0) / den : 0;
-  const battery = last[1] as number, morning = nextSeven(now);
+  // The saved history is the system's charge. When it has run ahead of the energy that really went in
+  // (systemLead), the estimate starts from the lower level and keeps the measured rate of loss.
+  const off = lowerBy > 0 ? lowerBy : 0, extra = off ? {lowerBy: Math.round(off)} : {};
+  const battery = Math.max(0, (last[1] as number) - off), morning = nextSeven(now);
   const hours = Math.max(0, (morning - last[0]) / 3600);
   const atMorning = Math.max(0, Math.min(100, battery + rate * hours));
-  if (rate >= -0.2) return {verdict: 'charging', battery: Math.round(battery), ratePerHour: Math.round(rate * 10) / 10, atMorning: Math.round(atMorning), floorAt: null, morning};
+  if (rate >= -0.2) return {verdict: 'charging', battery: Math.round(battery), ratePerHour: Math.round(rate * 10) / 10, atMorning: Math.round(atMorning), floorAt: null, morning, ...extra};
   const toFloor = battery > NIGHT_FLOOR_PERCENT ? (battery - NIGHT_FLOOR_PERCENT) / -rate : 0;
   const floorAt = last[0] + toFloor * 3600;
   const verdict: TonightVerdict = floorAt < morning ? 'low' : atMorning < NIGHT_TIGHT_PERCENT ? 'tight' : 'ok';
-  return {verdict, battery: Math.round(battery), ratePerHour: Math.round(rate * 10) / 10, atMorning: Math.round(atMorning), floorAt: floorAt < morning ? Math.round(floorAt) : null, morning};
+  return {verdict, battery: Math.round(battery), ratePerHour: Math.round(rate * 10) / 10, atMorning: Math.round(atMorning), floorAt: floorAt < morning ? Math.round(floorAt) : null, morning, ...extra};
 }
 
 const clock = (s: number) => new Date(s * 1000).toLocaleTimeString(undefined, {hour: 'numeric', minute: '2-digit'});
@@ -201,7 +241,7 @@ export function tonightHeadline(t: Tonight): string {
 /** The why, in one short line. */
 export function tonightBasis(t: Tonight): string {
   const rate = Math.abs(t.ratePerHour);
-  return 'Battery ' + t.battery + '% now, ' + (t.ratePerHour < 0 ? 'losing about ' + rate + '% an hour' : t.ratePerHour > 0 ? 'gaining about ' + rate + '% an hour' : 'flat') + ' over the last 2 hours.';
+  return 'Battery ' + (t.lowerBy ? 'about ' : '') + t.battery + '% now' + (t.lowerBy ? ' by the energy that went in (the system says ' + Math.min(100, t.battery + t.lowerBy) + '%, but it jumped ahead while charging)' : '') + ', ' + (t.ratePerHour < 0 ? 'losing about ' + rate + '% an hour' : t.ratePerHour > 0 ? 'gaining about ' + rate + '% an hour' : 'flat') + ' over the last 2 hours.';
 }
 
 /** What a tech should do about it, short and in order. Empty when nothing needs doing. */

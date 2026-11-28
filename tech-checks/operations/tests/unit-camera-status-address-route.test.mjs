@@ -11,8 +11,8 @@ const response=(data,status=200)=>new Response(JSON.stringify(data),{status,head
 const census=(matches)=>({result:{addressMatches:matches}});
 const katy={matchedAddress:'9500 KATY FWY, HOUSTON, TX, 77024',coordinates:{x:-95.534,y:29.7838}};
 
-function fixture({geocode=census([katy]),geocodeStatus=200,edits=[],role='owner',repeat=false,remoteResult=null,reconAgeMs=120000,aLinks=[],linkReply=null,vcc={contract:'COS_VCC_MOVES_V1',fresh:true,syncedAt:'2026-11-25T20:33:09Z',items:[]},vccReply=null,overnight={contract:'COS_OVERNIGHT_V1',since:'2026-11-25T04:56:17Z',items:[]},swaps={contract:'COS_ROUTER_SWAPS_V1',items:[]},swapReply=null,reports=[],closeReply=null}={}){
- const calls=[],unexpected=[],recorded=[],asked=[],linked=[],moved=[],swapped=[],closed=[],fixtureNow=Date.now();
+function fixture({geocode=census([katy]),geocodeStatus=200,edits=[],role='owner',repeat=false,remoteResult=null,reconAgeMs=120000,aLinks=[],linkReply=null,vcc={contract:'COS_VCC_MOVES_V1',fresh:true,syncedAt:'2026-11-25T20:33:09Z',items:[]},vccReply=null,overnight={contract:'COS_OVERNIGHT_V1',since:'2026-11-25T04:56:17Z',items:[]},swaps={contract:'COS_ROUTER_SWAPS_V1',items:[]},swapReply=null,reports=[],closeReply=null,checkReply=null}={}){
+ const calls=[],unexpected=[],recorded=[],asked=[],linked=[],moved=[],swapped=[],closed=[],checksAsked=[],fixtureNow=Date.now();
  const transport=async(url,init={})=>{
   const parsed=new URL(url),name=parsed.pathname.split('/').at(-1),body=init.body?JSON.parse(init.body):null,headers=new Headers(init.headers);
   calls.push({url,method:init.method||'GET',body});
@@ -33,6 +33,7 @@ function fixture({geocode=census([katy]),geocodeStatus=200,edits=[],role='owner'
   if(name==='cos_mhelp_hand_link_state_v1')return aLinks===null?response({message:'no'},500):response({contract:'COS_MHELP_HAND_LINKS_V1',links:aLinks});
   if(name==='cos_troubleshoot_open_v1'){assert.equal(headers.get('authorization'),'Bearer '+serviceKey,'Operations reads use the service key with the verified person');return reports===null?response({message:'no'},500):response({contract:'COS_TROUBLESHOOT_OPEN_V1',items:reports});}
   if(name==='cos_troubleshoot_close_v1'){closed.push(body);return closeReply?response(closeReply.data,closeReply.status):response({contract:'COS_TROUBLESHOOT_CLOSE_RESULT_V1',id:body.p_report_id,repeat:false,closedAt:'2026-11-26T15:00:00Z',closedBy:'Synthetic Owner'});}
+  if(name==='cos_check_now_v1'){checksAsked.push({body,auth:headers.get('authorization')});if(checkReply==='throw')throw Error('offline');return checkReply?response(checkReply.data,checkReply.status):response({contract:'COS_CHECK_NOW_V1',started:true,reason:'started',checkStartedAt:'2026-11-27T21:30:02Z',resultsBy:'2026-11-27T21:31:02Z',waitSeconds:60});}
   if(name==='cos_router_swaps_state_v1')return swaps===null?response({code:'42501',message:'no'},403):response(swaps);
   if(name==='cos_router_swap_apply_v1'){swapped.push({body,auth:headers.get('authorization')});return swapReply?response(swapReply.data,swapReply.status):response({contract:'COS_ROUTER_SWAP_RESULT_V1',key:body.p_key,unit:'SPOTTER 265',oldSerial:'RF3022434424854',newSerial:'RF3152533023860'});}
   if(name==='cos_overnight_v1')return overnight===null?response({code:'42501',message:'no'},403):(assert.deepEqual(body,{p_hours:24}),response(overnight));
@@ -52,7 +53,7 @@ function fixture({geocode=census([katy]),geocodeStatus=200,edits=[],role='owner'
  const handler=createOperationsHandler({platformUrl:nativeOrigin,serviceKey,fetch:transport});
  const send=(path,method,body)=>handler(new Request('https://synthetic-bridge.invalid/functions/v1/cos-operations-pages',{method:'POST',
   headers:{Authorization:'Bearer '+callerToken,'Content-Type':'application/json'},body:JSON.stringify({path,method,body})}));
- return {calls,unexpected,recorded,asked,linked,moved,swapped,closed,send};
+ return {calls,unexpected,recorded,asked,linked,moved,swapped,closed,checksAsked,send};
 }
 const geocodeCalls=f=>f.calls.filter(c=>c.url.includes('geocoding.geo.census.gov'));
 
@@ -357,4 +358,31 @@ test('a report is closed with a note as the verified person; a missing note or f
  assert.equal((await f.send('/api/unit-camera-status/troubleshoot-close','POST',{id,outcome:'fixed',note:'reset 192.168.10.14'})).status,422);
  assert.equal((await f.send('/api/unit-camera-status/troubleshoot-close','POST',{id,outcome:'maybe',note:'x'})).status,422);
  assert.equal(f.closed.length,1);
+});
+
+// Refresh runs the checks now (James, 27 Nov).
+test('check-now asks Tech Check as the signed-in person and passes on only what it said',async()=>{
+ const f=fixture();
+ const r=await f.send('/api/unit-camera-status/check-now','POST',{});
+ assert.equal(r.status,200,await r.clone().text());
+ assert.deepEqual(f.checksAsked,[{body:{},auth:'Bearer '+callerToken}]);
+ assert.deepEqual(await r.json(),{contract:'COS_CHECK_NOW_STARTED_V1',started:true,reason:'started',checkStartedAt:'2026-11-27T21:30:02.000Z',resultsBy:'2026-11-27T21:31:02.000Z',waitSeconds:60});
+ const busy=fixture({checkReply:{status:200,data:{contract:'COS_CHECK_NOW_V1',started:false,reason:'scheduled_check_running',checkStartedAt:'2026-11-27T21:30:00Z',resultsBy:'2026-11-27T21:31:15Z',waitSeconds:41,secret:'never forwarded'}}});
+ const b=await (await busy.send('/api/unit-camera-status/check-now','POST',{})).json();
+ assert.deepEqual(Object.keys(b).sort(),['checkStartedAt','contract','reason','resultsBy','started','waitSeconds']);
+ assert.equal(b.started,false);assert.equal(b.reason,'scheduled_check_running');assert.equal(b.waitSeconds,41);
+});
+test('check-now is POST only, and a refusal, a failure or an answer COS cannot confirm starts nothing and says so',async()=>{
+ assert.equal((await fixture().send('/api/unit-camera-status/check-now','GET')).status,405);
+ const refused=await fixture({checkReply:{status:403,data:{code:'42501',message:'An active Owner or approved IT account is required'}}}).send('/api/unit-camera-status/check-now','POST',{});
+ assert.equal(refused.status,403);assert.match((await refused.json()).error,/Only the Owner or approved IT/);
+ for(const checkReply of ['throw',{status:500,data:{}},
+   {status:200,data:{contract:'COS_CHECK_NOW_V1',started:true,reason:'started',checkStartedAt:'2026-11-27T21:30:02Z',resultsBy:'2026-11-27T21:31:02Z',waitSeconds:999}},
+   {status:200,data:{contract:'COS_CHECK_NOW_V1',started:true,reason:'whenever',checkStartedAt:'2026-11-27T21:30:02Z',resultsBy:'2026-11-27T21:31:02Z',waitSeconds:60}},
+   {status:200,data:{contract:'COS_CHECK_NOW_V1',started:'yes',reason:'started',checkStartedAt:'2026-11-27T21:30:02Z',resultsBy:'2026-11-27T21:31:02Z',waitSeconds:60}},
+   {status:200,data:{contract:'SOMETHING_ELSE',started:true,reason:'started',checkStartedAt:'2026-11-27T21:30:02Z',resultsBy:'2026-11-27T21:31:02Z',waitSeconds:60}},
+   {status:200,data:{contract:'COS_CHECK_NOW_V1',started:true,reason:'started',checkStartedAt:'not a time',resultsBy:'2026-11-27T21:31:02Z',waitSeconds:60}}]){
+  const r=await fixture({checkReply}).send('/api/unit-camera-status/check-now','POST',{});
+  assert.equal(r.status,503,JSON.stringify(checkReply));assert.match((await r.json()).error,/Still showing the last reading/);
+ }
 });

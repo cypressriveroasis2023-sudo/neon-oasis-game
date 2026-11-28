@@ -4,6 +4,7 @@ const ALERTS: [string, string, string][] = [
   ['Low battery', 'Under 20% right now.', 'Check its cameras on the COS Board and plan a visit or swap.'],
   ['Will run low tonight', 'At the rate it is draining, it reaches 20% before 7 AM.', 'Open the unit and follow "What to do" under Tonight.'],
   ['Getting low', 'Between 20% and 34%.', 'Keep an eye on it. Look again later in the day.'],
+  ['Second battery monitor reads low', 'Each Helios has a second battery monitor next to the system reading. On these units it reads more than 10 points below the system. Saved readings show the system number is the right one (it matches the energy the battery takes and gives), so the second monitor has drifted.', 'Not urgent. Next time a tech is at the unit, re-sync the second battery monitor (let the battery reach full in the sun so it resets to 100%, or set it to 100% by hand). The page and alerts already go by the system number.'],
   ['Dropped to N% overnight', 'Last night it went under 30% before sunrise.', 'The battery is not lasting the night. Check panels, the load and battery age.'],
   ["Didn't fill up today · best was N%", 'The sun is done and the battery never got to 95% today.', 'It will start the night short. Check for dirty or shaded panels, a loose solar cable, or a cloudy day. Two days in a row = tell the manager.'],
   ['Using more power than usual', 'At night it is pulling much more than its normal (1.5x and 10 W or more).', 'Something new is drawing power: a camera rebooting over and over, a heater, or extra gear plugged in. Check its cameras on the COS Board.'],
@@ -35,6 +36,7 @@ export default function VrmTechGuide() {
         <li><b className='g-in'>↑ 203 W in</b> — battery charging.</li>
         <li><b className='g-out'>↓ 37 W out</b> — battery draining.</li>
         <li><b>Moon · 20% by 3:40 AM</b> — will run low tonight (shown from 5 PM to 7 AM).</li>
+        <li><b>about 87% · filling</b> (amber, under the ring) — on a few units the system number jumps to 100% early in the morning, before the battery is really full. This line shows where the battery actually is by the energy that has gone in. It goes away once the battery stops taking charge (usually by late morning).</li>
         <li><b>Moon · Low 72%</b> — lowest battery last night (5 PM–7 AM). Green 50%+, yellow 20–49%, red under 20%.</li>
         <li><b>Plug · Plugged in</b> — stayed full all night on outside power. Nothing to do.</li>
         <li><b>Panels line</b> (on a unit's chart) — what the panels made today and yesterday in kWh, today's peak watts, and panel voltage. A healthy sunny day is about 0.8–1.1 kWh. The charger starts counting its next day a few hours after dark; the page still shows the day that just ended as today until midnight.</li>

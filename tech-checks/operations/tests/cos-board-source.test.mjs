@@ -37,8 +37,12 @@ test('the board is isolated from the rest of COS and sends nothing itself', () =
   // checks the person and the A#), and applying one Moved in VCC item (James, 25 Nov: "build move in VCC"; Tech Check
   // works the list out again and refuses anything no longer listed), and swapping a unit's router (James, 25 Nov:
   // "build router swap"; Tech Check checks again first), and closing a Send to IT report with a note (James, 26 Nov:
-  // close the loop; the report itself is never changed). The count stays exact so an eighth has to be argued for here.
-  assert.equal(landing.split('api.post(').length - 1, 7);
+  // close the loop; the report itself is never changed), and asking COS to run the camera checks now when Refresh is
+  // tapped (James, 27 Nov: "click refresh and it will refresh and update"; it sends no data, Tech Check checks the
+  // person and will not start a second check on top of one). The count stays exact so a ninth has to be argued for here.
+  assert.equal(landing.split('api.post(').length - 1, 8);
+  assert.equal(landing.split("api.post('/api/unit-camera-status/check-now', {})").length - 1, 1);
+  assert.match(app, /await hooks\.onRefresh\(text =>/);
   assert.equal(landing.split("api.post('/api/unit-camera-status/troubleshoot-close', {id, outcome, note})").length - 1, 1);
   assert.match(app, /await hooks\.onTroubleClose\(r\.id, outcome, said\)/);
   assert.equal(landing.split("api.post('/api/unit-camera-status/router-swap', {key})").length - 1, 1);

@@ -64,6 +64,30 @@ Newest first. One line: date, what changed, what to watch.
   (from the `COS_MHELP_RENEWAL_STATUS_V1` answer of job 10 in `net._http_response`) and "reconnected". State in
   `app_private.mhelp_auth_watch`. A later replace of `cos_router_down_alerts_v1` must keep that call. Board: red
   line when mHelp's read is over 50 min old. Record in `tech-checks/docs/db-changes/20261127_mhelp_auth_alert.md`.
+- **2026-11-27** — Camera checks keep the last good mHelp inventory for 24 h (**prepared, not
+  deployed**; needs James's go). Operations `cos-sheets-placement-publish` (live v24, loader pinned to
+  `d962b03`): `/endpoint-source` accepts an inventory whose last mHelp sync is up to 24 h old (was 45 min),
+  adds `inventorySyncedAt`/`inventoryCurrent`, logs when it does. `/camera-snapshot-source` stays 45 min.
+  Source and rollback: `tech-checks/docs/endpoint-source-inventory-grace-20261127/`. A next change to
+  this function must start from that source once deployed.
+- **2026-11-27** — **Refresh runs the camera checks now: live** (James's go, ~22:00 UTC). Tech Check
+  `public.cos_check_now_v1()` + `app_private.cos_check_now_log` applied (migration `cos_check_now_v1`,
+  text as in `20261127_cos_check_now.sql`); then `cos-unit-camera-status/check-now-v26` deployed: live now
+  **v27 `81a7a8a5`** (pins updated, source record `tech-checks/docs/cos-unit-camera-status-v27-entry`).
+  A Refresh tap can start the same three calls as cron jobs 2, 4 and 5 (never within 75 s after a
+  quarter hour, 20 s before one, or 2 min after another tap). Rollback `rollback-to-v26-entry`, then drop
+  the function and table. A next patch to this function must start from v27.
+- **2026-11-27** — Refresh runs the camera checks now (**prepared, nothing applied or deployed**;
+  each step needs James's go). Order: (1) Tech Check `public.cos_check_now_v1()` and
+  `app_private.cos_check_now_log`, `tech-checks/docs/db-changes/20261127_cos_check_now.sql`: Owner
+  or approved IT; makes the same three `net.http_post` calls as cron jobs 2, 4 and 5 unless the
+  timer's run is under 75 s old or under 20 s away, or one was started under 2 minutes ago. No
+  cron job or schedule changes. (2) Operations patch `cos-unit-camera-status/check-now-v26`
+  (starts from live v26 `d1136141`): `POST /api/unit-camera-status/check-now`, rollback
+  `rollback-to-v26-entry`. The board client (merged with this) calls it on Refresh, waits the
+  seconds Tech Check gives, then reads; until both are live the route is missing, Refresh reads
+  the saved reading as before and says a live check could not run. If another patch to this
+  function deploys first, rebuild this one.
 - **2026-11-27** — Tech Check: "power, not router". `inhand_private.router_night_drops`
   (refreshed each alert run by `cos_router_night_drops_refresh_v1`, hooked into
   `cos_router_down_alerts_v1` after the signal record line); `cos_router_down_hint_v1` replaces
@@ -79,9 +103,9 @@ Newest first. One line: date, what changed, what to watch.
   the app; no code change is involved and none should be made to get around it.
 - **2026-11-27** — `public.cos_sweep_watchdog_check_v1()` **crashes whenever it has a reason to
   record** (`text[] || 'literal'` → malformed array literal), so it logged nothing through the
-  26 Nov refusal or today's hold. Fix **prepared, not applied** (needs James's go):
-  `tech-checks/docs/db-changes/20261127_sweep_watchdog_reasons_fix.md`. Until then do not
-  trust `cos_sweep_watchdog_recent_v1` showing `ok`; check `cron.job_run_details` for job 15.
+  26 Nov refusal or today's hold. Fix **applied** 17:50 UTC (James's go): the four lines now use
+  `array_append`; first run recorded `alarm` (0 of 44 fresh). Record
+  `tech-checks/docs/db-changes/20261127_sweep_watchdog_reasons_fix.md`.
 - **2026-11-27** — Deployed `cos-unit-camera-status/last-direct-check-v25` (#572, 15:20 UTC,
   James's go): live now **v26 `d1136141`** (pins updated). Each IP-checked unit carries
   `directCheck`, so the board's router second witness (`boardData.routerWitness`) is now
@@ -90,6 +114,11 @@ Newest first. One line: date, what changed, what to watch.
   `rollback-to-v25-entry` turns it off again. A next patch to this function must start from v26.
 - **2026-11-27** — Router as a second witness for Snipers / CAM Vs (board client merged; the
   function patch was **prepared**, now deployed, see above). Operations patch
+- **2026-11-27 (later)** — Operations: `public.cos_vrm_placement_read()` now reads the **active mHelp
+  upload** (`upload_control` -> `upload_batches.records`), not `census_mhelp_current_coverage`.
+  Watch, for everyone: that view is **empty for a while after every mHelp upload** (it waits for the
+  address job), so anything reading it sees no units in that window. Record:
+  `tech-checks/docs/db-changes/20261127_cos_vrm_placement_read.md`.
 - **2026-11-27** — Operations: Helios Field/Shop from mHelp's own list. New read-only
   `public.cos_vrm_placement_read()` (service role only) and `cos-vrm-mppt-read` **v2**, whose answer
   now also carries `placements`. Why: `equipment_units` only holds HELIOS 001-010, so the Victron
