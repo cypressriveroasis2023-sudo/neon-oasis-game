@@ -59,6 +59,13 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-28** — Operations: Helios battery health trend (James's go, applied ~17:50 UTC, migration
+  `cos_vrm_battery_health`). New `cos_vrm_private.battery_health_nights` (one row per Helios per completed night:
+  energy out after dark over the charge it took = capacity Wh; kept 400 days), `cos_vrm_private.battery_health_refresh()`
+  and `public.cos_vrm_battery_health_read()` (service_role only). New Operations **cron job `cos-vrm-battery-health`**
+  at `17 13 * * *` (free minute; jobs 1-3 unchanged). Backfilled 35 nights, 12 units, 2756-3178 Wh. Only reads
+  `power_history`; the Victron sync is unchanged. `cos-vrm-mppt-read` **v3** adds `health` to its answer (an extra:
+  if it cannot be read, readings still go out). Record and rollback: `tech-checks/docs/db-changes/20261128_cos_vrm_battery_health.sql`.
 - **2026-11-28** — **COS look** (James: "I want this theme on my entire program"). New `tech-checks/operations/src/cosTheme.ts`:
   `COS_THEME_VARS` (champagne `--cos-lux`, graphite `--cos-card`, gold main button) is the one source of the look;
   `COS_BOARD_THEME_CSS` is appended last in the board's shadow style (`boardApp.ts`). Only looks change. Status colours

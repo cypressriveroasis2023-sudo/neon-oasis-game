@@ -318,3 +318,15 @@ export function batteryHealth(points: readonly HistoryPoint[] | null | undefined
 }
 /** "100%+" for a battery that measures at or above its rating; otherwise the rounded percent. */
 export const healthLabel = (h: BatteryHealth) => h.health >= 1 ? '100%+' : Math.round(h.health * 100) + '%';
+
+/** Battery health from the saved nights (up to 60): the middle of the last 7 nights, and, once 14 nights are
+ * saved, the change from the first week of the last 30 days to the last week. Steadier than the 2-day view. */
+export type HealthTrend = BatteryHealth & {changeWh: number | null; series: [string, number][]};
+export function healthTrend(nights: readonly [string, number][] | null | undefined): HealthTrend | null {
+  if (!nights?.length) return null;
+  const mid = (v: number[]) => { const x = [...v].sort((a, b) => a - b); return x[Math.floor(x.length / 2)]; };
+  const series = nights.slice(-30), recent = series.slice(-7).map(n => n[1]);
+  const capacityWh = mid(recent);
+  const changeWh = series.length >= 14 ? capacityWh - mid(series.slice(0, 7).map(n => n[1])) : null;
+  return {capacityWh, health: Math.round(capacityWh / DD3_BATTERY_WH * 100) / 100, nights: nights.length, changeWh, series};
+}

@@ -231,3 +231,23 @@ test('the saved list decides; mHelp answers only for a Helios the saved list doe
   assert.equal(withMhelpPlacement(saved, null), saved); assert.equal(withMhelpPlacement(saved, []), saved); assert.equal(withMhelpPlacement(null, null), null);
   assert.deepEqual(['HELIOS 001', 'HELIOS 012'].map(n => heliosPlacement(n, withMhelpPlacement(null, places))), ['shop', 'shop']);
 });
+
+import {safeVrmHealth} from '../../supabase/functions/cos-vrm-mppt-read/read.ts';
+import {parseHealth} from '../src/vrmMppt.ts';
+import {healthTrend} from '../src/vrmHistory.ts';
+test('battery health nights: bounded on the server, parsed on the page, trended', () => {
+  const body = {units: [{installationId: 7, nights: [['2026-11-25', 3033], ['2026-11-26', 3040]]}]};
+  assert.deepEqual(safeVrmHealth(body).units[0].nights[1], ['2026-11-26', 3040]);
+  for (const bad of [{units: [{installationId: 7, nights: [['2026-11-25', 99]]}]}, {units: [{installationId: 7, nights: [['soon', 3000]]}]}, {units: 'x'}])
+    assert.throws(() => safeVrmHealth(bad));
+  const page = parseHealth({health: body.units});
+  assert.deepEqual(page.get(7), [['2026-11-25', 3033], ['2026-11-26', 3040]]);
+  assert.equal(parseHealth({health: null}), null);
+  const short = healthTrend(page.get(7));
+  assert.equal(short.capacityWh, 3040); assert.equal(short.changeWh, null); assert.equal(short.health, 1.1);
+  // 30 nights fading from 3.0 to 2.4 kWh: the change is the first week against the last week.
+  const fade = Array.from({length: 30}, (_, i) => ['2026-10-' + String(i + 1).padStart(2, '0'), 3000 - i * 20]);
+  const t = healthTrend(fade);
+  assert.equal(t.capacityWh, 2480); assert.equal(t.changeWh, -460); assert.equal(t.series.length, 30);
+  assert.equal(healthTrend([]), null);
+});
