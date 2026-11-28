@@ -10,7 +10,8 @@
 --   cos_router_swap_apply_v1(key, name)   move the unit's link to the new router, only if still listed
 --
 -- Listed only when all hold:
---   * the unlinked router is online in the latest InHand pull and was seen within 2 days;
+--   * the unlinked router is online in the latest InHand pull (pulled within 2 hours). InHand's last_seen is when it
+--     last connected, so a router online for days looks old by that field (27 Nov: Spotter 265 dropped off the list);
 --   * its name gives a family and number (same reader as Moved in VCC) and is not marked BAD, BROKEN or TEST;
 --   * exactly one COS unit with a router row has that family and number;
 --   * that unit's linked router is not online.
@@ -33,7 +34,7 @@ returns jsonb language sql stable security definer set search_path to '' as $$
   with cand as (
     select u.serial, u.name, u.model, u.last_seen, app_private.cos_vcc_unit_of(u.name) k
       from inhand_private.unmatched_routers u
-     where u.online and u.last_seen > now() - interval '2 days'
+     where u.online and u.observed_at > now() - interval '2 hours'
        and upper(u.name) !~ '(BAD|BROKEN|TEST)'
   ), linked as (
     select r.id, r.unit_key, r.inhand_serial, r.current_status, r.last_online_at, app_private.cos_vcc_unit_of(r.unit_key) k

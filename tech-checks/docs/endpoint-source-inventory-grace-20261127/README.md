@@ -1,6 +1,6 @@
 # Camera checks keep the last good mHelp inventory for 24 hours, and a customer name alone no longer holds a Sniper
 
-**Prepared, not deployed.** Operations (`tughscoxralhofrckvxy`), edge function
+**Deployed 2026-11-28 ~05:44 UTC** (James's go) as `cos-sheets-placement-publish` v25 `00013c1e`, loader pinned to `c1733c19d1ad289cf3f887ddb195520add8f5f81`. Before that it was prepared on Operations (`tughscoxralhofrckvxy`), edge function
 `cos-sheets-placement-publish`, live **v24** (`ffaf4c17…`, a one-line loader pinned to
 `d962b03`, `tech-checks/docs/fleet-scheduled-repair-20261104/source/serve.ts`).
 Deploying needs James's go.

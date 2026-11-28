@@ -10,7 +10,7 @@ import { heliosPlacement, placementLabel, victronFleetView, victronNeedsAttentio
 import { canonicalCameraUnit } from './fieldCameraHealth';
 import { mpptLine, readVrmExtras, type MhelpPlace, type Mppt } from './vrmMppt';
 import { cloudyWarning, heliosSpots, outlookLine, readSunForecast, sunOutlook, type SunDay } from './vrmWeather';
-import { dayPeak, historyFlags, isNightForecastTime, nightLoad, last24h, overnightLow, readVrmHistory, solarVsYesterday, systemLead, tonightBasis, tonightForecast, tonightHeadline, tonightSteps, type HistoryPoint, type Tonight } from './vrmHistory';
+import { dayPeak, historyFlags, isNightForecastTime, nightLoad, last24h, overnightLow, withoutSun, readVrmHistory, solarVsYesterday, systemLead, tonightBasis, tonightForecast, tonightHeadline, tonightSteps, type HistoryPoint, type Tonight } from './vrmHistory';
 import VrmTechGuide from './VrmTechGuide';
 import VrmNightReport, { nightLevel } from './VrmNightReport';
 import { nightReport } from './vrmNightReport';
@@ -198,23 +198,49 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
     const tile = tiles.get(d.installationId);
     return deployCheck({...d, fresh: !!tile?.fresh, hasBattery: !!tile?.soc, points: history?.get(d.installationId) ?? [], mppt: mppt?.get(d.installationId)}, now);
   });
-  const attention = victronNeedsAttention(units, power.rows, inventory, now, history, tonight, weather, mppt, deploys);
+  const reserve = units.filter(u => place.get(u.installationId) === 'field').flatMap(u => { const r = withoutSun(history?.get(u.installationId), now); return r ? [{...r, installationId: u.installationId, name: u.name}] : []; })
+    .sort((a, b) => a.fromNow - b.fromNow || a.name.localeCompare(b.name, undefined, {numeric: true}));
+  const fulls = reserve.map(r => r.full).sort((a, b) => a - b), fleetFull = fulls.length ? fulls[Math.floor(fulls.length / 2)] : null;
+  const watts = reserve.map(r => r.watts).sort((a, b) => a - b);
+  const attentionAll = victronNeedsAttention(units, power.rows, inventory, now, history, tonight, weather, mppt, deploys);
+  const attention = attentionAll.filter(item => item.kind !== 'monitors'), monitors = attentionAll.find(item => item.kind === 'monitors');
   const syncTone = !sync ? 'stale' : error || sync.state === 'error' ? 'low' : sync.state === 'current' ? 'good' : 'stale';
   const lastSuccess = readableTime(sync?.lastSuccessAt ?? null);
   const nextSync = readableTime(sync?.nextSyncAt ?? null);
   return <section className={'panel module vrm-workspace' + (expanded ? ' vrm-expanded' : '')} aria-label='Victron VRM Helios fleet'>
-    <div className='panelhead vrm-fleet-heading'><div><span className='vrm-eyebrow'>HELIOS · ENERGY SYSTEMS</span><h2>Helios power monitoring</h2><span>Victron Remote Management · {loaded ? units.length + (units.length === 1 ? ' installation' : ' installations') : loading ? 'Loading fleet…' : 'Fleet unavailable'}</span></div>
-      <div className='purchase-actions'><a className='operations-reference-link' href='https://vrm.victronenergy.com/installation-overview' target='_blank' rel='noopener noreferrer'>Open VRM fleet ↗</a><button className='secondary' onClick={() => void refresh(canDiscover)} disabled={loading || privateInvalidated}>{loading ? 'Checking fleet…' : canDiscover ? 'Refresh fleet' : 'Reload saved fleet'}</button></div>
+    <div className='panelhead vrm-fleet-heading vrm-hero'>
+      <svg className='vrm-hero-art' viewBox='0 0 200 120' aria-hidden='true' focusable='false'><defs><radialGradient id='vrmHeroSun' cx='50%' cy='100%' r='70%'><stop offset='0' stopColor='currentColor' stopOpacity='.55'/><stop offset='1' stopColor='currentColor' stopOpacity='0'/></radialGradient></defs><circle cx='150' cy='120' r='80' fill='url(#vrmHeroSun)'/>{[0, 1, 2, 3].map(i => <circle key={i} cx='150' cy='120' r={28 + i * 22} fill='none' stroke='currentColor' strokeOpacity={0.32 - i * 0.07} strokeWidth='.8'/>)}{[-70, -45, -20, 5, 30, 55].map(d => <line key={d} x1='150' y1='120' x2={150 + 118 * Math.sin(d * Math.PI / 180)} y2={120 - 118 * Math.cos(d * Math.PI / 180)} stroke='currentColor' strokeOpacity='.12' strokeWidth='.6'/>)}</svg>
+      <div className='vrm-hero-text'><span className='vrm-eyebrow'>HELIOS · ENERGY SYSTEMS</span><h2>Helios power monitoring</h2>
+        <p className='vrm-hero-sub'>Victron Remote Management · {loaded ? units.length + (units.length === 1 ? ' installation' : ' installations') : loading ? 'Loading fleet…' : 'Fleet unavailable'}</p></div>
+      {sync && <div className={'vrm-sync-status vrm-tone-'+syncTone} role='status'>
+      <p className='vrm-sync-line'><i aria-hidden='true'/><strong>{error ? 'Saved sync status, not reverified: ' : ''}{syncDescription(sync)}</strong>{sync.error ? <span> {sync.error}</span> : null}</p>
+      <p className='vrm-sync-times'>{lastSuccess ? <span title={lastSuccess}>Synced {shortTime(sync.lastSuccessAt ?? null)}</span> : <span>No successful sync yet</span>}{nextSync && <span title={nextSync}>Next {shortTime(sync.nextSyncAt ?? null)}</span>}<span>{sync.scheduleActive ? 'Every 15 min' : 'Auto sync off'}</span></p>
+      </div>}
+      <div className='purchase-actions vrm-hero-actions'>
+        <a className='operations-reference-link vrm-hero-btn vrm-hero-primary' href='https://vrm.victronenergy.com/installation-overview' target='_blank' rel='noopener noreferrer'><svg viewBox='0 0 24 24' aria-hidden='true' focusable='false'><path d='M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5'/></svg>Open in VRM</a>
+        <button className='secondary vrm-hero-btn' onClick={() => void refresh(canDiscover)} disabled={loading || privateInvalidated}><svg className={loading ? 'vrm-spin' : ''} viewBox='0 0 24 24' aria-hidden='true' focusable='false'><path d='M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7'/></svg>{loading ? 'Checking fleet…' : canDiscover ? 'Refresh fleet' : 'Reload saved fleet'}</button>
+      </div>
     </div>
     {error && <p role='alert'>{error}{privateInvalidated ? '' : loaded ? ' Showing the last successfully loaded fleet; it may be out of date.' : ' Reload the fleet to try again.'}</p>}
-    {sync && <div className={'vrm-sync-status vrm-tone-'+syncTone} role='status'>
-      <p className='vrm-sync-line'><i aria-hidden='true'/><strong>{error ? 'Saved sync status, not reverified: ' : ''}{syncDescription(sync)}</strong>{sync.error ? <span> {sync.error}</span> : null}</p>
-      <p className='vrm-sync-times'>{lastSuccess ? <span title={lastSuccess}>Synced {shortTime(sync.lastSuccessAt ?? null)}</span> : <span>No successful sync yet</span>}{nextSync && <span title={nextSync}>Next {shortTime(sync.nextSyncAt ?? null)}</span>}<span>{sync.scheduleActive ? 'Auto every 15 min' : 'Auto sync off'}</span></p>
-    </div>}
     {units.length > 0 && <ul className='vrm-fleet-summary' aria-label='Fleet power summary'>{summary.map(item => <li key={item.label} className={'vrm-tone-'+item.key}><strong>{item.value}</strong><span>{item.label}</span></li>)}</ul>}
     {units.length > 0 && placed > 0 && <section className={'vrm-attention' + (attention.length ? '' : ' vrm-attention-clear')} aria-label='Needs attention'>
       <h3>{attention.length ? 'Needs attention · Field units' : 'No Field power issues'}</h3>
       {attention.length > 0 && <ul>{attention.map((item, index) => <li key={item.installationId + ':' + item.kind + ':' + index}><button type='button' className={'vrm-attn-'+item.kind} onClick={() => select(item.installationId)}><strong>{item.name}</strong><span>{item.line}</span></button></li>)}</ul>}
+    </section>}
+    {reserve.length > 0 && fleetFull !== null && <section className='vrm-sun' aria-label='Without sun'>
+      <div className='vrm-sun-head'>
+        <div><span className='vrm-eyebrow'>Without sun</span><p className='vrm-sun-big'><strong>{fleetFull.toFixed(1)}</strong> days</p>
+          <p className='vrm-sun-lede'>A full Helios runs about this long on its battery alone, with no sun at all. Cloudy days still add some charge, so real runs go longer.</p></div>
+        <dl className='vrm-sun-facts'><div><dt>Shortest from now</dt><dd>{reserve[0].name.replace(/^HELIOS\s+/i, '')} · {reserve[0].fromNow.toFixed(1)} days</dd></div><div><dt>Use per unit</dt><dd>{watts[0] === watts[watts.length - 1] ? watts[0] : watts[0] + '–' + watts[watts.length - 1]} W all day</dd></div></dl>
+      </div>
+      <ul className='vrm-sun-grid' aria-label='Days on battery from now, Field units'>{reserve.map(r => <li key={r.installationId} className={'vrm-sun-' + (r.fromNow < 1.5 ? 'low' : r.fromNow < 2.5 ? 'mid' : 'ok')}>
+        <button type='button' onClick={() => select(r.installationId)} aria-label={r.name + ': ' + r.fromNow.toFixed(1) + ' days on battery from now'}>
+          <span className='vrm-sun-name' aria-hidden='true'>{r.name.replace(/^HELIOS\s+/i, '')}</span>
+          <strong aria-hidden='true'>{r.fromNow.toFixed(1)}<small>d</small></strong>
+          <span className='vrm-sun-bar' aria-hidden='true'><i style={{width: Math.min(100, r.fromNow / Math.max(r.full, 0.1) * 100) + '%'}}/></span>
+        </button></li>)}</ul>
+      <p className='vrm-sun-axis'>Each unit: days on battery from where it is now, shortest first. The bar is how full it is.</p>
+      {monitors && <p className='vrm-sun-maint'><b>Maintenance, not urgent</b> · Second battery monitor reads low on {(m => /^HELIOS/i.test(monitors.name) ? monitors.name + ' (' + m + ')' : m)(monitors.line.replace(/^Second battery monitor reads low · /, '').replace(/ · needs a re-sync$/, ''))}. The page and alerts use the system reading, so nothing is affected.</p>}
     </section>}
     {deploys.length > 0 && <section className='vrm-deploy' aria-label='Just set up'>
       <h3>Just set up · first two days</h3>

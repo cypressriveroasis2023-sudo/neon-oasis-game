@@ -221,7 +221,7 @@ test('the map covers its box, and a spot with a mix of states is a ring, not one
   assert.ok(style.includes('.mapwrap{height:auto;min-height:0;max-height:none;aspect-ratio:' + map.w + '/' + map.h.toFixed(1) + '}'));
   // A circle no longer takes the colour of the worst unit in it.
   assert.equal(app.includes('worst is'), false);
-  assert.match(app, /const kinds=\["down","issues","unknown","up"\]\.filter\(k=>by\[k\]\), mixed=kinds\.length>1;/);
+  assert.match(app, /const kinds=\["down","issues","unknown","up","nm"\]\.filter\(k=>by\[k\]\), mixed=kinds\.length>1;/);
   assert.match(app, /n\+" units here: "\+kinds\.map\(k=>by\[k\]\+" "\+LABEL\[k\]\)\.join\(", "\)/);
   // The red number is the count of down units at that spot, and only shows where there is one.
   assert.match(app, /if\(by\.down\)\{ const b=R\*\.82; kids\.push\(sv\("circle",\{class:"bad"/);

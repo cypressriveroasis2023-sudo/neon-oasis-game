@@ -23,8 +23,9 @@ so a rename costs at most one skipped write. No audit row; endpoint claims do no
 
 ## After
 Unplaced router rows 30 → 8 (left for James: SNIPER 305, SNIPER 313, SNIPER 318, SNIPER 4 243,
-SNIPPER 500 (ASAP/COS), SOLAR SPOTTER 023.1, SOLAR SPOTTER 182, SPOTTER 227). Camera check 05:45 UTC published 38 of
-44 (34 before); router checks 192 of 192, 0 unverified; all five renamed rows checked under their new names.
+SNIPPER 500 (ASAP/COS), SOLAR SPOTTER 023.1, SOLAR SPOTTER 182, SPOTTER 227). Router checks 05:45 UTC: 192 of 192, 0 unverified; all five renamed rows checked under their new names.
+The camera check went from 34 to 38 of 44 at the same time, but that came from another session's
+`cos-sheets-placement-publish` v25 deploy (~05:44 UTC), not from these changes.
 
 ## Rollback
 ```sql
