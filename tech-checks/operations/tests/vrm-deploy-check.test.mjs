@@ -80,3 +80,19 @@ test('Without sun: all-day use (night draw after dark, daytime load in daylight)
   assert.equal(withoutSun([], now), null);
   assert.ok(darkHours(new Date(2026, 5, 21)) < 10.5 && darkHours(new Date(2026, 11, 21)) > 13.5);
 });
+
+import {batteryHealth, healthLabel} from '../src/vrmHistory.ts';
+test('battery health: night energy out over the charge it took, against the DD3 rating', () => {
+  const start = Math.round(new Date(2026, 10, 27, 19, 0).getTime() / 1000), pts = [];
+  // 11 hours after dark at 36 W, 30 Wh per 1% → ~13 points down: a healthy 3.0 kWh battery.
+  for (let i = 0; i <= 22; i++) pts.push([start + i * 1800, 96 - i * 0.6, 0, -36]);
+  const h = batteryHealth(pts);
+  assert.equal(h.nights, 1); assert.ok(h.capacityWh > 2900 && h.capacityWh < 3100, String(h.capacityWh)); assert.equal(healthLabel(h), '100%+');
+  // A worn battery: same draw, the charge falls twice as fast → about half the energy.
+  const worn = pts.map(([t, s, sw, bw], i) => [t, 96 - i * 1.2, sw, bw]);
+  const w = batteryHealth(worn); assert.ok(w.health < 0.6, String(w.health)); assert.match(healthLabel(w), /^\d+%$/);
+  // Daytime, charging, or too small a drop: no reading.
+  assert.equal(batteryHealth(pts.map(([t, s]) => [t, s, 200, 150])), null);
+  assert.equal(batteryHealth(pts.slice(0, 6)), null);
+  assert.equal(batteryHealth([]), null);
+});
