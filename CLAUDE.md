@@ -59,6 +59,9 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-27** — Tech Check: `app_private.cos_router_swaps_compute()` now lists an unlinked router that is online
+  in an InHand pull from the last 2 hours (`observed_at`), not by `last_seen` (InHand's last *connect* time). Spotter
+  265's swap is listed again; not applied. Record in `tech-checks/docs/db-changes/20261127_router_swap_seen_fix.md`.
 - **2026-11-28** — Board: **Not monitored** state (`src/cosBoard/boardApp.ts`, James's go). A field unit from mHelp with
   no camera feed reads `nm` (not Unknown) when it is a Wall-E (the stand a Recon goes on) or one of the witness Spotters
   052 / 088 (A# 1713914 / 2036036, `WITNESS_PIDS`). It counts in the field, sits on the map at its mHelp site, is left out
