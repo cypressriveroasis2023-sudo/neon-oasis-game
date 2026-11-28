@@ -1,4 +1,4 @@
-# Camera checks keep the last good mHelp inventory for 24 hours
+# Camera checks keep the last good mHelp inventory for 24 hours, and a customer name alone no longer holds a Sniper
 
 **Prepared, not deployed.** Operations (`tughscoxralhofrckvxy`), edge function
 `cos-sheets-placement-publish`, live **v24** (`ffaf4c17…`, a one-line loader pinned to
@@ -22,6 +22,12 @@ Only `/endpoint-source` (what the camera sweep reads):
 - adds `inventorySyncedAt` and `inventoryCurrent` to its answer (the sweep ignores extra
   fields) and logs `Endpoint source using last accepted mHelp inventory` with the age and
   mHelp's error code on every read made in that window.
+
+Also (added later on 27 Nov, James's go): a `customer_mismatch` review reason alone
+no longer stops a check. It held SNIPER 227 and 328 (moved to AT&T sites after the 2027
+tracker's 4 Nov mHelp copy) and 2-347 / 2-348 (customer respelled in mHelp) on every run.
+The tracker IPs for all four match `camera_devices`, and no other unit shares them.
+Placement, identity, tracker-restriction and binding reasons, and every hold, still stop it.
 
 Unchanged: every other inventory check (complete, reviewed, sync enabled, membership,
 not in the future), the tracker read, holds, the publisher, and `/camera-snapshot-source`

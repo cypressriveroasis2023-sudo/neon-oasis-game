@@ -59,6 +59,14 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-27** — Unknowns on the board (**prepared, not deployed**; each deploy needs James's go).
+  (1) Same pending `cos-sheets-placement-publish` source as the 24 h grace below: `/endpoint-source` drops a
+  lone `customer_mismatch` review reason, so SNIPER 227 / 328 / 2-347 / 2-348 are checked again.
+  (2) `cos-unit-camera-status/recon-window-v27` (starts from live v27 `81a7a8a5`): a Recon Online report
+  counts 6 h (was 45 min); a detector whose last report was Offline and went quiet reads Down with when it
+  was last heard (was Not verified), only while the Reconeyez feed is current. Source
+  `tech-checks/operations/shared/otherUnitStatus.ts`; v28 record `cos-unit-camera-status-v28-entry`;
+  rollback `rollback-to-v27-entry`. If another patch to this function deploys first, rebuild this one.
 - **2026-11-27** — Camera checks keep the last good mHelp inventory for 24 h (**prepared, not
   deployed**; needs James's go). Operations `cos-sheets-placement-publish` (live v24, loader pinned to
   `d962b03`): `/endpoint-source` accepts an inventory whose last mHelp sync is up to 24 h old (was 45 min),
