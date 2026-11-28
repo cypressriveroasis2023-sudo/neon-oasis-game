@@ -948,6 +948,20 @@ if(path==="/api/fleet-saved-board"||path==="/api/fleet-saved-board/refresh"||pat
       // A record of what a tech found, for the next daily IT sheet. It schedules
       // nothing and changes no unit, camera, mHelp, Star4Live or InHand data. The
       // person is the verified session; the database checks Owner-or-IT again.
+      // Refresh asks for a real check (James, 27 Nov: "click refresh and it will refresh and update"). Tech Check checks
+      // the person, starts the same checks the timer runs unless one is already running or has just run, and says when
+      // the results should be in. Nothing is read or changed here.
+      if (path === '/api/unit-camera-status/check-now') {
+        if (method !== 'POST') fail('Use POST to start a check.', 405);
+        let kReply, kData = {};
+        try { kReply = await requestFetch(LEGACY_URL + '/rest/v1/rpc/cos_check_now_v1', {method: 'POST', headers: {...context.headers, 'Content-Type': 'application/json'}, body: '{}'}); } catch { fail('COS could not start a check. Still showing the last reading.', 503); }
+        try { kData = await kReply.json(); } catch { kData = {}; }
+        if (!kReply.ok) return json({error: kData?.code === '42501' ? 'Only the Owner or approved IT can start a check.' : 'COS could not start a check. Still showing the last reading.'}, kReply.status === 403 || kData?.code === '42501' ? 403 : 503);
+        const kTime = value => typeof value === 'string' && Number.isFinite(Date.parse(value)) ? new Date(Date.parse(value)).toISOString() : null;
+        if (kData?.contract !== 'COS_CHECK_NOW_V1' || typeof kData.started !== 'boolean' || !['started', 'scheduled_check_running', 'scheduled_check_due', 'checked_recently'].includes(kData.reason) || !kTime(kData.checkStartedAt) || !kTime(kData.resultsBy) || !Number.isInteger(kData.waitSeconds) || kData.waitSeconds < 0 || kData.waitSeconds > 180) fail('COS could not confirm the check started. Still showing the last reading.', 503);
+        // waitSeconds is Tech Check's own count, so the board does not depend on the phone's clock.
+        return json({contract: 'COS_CHECK_NOW_STARTED_V1', started: kData.started, reason: kData.reason, checkStartedAt: kTime(kData.checkStartedAt), resultsBy: kTime(kData.resultsBy), waitSeconds: kData.waitSeconds});
+      }
       // Close a Send to IT report as fixed or not needed, with a note (James, 26 Nov: close the loop). The report itself
       // is never changed; Operations adds a closing row with who and when.
       if (path === '/api/unit-camera-status/troubleshoot-close') {

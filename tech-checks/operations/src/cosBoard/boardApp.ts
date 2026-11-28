@@ -252,7 +252,11 @@ function render(){
   if(TV.on){ drawTv(vs, c); return; }
   /* One count. mHelp is the official list: a unit is in the field, at the site mHelp gives, until mHelp shows it back in the shop or it is moved by hand here. */
   if(S.mh ? S.filter==="excl" : S.filter==="notin") S.filter="field";
-  $("modeRow").replaceChildren(h("span",{class:"hint",text: S.mh ? "One count: mHelp, the official list"+(S.mh.meta.at ? ", read "+when(S.mh.meta.at) : "")+". A unit is in the field, at the site mHelp gives, until mHelp shows it back in the shop or it is moved by hand here."
+  /* James, 27 Nov: mHelpDesk refused COS's saved login at 2 AM and nobody knew until 3 PM, while Snipers and CAM Vs
+     sat at Unknown. mHelp is read every 15 minutes; three missed reads in a row says so in red above the counts. */
+  const mhAge = S.mh && S.mh.meta && S.mh.meta.at ? Date.now()/1000 - S.mh.meta.at : 0;
+  const mhLate = mhAge > 50*60 ? h("p",{class:"mgerr",role:"alert",style:"flex-basis:100%;margin:0 0 4px",text:"mHelpDesk has not been read since "+when(S.mh.meta.at)+". Usually it needs reconnecting: the Owner opens Unit Tracker → Advanced / IT tools → Reconnect mHelpDesk. Until then Snipers and CAM Vs can read Unknown."}) : null;
+  $("modeRow").replaceChildren(...(mhLate ? [mhLate] : []), h("span",{class:"hint",text: S.mh ? "One count: mHelp, the official list"+(S.mh.meta.at ? ", read "+when(S.mh.meta.at) : "")+". A unit is in the field, at the site mHelp gives, until mHelp shows it back in the shop or it is moved by hand here."
     : "The mHelp list has not loaded, so this shows only what the camera systems can see. It is not the official count."}));
   /* James read the board twice within a minute and got two different counts, because the first read came before
      the mHelp list arrived. Both counts were honest: without mHelp the board can only count the camera records
@@ -458,6 +462,19 @@ function morningItems(){
   const byKey={}; for(const v of Object.values(S.vmap||{})) byKey[String(v.k).toUpperCase()]=v;
   return (S.morning ? S.morning.items : []).filter(it=>{ const v=byKey[String(it.unitKey||"").toUpperCase()]; return !v || (v.place!=="shop" && v.status!=="excl" && v.status!=="notin"); });
 }
+/* James, 27 Nov: Helios 016 was "Likely power, check battery first" with Victron reading 100%. Tech Check has no battery
+   readings, so the board corrects the line from the unit's own current Victron reading: a full battery is not a power
+   problem, a low one is. Without a current reading the Tech Check line stands as it is. */
+function morningPower(it){
+  const v=Object.values(S.vmap||{}).find(x=>String(x.k).toUpperCase()===String(it.unitKey||"").toUpperCase());
+  const pw=v && v.u && v.u.pw;
+  if(!pw || pw.q==="off" || pw.q==="stale" || pw.q==="none" || typeof pw.b!=="number") return null;
+  if(pw.b<20) return {b:pw.b, cause:"Victron shows the battery at "+pw.b+"%, so the unit is most likely out of power. Check the panels and the charge controller first.", sheet:"Battery "+pw.b+"% (Victron): likely out of power, check panels and charge controller."};
+  if(pw.b>=50) return {b:pw.b, cause:"Victron shows the battery at "+pw.b+"%, so it is not power. "+(it.router && it.router.status==="offline" ? "The router is offline too, so check the router and the SIM (Coverage map, Downdetector, Simetry)" : "Check the cameras and the NVR")+", then Check this unit now.", sheet:"Battery "+pw.b+"% (Victron), so not power: check "+(it.router && it.router.status==="offline" ? "router and SIM." : "cameras and NVR.")};
+  return null;
+}
+function morningCause(it){ const p=morningPower(it); return p ? p.cause : (it.cause||""); }
+function morningSheet(it){ const p=morningPower(it), line=String(it.sheetLine||""); if(!p) return line; const cut=line.search(/ Likely /); return (cut>0 ? line.slice(0,cut) : line)+" "+p.sheet; }
 function morningWhen(t){ if(!t) return ""; const d=new Date(t); return isNaN(d) ? "" : d.toLocaleString([], {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"}); }
 function drawMorning(){
   const sec=PSEC.find(p=>p[0]==="morning"), items=morningItems(), fresh=items.filter(it=>it.new), old=items.filter(it=>!it.new);
@@ -467,12 +484,12 @@ function drawMorning(){
     const uv=byKey[String(it.unitKey||"").toUpperCase()], r=it.router||{};
     const cams=(it.cameras||[]).map(c=>c.name).join(", ");
     const lines=[["Down: ", it.down+" of "+it.total+" camera"+(it.total===1?"":"s")+(it.downSince ? " since "+morningWhen(it.downSince) : "")], cams ? ["Cameras: ", cams] : null,
-      ["Router: ", r.status ? r.status+(r.carrier ? " · "+r.carrier : "")+(r.bars ? " · "+r.bars+" bars" : "") : "none linked"], ["Likely: ", it.cause||""]].filter(Boolean);
+      ["Router: ", r.status ? r.status+(r.carrier ? " · "+r.carrier : "")+(r.bars ? " · "+r.bars+" bars" : "") : "none linked"], ["Likely: ", morningCause(it)]].filter(Boolean);
     return h("div",{class:"prow"+(uv?" s-"+uv.status:"")},h("button",{class:"pmain",type:"button",disabled:!uv,onclick:()=>{ if(uv) openUnit(uv.id); }},
       h("span",{class:"name",text:(uv && uv.name) || it.unitKey}), lines.map(([a,b])=>h("span",{class:"sub"},h("b",{text:a}),b))));
   };
   const copy = h("button",{class:"fixbtn",type:"button",disabled:!items.length,onclick:async()=>{
-    const text=["New since yesterday:",...(fresh.length?fresh.map(it=>"- "+it.sheetLine):["- none"]),"","Still down:",...(old.length?old.map(it=>"- "+it.sheetLine):["- none"])].join("\n");
+    const text=["New since yesterday:",...(fresh.length?fresh.map(it=>"- "+morningSheet(it)):["- none"]),"","Still down:",...(old.length?old.map(it=>"- "+morningSheet(it)):["- none"])].join("\n");
     try{ await navigator.clipboard.writeText(text); toast("Copied "+items.length+" line"+(items.length===1?"":"s")+" for the IT sheet.", 6000); }
     catch(_){ toast("Copy did not work here. Long-press a line to copy it instead.", 8000); }
   }},"Copy for the IT sheet");
@@ -1463,7 +1480,14 @@ async function refresh(){
   btn.disabled=true; btn.textContent="Reading…";
   void loadRouters();
   S.before = S.meta ? S.meta.v : null;
-  try{ await hooks.onRefresh(); S.announce=true; clearTimeout(announceTimer); announceTimer=setTimeout(announce, 1500); }
+  /* Refresh asks COS to run the camera checks now and waits for them (James, 27 Nov). The app says where it is
+     ("Checking… 42s") and whether a live check ran; without one this is the saved reading, and the board says so. */
+  try{
+    const got = await hooks.onRefresh(text => { if(typeof text==="string" && text) btn.textContent=text.slice(0,24); });
+    void loadRouters();
+    S.live = !got || got.live!==false;
+    S.announce=true; clearTimeout(announceTimer); announceTimer=setTimeout(announce, 1500);
+  }
   catch(_){ toast("Couldn't get a new reading. Still showing "+was+".", 12000); }
   btn.disabled=false; btn.textContent="Refresh";
 }
@@ -1472,7 +1496,8 @@ async function refresh(){
 let announceTimer=null;
 function announce(){ if(!S.announce) return; S.announce=false; clearTimeout(announceTimer);
   const at = S.meta && S.meta.v;
-  toast(!at ? "New reading loaded." : at===S.before ? "No newer Star4Live reading yet. Last read "+when(at)+"." : "New reading: Star4Live "+when(at)+".", 5000); }
+  const live = S.live===false ? " COS could not run a live check, so this is the saved reading." : "";
+  toast((!at ? "New reading loaded." : at===S.before ? "No newer Star4Live reading yet. Last read "+when(at)+"." : "New reading: Star4Live "+when(at)+".")+live, live ? 9000 : 5000); }
 /* ---------- manager view ----------
    For the owner sign-in only. One screen of what Tech Check already records: today's truck inspections, what each
    truck carries, and what IT and Service handed to each other. The camera numbers at the top are the board's own.

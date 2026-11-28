@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {projectIpCheckUnits, projectReconUnits, mergeUnitSources, unconfirmedMiss, DOWN_AFTER_MISSES} from '../shared/otherUnitStatus.ts';
+import {projectIpCheckUnits, projectReconUnits, mergeUnitSources, unconfirmedMiss, DOWN_AFTER_MISSES, RECON_REPORT_FRESH_MS} from '../shared/otherUnitStatus.ts';
 import {applyHandEdits, countUnits} from '../shared/starUnitStatus.ts';
 
 const NOW = Date.parse('2026-11-13T21:40:00Z');
@@ -260,22 +260,62 @@ test('the list finds a unit by the name a person gave it and by the provider nam
 });
 
 
-test('fresh Recon inventory never renews stale, missing, invalid or future detector health', () => {
-  for (const status of ['online', 'offline']) for (const at of [null, '', 'invalid', '2026-10-09T13:00:00Z', '2026-11-13T21:42:00Z']) {
+test('fresh Recon inventory never renews missing, invalid or future detector health, or an old Online report', () => {
+  for (const status of ['online', 'offline']) for (const at of [null, '', 'invalid', '2026-11-13T21:42:00Z']) {
     const [unit] = projectReconUnits([detector({source_last_seen_at: reconFeed.syncedAt})],
       [check({camera_device_id: 10, overall_status: status, checked_at: at})], reconFeed, NOW);
     assert.equal(unit.state, 'UNKNOWN', `${status} ${at}`);
     assert.equal(unit.online + unit.offline, 0);
   }
+  const [old] = projectReconUnits([detector()], [check({camera_device_id: 10, checked_at: '2026-10-09T13:00:00Z'})], reconFeed, NOW);
+  assert.deepEqual([old.state, old.online], ['UNKNOWN', 0]);
 });
 
-test('Recon mixed-age observations stay unknown and expose the oldest health timestamp', () => {
+// 27 Nov 2026: Recons report about once an hour, so a 45-minute window read healthy
+// Recons as Not verified for part of every hour. The board already allows six hours.
+test('a Recon Online report counts for six hours, then is Not verified', () => {
+  const at = age => projectReconUnits([detector()], [check({camera_device_id: 10, checked_at: new Date(NOW - age).toISOString()})], reconFeed, NOW)[0];
+  assert.equal(RECON_REPORT_FRESH_MS, 6 * 3600000);
+  for (const age of [60000, 46 * 60000, 2 * 3600000, 6 * 3600000]) assert.equal(at(age).state, 'GREEN', 'age ' + age);
+  assert.equal(at(6 * 3600000 + 1).state, 'UNKNOWN');
+});
+
+test('a Recon detector that said Offline and went quiet is Down, with when it was last heard', () => {
+  const [unit] = projectReconUnits([detector()], [check({camera_device_id: 10, overall_status: 'offline', checked_at: '2026-11-12T19:00:00Z'})], reconFeed, NOW);
+  assert.deepEqual([unit.state, unit.offline, unit.unknown], ['RED', 1, 0]);
+  assert.deepEqual(unit.down[0], {name: 'CAM 1', status: 'offline', lastReportedStatus: 'offline', lastReportedAt: '2026-11-12T19:00:00.000Z'});
+  assert.equal(unit.observedAt, new Date(Date.parse(reconFeed.syncedAt)).toISOString());
+  // Only while the Reconeyez feed itself is current.
+  for (const feed of [{...reconFeed, syncedAt: '2026-11-13T20:50:00Z'}, {...reconFeed, status: 'error'}, {...reconFeed, enabled: false}, null]) {
+    const [held] = projectReconUnits([detector()], [check({camera_device_id: 10, overall_status: 'offline', checked_at: '2026-11-12T19:00:00Z'})], feed, NOW);
+    assert.deepEqual([held.state, held.offline], ['UNKNOWN', 0]);
+  }
+});
+
+test('RII005 and RII022 as they stood on 27 Nov: some detectors up, some quiet after Offline', () => {
+  const t = '2026-11-13T21:37:00Z';
+  const [rii022] = projectReconUnits([10, 11, 12, 13, 14, 15].map(id => detector({id})),
+    [check({camera_device_id: 10, checked_at: t}), check({camera_device_id: 11, overall_status: 'offline', checked_at: '2026-11-03T17:11:00Z'}),
+     check({camera_device_id: 12, overall_status: 'offline', checked_at: '2026-11-13T06:39:00Z'}), check({camera_device_id: 13, checked_at: '2026-11-13T21:22:00Z'}),
+     check({camera_device_id: 14, checked_at: '2026-11-13T21:22:00Z'}), check({camera_device_id: 15, checked_at: t})], reconFeed, NOW);
+  assert.deepEqual([rii022.state, rii022.online, rii022.offline, rii022.unknown], ['YELLOW', 4, 2, 0]);
+  assert.equal(rii022.observedAt, '2026-11-13T21:22:00.000Z');
+  const [rii005] = projectReconUnits([10, 11, 12].map(id => detector({id})),
+    [check({camera_device_id: 10, checked_at: t}), check({camera_device_id: 11, overall_status: 'offline', checked_at: '2026-11-05T17:23:00Z'})], reconFeed, NOW);
+  assert.deepEqual([rii005.state, rii005.online, rii005.offline, rii005.unknown], ['YELLOW', 1, 1, 1]);
+  assert.equal(rii005.observedAt, t.replace('Z', '.000Z'));
+});
+
+test('a Recon unit rests on its oldest Online report, and a missing report is Not verified', () => {
   const [unit] = projectReconUnits([detector(), detector({id: 11})],
     [check({camera_device_id: 10}), check({camera_device_id: 11, checked_at: '2026-11-13T19:00:00Z'})], reconFeed, NOW);
-  assert.deepEqual([unit.state, unit.online, unit.offline, unit.unknown], ['UNKNOWN', 1, 0, 1]);
+  assert.deepEqual([unit.state, unit.online, unit.offline, unit.unknown], ['GREEN', 2, 0, 0]);
   assert.equal(unit.observedAt, '2026-11-13T19:00:00.000Z');
   const [missing] = projectReconUnits([detector(), detector({id: 11})], [check({camera_device_id: 10})], reconFeed, NOW);
-  assert.equal(missing.observedAt, null);
+  assert.deepEqual([missing.state, missing.online, missing.unknown], ['UNKNOWN', 1, 1]);
+  assert.equal(missing.observedAt, '2026-11-13T21:30:00.000Z');
+  const [none] = projectReconUnits([detector()], [], reconFeed, NOW);
+  assert.equal(none.observedAt, null);
 });
 
 test('Recon detector freshness honors the existing explicit max-age boundary', () => {
@@ -287,8 +327,8 @@ test('Recon detector freshness honors the existing explicit max-age boundary', (
 });
 
 
-test('Recon stale offline remains dated historical evidence without becoming a current outage', () => {
-  const [unit] = projectReconUnits([detector()], [check({camera_device_id: 10, overall_status: 'offline', checked_at: '2026-11-12T19:00:00Z'})], reconFeed, NOW);
+test('an old Recon Online report stays dated evidence, never a current Up', () => {
+  const [unit] = projectReconUnits([detector()], [check({camera_device_id: 10, overall_status: 'online', checked_at: '2026-11-12T19:00:00Z'})], reconFeed, NOW);
   assert.equal(unit.state, 'UNKNOWN');
-  assert.deepEqual(unit.down[0], {name: 'CAM 1', status: 'unknown', lastReportedStatus: 'offline', lastReportedAt: '2026-11-12T19:00:00.000Z'});
+  assert.deepEqual(unit.down[0], {name: 'CAM 1', status: 'unknown', lastReportedStatus: 'online', lastReportedAt: '2026-11-12T19:00:00.000Z'});
 });

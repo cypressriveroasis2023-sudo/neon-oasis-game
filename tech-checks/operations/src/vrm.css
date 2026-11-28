@@ -265,3 +265,148 @@ html[data-theme='light'] #root#root .operations-shell .vrm-workspace .vrm-unit-g
 html[data-theme='light'] #root#root .operations-shell .vrm-workspace .vrm-unit-grid button.vrm-shop-off{background:linear-gradient(180deg,#f7f5f0,#efece4)!important;border-color:#e0d9c8!important}
 html[data-theme='light'] #root#root .operations-shell .vrm-workspace .vrm-unit-grid button.vrm-shop-off:not(.selected) .vrm-tile-head strong{color:#8b826d!important}
 html[data-theme='light'] .vrm-unit-grid .vrm-flow-draining{color:#8a6d2f}html[data-theme='light'] .vrm-ring-off .vrm-ring-track{stroke:rgba(0,0,0,.14)}
+.cos-energy-node>span svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+/* The rest of the Victron page in the same hand as the tiles (2026-11-27). Dark theme only; the light theme keeps its own rules.
+   Red stays for trouble (and the COS line on top). Champagne is chrome, never a warning. */
+html:not([data-theme='light']) .vrm-workspace{--vt-surface:radial-gradient(130% 90% at 0% 0%,#1a1f29 0%,#10131a 60%,#0b0d12 100%);--vt-hair:rgba(255,255,255,.07)}
+html:not([data-theme='light']) .vrm-workspace .vrm-eyebrow{color:var(--vt-lux);letter-spacing:.2em;font-weight:600;background:none}
+html:not([data-theme='light']) .vrm-workspace .vrm-fleet-heading h2,html:not([data-theme='light']) .vrm-workspace .vrm-selected-unit{font-weight:300;letter-spacing:-.01em;color:var(--vt-ink)}
+html:not([data-theme='light']) .vrm-workspace .purchase-actions>*,html:not([data-theme='light']) #root#root .operations-shell .vrm-workspace .vrm-step-controls button,html:not([data-theme='light']) .vrm-workspace .vrm-view-actions>a{border:1px solid var(--vt-lux-faint)!important;border-radius:12px!important;background:var(--vt-surface)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)!important;color:var(--vt-ink)!important}
+html:not([data-theme='light']) .vrm-workspace a.operations-reference-link{color:var(--vt-lux)!important}
+html:not([data-theme='light']) .vrm-workspace .vrm-sync-status{border-color:var(--vt-lux-faint);border-radius:14px;background:var(--vt-surface);box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+html:not([data-theme='light']) .vrm-workspace .vrm-sync-line{color:var(--vt-ink)}html:not([data-theme='light']) .vrm-workspace .vrm-sync-line strong{font-weight:500}
+html:not([data-theme='light']) .vrm-workspace .vrm-sync-times span{border-color:var(--vt-hair);color:var(--vt-mute)}
+html:not([data-theme='light']) .vrm-workspace .vrm-sync-status.vrm-tone-good .vrm-sync-line i{background:var(--vt-emerald);box-shadow:0 0 9px rgba(82,216,162,.7)}
+/* Needs attention: still red when there is trouble, drawn finer. */
+html:not([data-theme='light']) .vrm-workspace .vrm-attention{padding:14px;border:1px solid rgba(242,93,112,.3);border-radius:16px;background:radial-gradient(130% 90% at 0% 0%,#24131a 0%,#170d12 60%,#0f090c 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+html:not([data-theme='light']) .vrm-workspace .vrm-attention h3{font-size:10.5px;font-weight:600;letter-spacing:.2em;color:#f3a6b0}
+html:not([data-theme='light']) #root#root .operations-shell .vrm-workspace .vrm-attention button{padding:10px 12px!important;border-radius:11px;border:1px solid var(--vt-hair)!important;background:rgba(255,255,255,.025)!important;color:var(--vt-ink)!important}
+html:not([data-theme='light']) .vrm-workspace .vrm-attention button strong{font-size:11px;font-weight:600;letter-spacing:.14em;color:var(--vt-ink)}
+html:not([data-theme='light']) .vrm-workspace .vrm-attention button span{font-weight:500!important;text-align:right}
+html:not([data-theme='light']) .vrm-workspace .vrm-attention.vrm-attention-clear{padding:12px 14px;border-color:var(--vt-lux-faint);background:var(--vt-surface)}
+html:not([data-theme='light']) .vrm-workspace .vrm-attention-clear h3{display:flex;align-items:center;gap:10px;color:var(--vt-emerald)}
+html:not([data-theme='light']) .vrm-workspace .vrm-attention-clear h3::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--vt-emerald);box-shadow:0 0 8px rgba(82,216,162,.7)}
+/* Last night */
+html:not([data-theme='light']) .vrm-workspace .vrm-night{gap:8px;padding:12px 14px;border:1px solid var(--vt-lux-faint);border-radius:16px;background:var(--vt-surface);box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+html:not([data-theme='light']) .vrm-workspace .vrm-night-title{font-size:10.5px;font-weight:600;letter-spacing:.2em;color:var(--vt-lux)}
+html:not([data-theme='light']) .vrm-workspace .vrm-night-chip{padding:4px 11px;border:1px solid var(--vt-hair);background:rgba(255,255,255,.03);color:var(--vt-ink);font-size:12.5px}
+html:not([data-theme='light']) .vrm-workspace .vrm-night-chip b{font-weight:600}
+html:not([data-theme='light']) .vrm-workspace .vrm-night-line{color:var(--vt-mute);opacity:1;font-size:12px;line-height:1.5}
+/* Guide */
+html:not([data-theme='light']) .vrm-workspace .vrm-guide{border-color:var(--vt-lux-faint);border-radius:16px;background:var(--vt-surface)}
+html:not([data-theme='light']) .vrm-workspace .vrm-guide summary{padding:13px 14px;font-weight:500;color:var(--vt-ink)}
+html:not([data-theme='light']) .vrm-workspace .vrm-guide summary::before{background:transparent;border:1px solid var(--vt-lux);color:var(--vt-lux);width:17px;height:17px;font-size:10px}
+html:not([data-theme='light']) .vrm-workspace .vrm-guide-body h5{color:var(--vt-lux);letter-spacing:.2em;font-weight:600}
+html:not([data-theme='light']) .vrm-workspace .vrm-guide-alerts li{border-color:var(--vt-hair);border-radius:11px;background:rgba(255,255,255,.025)}
+/* Selected unit */
+html:not([data-theme='light']) .vrm-workspace .vrm-dashboard-heading{border-top:0;position:relative;padding-top:20px}
+html:not([data-theme='light']) .vrm-workspace .vrm-dashboard-heading::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,var(--vt-lux-soft),transparent)}
+html:not([data-theme='light']) .vrm-workspace .vrm-dashboard-stage{padding:14px;border:1px solid var(--vt-lux-faint);border-radius:18px;background:#090b10}
+html:not([data-theme='light']) .vrm-workspace .vrm-installation-info>div{padding:10px 8px;border:1px solid var(--vt-hair);border-radius:12px;background:rgba(255,255,255,.025)}
+html:not([data-theme='light']) .vrm-workspace .vrm-installation-info dt{letter-spacing:.14em;color:var(--vt-mute)}html:not([data-theme='light']) .vrm-workspace .vrm-installation-info dd{font-weight:500;color:var(--vt-ink)}
+/* Power overview */
+html:not([data-theme='light']) .vrm-workspace .vrm-native-dashboard{border:1px solid var(--vt-lux-faint);border-radius:16px;background:var(--vt-surface);color:var(--vt-ink)}
+html:not([data-theme='light']) .vrm-workspace .vrm-native-heading h4{font-size:22px;font-weight:300;letter-spacing:-.01em}
+html:not([data-theme='light']) .vrm-workspace .vrm-native-status{padding:6px 12px;border-color:rgba(82,216,162,.35);background:rgba(82,216,162,.08);color:var(--vt-emerald);letter-spacing:.02em}
+html:not([data-theme='light']) .vrm-workspace .vrm-native-status.vrm-native-warning{border-color:rgba(236,187,98,.4);background:rgba(236,187,98,.08);color:var(--vt-amber)}
+html:not([data-theme='light']) .vrm-workspace .vrm-native-dashboard .vrm-native-caption{color:var(--vt-mute);font-size:11px;line-height:1.55}
+html:not([data-theme='light']) .vrm-workspace .vrm-native-grid~.vrm-native-caption{margin:0;padding-top:10px;border-top:1px solid var(--vt-hair)}
+html:not([data-theme='light']) .vrm-workspace .vrm-native-grid~.vrm-native-caption~.vrm-native-caption{border-top:0;padding-top:6px}
+html:not([data-theme='light']) .vrm-workspace .cos-energy-flow{padding:20px 10px 14px;border:1px solid var(--vt-hair);border-radius:16px;background:rgba(255,255,255,.02);color:var(--vt-ink)}
+html:not([data-theme='light']) .vrm-workspace .cos-energy-node>span{width:48px;height:48px;border-radius:50%;border:1px solid var(--vt-lux-faint);background:rgba(255,255,255,.03);color:var(--vt-amber)}
+html:not([data-theme='light']) .vrm-workspace .cos-energy-node:nth-child(5)>span{color:var(--vt-lux)}
+html:not([data-theme='light']) .vrm-workspace .cos-energy-hub>span{border:0;background:linear-gradient(180deg,#ecd9ab,#b8964a);color:#1a1509;box-shadow:0 0 0 4px rgba(216,191,138,.1),0 8px 22px rgba(216,191,138,.22)}
+html:not([data-theme='light']) .vrm-workspace .cos-energy-node small,html:not([data-theme='light']) .vrm-workspace .cos-energy-flow-caption{color:var(--vt-mute);letter-spacing:.04em}
+html:not([data-theme='light']) .vrm-workspace .cos-energy-node strong{font-size:17px;font-weight:300;color:var(--vt-ink)}
+html:not([data-theme='light']) .vrm-workspace .cos-energy-line{height:1px;background:rgba(255,255,255,.12);overflow:visible}
+html:not([data-theme='light']) .vrm-workspace .cos-energy-line i{top:-1px;height:3px;border-radius:2px;background:var(--vt-lux);box-shadow:0 0 6px var(--vt-lux)}
+html:not([data-theme='light']) .vrm-workspace .vrm-native-card{position:relative;padding:14px;border:1px solid var(--vt-hair);border-top:1px solid var(--vt-hair);border-radius:14px;background:rgba(255,255,255,.025)}
+html:not([data-theme='light']) .vrm-workspace .vrm-native-card h5{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:600;letter-spacing:.16em;color:var(--vt-mute)}
+html:not([data-theme='light']) .vrm-workspace .vrm-native-card h5::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--vt-mute);flex:none}
+html:not([data-theme='light']) .vrm-workspace .vrm-native-solar h5::before{background:var(--vt-amber)}html:not([data-theme='light']) .vrm-workspace .vrm-native-battery h5::before{background:var(--vt-emerald)}html:not([data-theme='light']) .vrm-workspace .vrm-native-load h5::before{background:var(--vt-lux)}
+html:not([data-theme='light']) .vrm-workspace .vrm-native-value{font-weight:300;letter-spacing:-.01em;color:var(--vt-ink)}
+html:not([data-theme='light']) .vrm-workspace .vrm-native-value small{font-size:.42em;font-weight:500;color:var(--vt-lux)}
+html:not([data-theme='light']) .vrm-workspace .vrm-native-card p{font-size:10px;line-height:1.5;color:var(--vt-mute)}
+html:not([data-theme='light']) .vrm-workspace .vrm-native-card .vrm-native-multiple{font-size:10.5px}
+html:not([data-theme='light']) .vrm-workspace .vrm-native-source{opacity:.75}
+html:not([data-theme='light']) .vrm-workspace .vrm-native-dashboard:not(.vrm-native-embedded) .vrm-native-multi{grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:4px 14px}
+html:not([data-theme='light']) .vrm-workspace .cos-energy-charge{height:5px;margin-top:10px}
+html:not([data-theme='light']) .vrm-workspace .cos-energy-charge::-webkit-meter-bar{background:rgba(255,255,255,.08);border:0;border-radius:6px;height:5px}
+html:not([data-theme='light']) .vrm-workspace .cos-energy-charge::-webkit-meter-optimum-value{background:linear-gradient(90deg,#2fae82,var(--vt-emerald));border-radius:6px}
+html:not([data-theme='light']) .vrm-workspace .cos-energy-charge::-webkit-meter-suboptimum-value{background:var(--vt-amber);border-radius:6px}html:not([data-theme='light']) .vrm-workspace .cos-energy-charge::-webkit-meter-even-less-good-value{background:var(--vt-ruby);border-radius:6px}
+/* Tonight, the 24-hour chart, the facts */
+html:not([data-theme='light']) .vrm-workspace .vrm-history{padding:16px;border:1px solid var(--vt-lux-faint);border-radius:16px;background:var(--vt-surface);box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+html:not([data-theme='light']) .vrm-workspace .vrm-history h4{font-size:10.5px;font-weight:600;letter-spacing:.2em;color:var(--vt-lux)}
+html:not([data-theme='light']) .vrm-workspace .vrm-tonight{padding:14px;border:1px solid var(--vt-hair);border-left:2px solid var(--vt-mute);border-radius:14px;background:rgba(255,255,255,.025)}
+html:not([data-theme='light']) .vrm-workspace .vrm-tonight-ok,html:not([data-theme='light']) .vrm-workspace .vrm-tonight-charging{border-left-color:var(--vt-emerald)}
+html:not([data-theme='light']) .vrm-workspace .vrm-tonight-tight{border-left-color:var(--vt-amber);background:rgba(236,187,98,.05)}html:not([data-theme='light']) .vrm-workspace .vrm-tonight-low{border-left-color:var(--vt-ruby);background:rgba(242,93,112,.06)}
+html:not([data-theme='light']) .vrm-workspace .vrm-tonight-headline{font-weight:500;color:var(--vt-ink)}
+html:not([data-theme='light']) .vrm-workspace .vrm-tonight-low .vrm-tonight-headline{color:#f7a3ae}html:not([data-theme='light']) .vrm-workspace .vrm-tonight-tight .vrm-tonight-headline{color:var(--vt-amber)}html:not([data-theme='light']) .vrm-workspace .vrm-tonight-ok .vrm-tonight-headline,html:not([data-theme='light']) .vrm-workspace .vrm-tonight-charging .vrm-tonight-headline{color:var(--vt-emerald)}
+html:not([data-theme='light']) .vrm-workspace .vrm-tonight-basis{color:var(--vt-mute)}
+html:not([data-theme='light']) .vrm-workspace .vrm-hc-grid{stroke:rgba(255,255,255,.07)}html:not([data-theme='light']) .vrm-workspace .vrm-hc-low{stroke:var(--vt-ruby)}
+html:not([data-theme='light']) .vrm-workspace .vrm-hc-solar{fill:var(--vt-lux);opacity:.2}html:not([data-theme='light']) .vrm-workspace .vrm-hc-soc{stroke:var(--vt-emerald);stroke-width:1.8}
+html:not([data-theme='light']) .vrm-workspace .vrm-hc-label{fill:var(--vt-mute)}html:not([data-theme='light']) .vrm-workspace .vrm-history-chart figcaption{color:var(--vt-mute)}
+html:not([data-theme='light']) .vrm-workspace .vrm-hc-key-soc::before{background:var(--vt-emerald)}html:not([data-theme='light']) .vrm-workspace .vrm-hc-key-solar::before{background:rgba(216,191,138,.45)}html:not([data-theme='light']) .vrm-workspace .vrm-hc-key-low::before{background:var(--vt-ruby)}
+html:not([data-theme='light']) .vrm-workspace .vrm-history-facts li{padding:11px 12px;border:1px solid var(--vt-hair);border-radius:12px;background:rgba(255,255,255,.025)}
+html:not([data-theme='light']) .vrm-workspace .vrm-history-facts span{font-size:10px;font-weight:600;letter-spacing:.14em;color:var(--vt-mute)}
+html:not([data-theme='light']) .vrm-workspace .vrm-history-facts b{font-size:22px;font-weight:300;color:var(--vt-ink)}
+html:not([data-theme='light']) .vrm-workspace .vrm-history-facts .bad b{color:var(--vt-ruby)}html:not([data-theme='light']) .vrm-workspace .vrm-history-facts .warn b{color:var(--vt-amber)}
+html:not([data-theme='light']) .vrm-workspace .vrm-sky{margin-top:12px;font-size:12.5px;color:var(--vt-ink)}
+html:not([data-theme='light']) .vrm-workspace .vrm-sky span{font-size:10px;font-weight:600;letter-spacing:.2em;color:var(--vt-lux);opacity:1}
+html:not([data-theme='light']) .vrm-workspace .vrm-sky b{font-weight:500}html:not([data-theme='light']) .vrm-workspace .vrm-sky em{color:var(--vt-amber)}
+html:not([data-theme='light']) .vrm-workspace .vrm-note,html:not([data-theme='light']) .vrm-workspace .vrm-help{color:var(--vt-mute)}
+html:not([data-theme='light']) #root#root .operations-shell .vrm-workspace a.operations-reference-link{color:var(--vt-lux)!important;border:1px solid var(--vt-lux-faint)!important;border-radius:12px!important;background:var(--vt-surface)!important;font-weight:500}
+html:not([data-theme='light']) #root#root .operations-shell .vrm-workspace .vrm-eyebrow{color:var(--vt-lux)!important;background:none!important;letter-spacing:.2em;font-weight:600}
+html:not([data-theme='light']) #root#root .operations-shell .vrm-workspace .vrm-fleet-heading h2,html:not([data-theme='light']) #root#root .operations-shell .vrm-workspace .vrm-selected-unit h3,html:not([data-theme='light']) #root#root .operations-shell .vrm-workspace .vrm-native-heading h4{font-weight:300!important;letter-spacing:-.01em;color:var(--vt-ink)!important}
+html:not([data-theme='light']) #root#root .operations-shell .vrm-workspace .vrm-history h4{font-size:10.5px!important;font-weight:600!important;letter-spacing:.2em!important;text-transform:uppercase;color:var(--vt-lux)!important}
+html:not([data-theme='light']) #root#root .operations-shell .vrm-workspace .vrm-step-controls span{color:var(--vt-mute);font-variant-numeric:tabular-nums}
+html:not([data-theme='light']) .vrm-workspace .vrm-native-reading p span{display:block}
+html:not([data-theme='light']) .vrm-workspace .cos-energy-node small{white-space:nowrap}
+html:not([data-theme='light']) .vrm-workspace .vrm-guide-keys .g-shop{background:var(--vt-lux)}
+html:not([data-theme='light']) #root#root .operations-shell .vrm-workspace .purchase-actions button{border:1px solid var(--vt-lux-faint)!important;border-radius:12px!important;background:var(--vt-surface)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)!important;color:var(--vt-ink)!important;font-weight:500}
+html:not([data-theme='light']) #root#root .operations-shell .vrm-workspace .vrm-attention h3{font-size:10.5px!important;font-weight:600!important;letter-spacing:.2em!important;color:#f3a6b0!important}
+html:not([data-theme='light']) #root#root .operations-shell .vrm-workspace .vrm-attention-clear h3{color:var(--vt-emerald)!important}
+html:not([data-theme='light']) .vrm-workspace .vrm-native-dashboard:not(.vrm-native-embedded) .vrm-native-multi{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:6px 22px}
+@media(max-width:700px){
+ html:not([data-theme='light']) .vrm-workspace .vrm-native-dashboard:not(.vrm-native-embedded) .vrm-native-multi{grid-template-columns:1fr;gap:0}
+ html:not([data-theme='light']) .vrm-workspace .vrm-native-multi .vrm-native-reading{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;column-gap:14px;padding:9px 0}
+ html:not([data-theme='light']) .vrm-workspace .vrm-native-multi .vrm-native-reading+.vrm-native-reading{border-top:1px solid var(--vt-hair);padding-top:9px}
+ html:not([data-theme='light']) .vrm-workspace .vrm-native-multi .vrm-native-value{font-size:23px;min-width:62px}
+ html:not([data-theme='light']) .vrm-workspace .vrm-native-multi .cos-energy-charge{margin-top:0}
+ html:not([data-theme='light']) .vrm-workspace .vrm-native-multi .vrm-native-reading p{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:0 10px;margin-top:5px}
+ html:not([data-theme='light']) .vrm-workspace .vrm-native-multi .vrm-native-reading p span{display:inline}
+}
+/* Battery monitors that agree fold into one reading; ones that differ say by how much. */
+.vrm-native-sources{margin-top:8px}
+.vrm-native-sources summary{display:flex;align-items:center;gap:8px;min-height:36px;cursor:pointer;list-style:none;font-size:11.5px;color:#a3b3ca}
+.vrm-native-sources summary::-webkit-details-marker{display:none}
+.vrm-native-sources summary::before{content:'';width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);transition:transform .15s ease;flex:none}
+.vrm-native-sources[open] summary::before{transform:rotate(45deg)}
+.vrm-native-sources .vrm-native-reading{margin-top:0;padding:10px 0 2px;border-top:1px solid #253447}
+.vrm-native-sources .vrm-native-value{font-size:20px}
+.vrm-native-card .vrm-native-differ{margin:0 0 6px;font-size:11.5px;line-height:1.45;color:#f5b942}
+.vrm-native-multi>.vrm-native-differ,.vrm-native-embedded .vrm-native-battery>.vrm-native-differ,.vrm-native-embedded .vrm-native-battery>.vrm-native-sources{grid-column:1/-1}
+html[data-theme='light'] .vrm-native-sources summary{color:#40586c}html[data-theme='light'] .vrm-native-card .vrm-native-differ{color:#875900}html[data-theme='light'] .vrm-native-sources .vrm-native-reading{border-top-color:#d5e1ea}
+html:not([data-theme='light']) .vrm-workspace .vrm-native-sources summary{color:var(--vt-lux);letter-spacing:.02em}
+html:not([data-theme='light']) .vrm-workspace .vrm-native-sources .vrm-native-reading{border-top-color:var(--vt-hair)}
+html:not([data-theme='light']) .vrm-workspace .vrm-native-card .vrm-native-differ{color:var(--vt-amber);font-size:11px}
+html:not([data-theme='light']) .vrm-workspace .vrm-native-agree .vrm-native-value{font-size:34px}
+html:not([data-theme='light']) .vrm-workspace .vrm-native-dashboard .vrm-native-card p.vrm-native-differ{color:var(--vt-amber);font-size:11px}
+/* System number ran ahead while charging: the tile shows the energy-based level under the ring. */
+.vrm-unit-grid .vrm-tile-differ{display:block;max-width:100%;font-size:10px;font-weight:600;line-height:1.25;color:var(--vt-amber,#f5b942);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vrm-attention .vrm-attn-monitors span{color:#f5b942}
+html:not([data-theme='light']) .vrm-workspace .vrm-attention .vrm-attn-monitors span{color:var(--vt-amber)}
+html[data-theme='light'] .vrm-attention .vrm-attn-monitors span,html[data-theme='light'] .vrm-unit-grid .vrm-tile-differ{color:#875900}
+
+/* Just set up: a checklist for a Helios in its first two days on site. */
+.vrm-deploy{margin:10px 0 4px;padding:12px;border:1px solid var(--vt-hair,#2a2f3a);border-left:3px solid var(--vt-lux,#d8bf8a);border-radius:10px;background:var(--vt-surface,#11141b)}
+.vrm-deploy h3{margin:0 0 8px;font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--vt-lux,#d8bf8a)}
+#root#root .operations-shell .vrm-workspace .vrm-deploy-unit{display:block;width:100%;text-align:left;margin:0 0 6px;padding:9px 11px!important;border-radius:8px;border:1px solid var(--vt-hair,#2a2f3a)!important;background:transparent!important;color:var(--vt-ink,#e6edf7)!important;box-shadow:none!important;min-height:0}
+#root#root .operations-shell .vrm-workspace .vrm-deploy-unit.vrm-deploy-fail{border-color:#5a2029!important}
+#root#root .operations-shell .vrm-workspace .vrm-deploy-unit.vrm-deploy-done{border-color:#1f4a35!important}
+.vrm-deploy-head{display:flex;justify-content:space-between;gap:10px;margin:0 0 6px;font-size:13px}.vrm-deploy-head span{color:var(--vt-mute,#9aa4b2);font-size:12px}
+.vrm-deploy ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:3px 12px;font-size:12px}
+.vrm-deploy li i{display:inline-block;width:14px;font-style:normal;font-weight:700}.vrm-deploy li em{font-style:normal;color:var(--vt-mute,#9aa4b2)}
+.vrm-deploy-ok i{color:var(--vt-emerald,#4fd18b)}.vrm-deploy-fail{color:#ffb3ba}.vrm-deploy-fail i{color:var(--vt-ruby,#ff6b7a)}.vrm-deploy-wait{color:var(--vt-mute,#9aa4b2)}
+html[data-theme='light'] .vrm-deploy{background:#fff}
+.vrm-attention .vrm-attn-deploy span{color:#ff6b7a;font-weight:700}

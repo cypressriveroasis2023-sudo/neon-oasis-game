@@ -1,3 +1,4 @@
+import { deployCheck, newlyDeployed } from './vrmDeployCheck';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, OperationsApiError } from './api';
 import { getVrmFleet } from './vrmFleetApi';
@@ -9,7 +10,7 @@ import { heliosPlacement, placementLabel, victronFleetView, victronNeedsAttentio
 import { canonicalCameraUnit } from './fieldCameraHealth';
 import { mpptLine, readVrmExtras, type MhelpPlace, type Mppt } from './vrmMppt';
 import { cloudyWarning, heliosSpots, outlookLine, readSunForecast, sunOutlook, type SunDay } from './vrmWeather';
-import { dayPeak, historyFlags, isNightForecastTime, nightLoad, last24h, overnightLow, readVrmHistory, solarVsYesterday, tonightBasis, tonightForecast, tonightHeadline, tonightSteps, type HistoryPoint, type Tonight } from './vrmHistory';
+import { dayPeak, historyFlags, isNightForecastTime, nightLoad, last24h, overnightLow, readVrmHistory, solarVsYesterday, systemLead, tonightBasis, tonightForecast, tonightHeadline, tonightSteps, type HistoryPoint, type Tonight } from './vrmHistory';
 import VrmTechGuide from './VrmTechGuide';
 import VrmNightReport, { nightLevel } from './VrmNightReport';
 import { nightReport } from './vrmNightReport';
@@ -156,7 +157,7 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
       setInventory(items ? items.filter((item): item is {unitNumber?: string} => Boolean(item) && typeof item === 'object') : null);
     }).catch(() => { if (active) setInventory(null); });
     const readHistory = () => { void readVrmHistory().then(units => { if (active && units) setHistory(new Map(units.map(u => [u.installationId, u.points]))); }); };
-    const readMppt = () => { void readVrmExtras().then(extra => { if (!active) return; if (extra.mppt) setMppt(extra.mppt); if (extra.places) setPlaces(extra.places); }); };
+    const readMppt = () => { void readVrmExtras().then(extra => { if (!active) return; if (extra.mppt) setMppt(extra.mppt); /* An empty placement answer keeps the last list. */ if (extra.places?.length) setPlaces(extra.places); }); };
     readHistory(); readMppt();
     const historyTimer = window.setInterval(() => { if (workspaceVisible()) { readHistory(); readMppt(); } }, 15 * 60_000);
     const dropHistory = () => { setHistory(null); setMppt(null); setPlaces(null); };
@@ -187,14 +188,17 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
   const enabled = units.filter(item => item.embedUrl).length;
   const nameCounts = new Map<string,number>();
   for (const item of units) nameCounts.set(item.name, (nameCounts.get(item.name) ?? 0) + 1);
-  const tiles0 = (item: typeof units[number]) => unitTileSummary(item, power.rows, now).fresh;
   const tonight = new Map<number, Tonight>();
-  for (const item of units) { const t = history && tiles0(item) ? tonightForecast(history.get(item.installationId) ?? [], now) : null; if (t) tonight.set(item.installationId, t); }
+  for (const item of units) { const tile = tiles.get(item.installationId)!; const points = history?.get(item.installationId) ?? []; const t = history && tile.fresh ? tonightForecast(points, now, systemLead(points, now)) : null; if (t) tonight.set(item.installationId, t); }
   const weather = new Map<string, ReturnType<typeof sunOutlook>>();
   if (sky) for (const [key, days] of sky) { const o = sunOutlook(days, now); if (o.length) weather.set(key, o); }
   const night = units.length > 0 && history ? nightReport(units, history, now, name => heliosPlacement(name, inventory) === 'shop') : null;
   const nightRows = new Map((night?.rows ?? []).map(r => [r.installationId, r]));
-  const attention = victronNeedsAttention(units, power.rows, inventory, now, history, tonight, weather, mppt);
+  const deploys = newlyDeployed(units, history, name => heliosPlacement(name, inventory) === 'field').map(d => {
+    const tile = tiles.get(d.installationId);
+    return deployCheck({...d, fresh: !!tile?.fresh, hasBattery: !!tile?.soc, points: history?.get(d.installationId) ?? [], mppt: mppt?.get(d.installationId)}, now);
+  });
+  const attention = victronNeedsAttention(units, power.rows, inventory, now, history, tonight, weather, mppt, deploys);
   const syncTone = !sync ? 'stale' : error || sync.state === 'error' ? 'low' : sync.state === 'current' ? 'good' : 'stale';
   const lastSuccess = readableTime(sync?.lastSuccessAt ?? null);
   const nextSync = readableTime(sync?.nextSyncAt ?? null);
@@ -210,7 +214,14 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
     {units.length > 0 && <ul className='vrm-fleet-summary' aria-label='Fleet power summary'>{summary.map(item => <li key={item.label} className={'vrm-tone-'+item.key}><strong>{item.value}</strong><span>{item.label}</span></li>)}</ul>}
     {units.length > 0 && placed > 0 && <section className={'vrm-attention' + (attention.length ? '' : ' vrm-attention-clear')} aria-label='Needs attention'>
       <h3>{attention.length ? 'Needs attention · Field units' : 'No Field power issues'}</h3>
-      {attention.length > 0 && <ul>{attention.map(item => <li key={item.installationId}><button type='button' className={'vrm-attn-'+item.kind} onClick={() => select(item.installationId)}><strong>{item.name}</strong><span>{item.line}</span></button></li>)}</ul>}
+      {attention.length > 0 && <ul>{attention.map((item, index) => <li key={item.installationId + ':' + item.kind + ':' + index}><button type='button' className={'vrm-attn-'+item.kind} onClick={() => select(item.installationId)}><strong>{item.name}</strong><span>{item.line}</span></button></li>)}</ul>}
+    </section>}
+    {deploys.length > 0 && <section className='vrm-deploy' aria-label='Just set up'>
+      <h3>Just set up · first two days</h3>
+      {deploys.map(d => <button type='button' key={d.installationId} className={'vrm-deploy-unit' + (d.failed.length ? ' vrm-deploy-fail' : d.done ? ' vrm-deploy-done' : '')} onClick={() => select(d.installationId)}>
+        <p className='vrm-deploy-head'><strong>{d.name}</strong><span>on since {shortDate(new Date(d.since * 1000).toISOString(), now)}{d.done ? ' · all checks passed' : d.failed.length ? ' · ' + d.failed.length + ' to fix' : ''}</span></p>
+        <ul>{d.checks.map(c => <li key={c.label} className={'vrm-deploy-' + c.state}><i aria-hidden='true'>{c.state === 'ok' ? '✓' : c.state === 'fail' ? '✕' : '…'}</i>{c.label}{c.note && <em> · {c.note}</em>}</li>)}</ul>
+      </button>)}
     </section>}
     {night && <VrmNightReport report={night}/>}
     {units.length > 0 && <VrmTechGuide/>}
@@ -229,6 +240,7 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
           <svg viewBox='0 0 64 64'><circle className='vrm-ring-track' cx='32' cy='32' r='27'/><circle className='vrm-ring-fill' cx='32' cy='32' r='27' pathLength={100} strokeDasharray={(tile.soc ? Math.max(0, Math.min(100, tile.soc.value)) : 0) + ' 100'}/></svg>
           <span className={'vrm-tile-soc' + (tile.soc && Math.round(tile.soc.value) >= 100 ? ' vrm-soc-full' : '')}>{tile.soc ? <>{Math.round(tile.soc.value)}<small>%</small></> : '—'}</span>
         </span>
+        {(lead => lead > 0 && tile.fresh && tile.soc && <span className='vrm-tile-differ' title={'The system number jumped ahead while charging. By the energy that has gone in, the battery is about ' + Math.max(0, Math.round(tile.soc.value) - lead) + '%. It catches up as it fills.'}>about {Math.max(0, Math.round(tile.soc.value) - lead)}%{tile.flow?.state === 'charging' ? ' · filling' : ''}</span>)(systemLead(history?.get(item.installationId), now))}
         {tile.tone === 'stale' || tile.tone === 'none'
           ? <span className='vrm-tile-solar vrm-tile-seen'>{lastReading}</span>
           : <span className='vrm-tile-solar'><TileIcon name='sun'/>{tile.solar ? Math.round(tile.solar.value) + ' ' + tile.solar.unit : '—'}</span>}
@@ -265,7 +277,7 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
       const day = last24h(points, now);
       if (day.length < 2) return <section className='vrm-history'><h4>Last 24 hours</h4><p className='vrm-note'>History is building up. It starts from when it was switched on and fills in with each Victron sync.</p></section>;
       const night = overnightLow(points, now), sun = solarVsYesterday(points, now), flags = historyFlags(points, now);
-      const t = tonightForecast(points, now), steps = t ? tonightSteps(t) : [];
+      const t = tonightForecast(points, now, systemLead(points, now)), steps = t ? tonightSteps(t) : [];
       return <section className='vrm-history'>
         <div className={'vrm-tonight vrm-tonight-' + (t ? t.verdict : 'none')}>
           <h4>Tonight</h4>

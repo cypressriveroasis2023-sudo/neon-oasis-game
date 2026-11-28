@@ -3,7 +3,7 @@ import {canonicalCameraUnit} from '../fieldCameraHealth';
 import {readDashboardPower, unitTileSummary, type TileTone} from '../vrmReadOnlyModel';
 import {cloudyWarning, outlookLine, type OutlookDay} from '../vrmWeather';
 import {mpptFlags, mpptLine, type Mppt} from '../vrmMppt';
-import {historyFlags, overnightLow, tonightBasis, tonightForecast, tonightHeadline, tonightSteps, type HistoryPoint} from '../vrmHistory';
+import {historyFlags, overnightLow, systemLead, tonightBasis, tonightForecast, tonightHeadline, tonightSteps, type HistoryPoint} from '../vrmHistory';
 
 /** One Helios unit's Victron reading as the COS Board draws it.
  * b = battery %, w = solar W, v = battery volts, t = reading time in seconds (0 = none), q = tone,
@@ -59,7 +59,7 @@ export function boardPowerByUnit(fleetData: unknown, now: number, history?: Read
       ...((points => {
         if (!points?.length) return {};
         const night = overnightLow(points, now), flags = historyFlags(points, now).map(f => f.line);
-        const t = tile.fresh ? tonightForecast(points, now) : null;
+        const t = tile.fresh ? tonightForecast(points, now, systemLead(points, now)) : null;
         return {...(night ? {nl: night.low} : {}), ...(flags.length ? {hf: flags} : {}),
           ...(t ? {tn: {v: t.verdict, h: tonightHeadline(t), b: tonightBasis(t), s: tonightSteps(t)}} : {})};
       })(history?.get(item.installationId))),
