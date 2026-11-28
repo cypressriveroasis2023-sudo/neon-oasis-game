@@ -40,3 +40,21 @@ export function safeVrmPlacement(value: unknown): {units: VrmPlacementUnit[]} {
   });
   return {units};
 }
+
+/** Nightly battery capacity per Helios (last 60 nights): [date, Wh]. Same rule: anything odd fails the extra. */
+export type VrmHealthUnit = {installationId: number; nights: [string, number][]};
+export function safeVrmHealth(value: unknown): {units: VrmHealthUnit[]} {
+  const v = value as {units?: unknown};
+  if (!v || typeof v !== 'object' || !Array.isArray(v.units) || v.units.length > 200) throw Error('Health unavailable');
+  const seen = new Set<number>();
+  const units = v.units.map((u: any): VrmHealthUnit => {
+    if (!u || !Number.isSafeInteger(u.installationId) || u.installationId < 1 || seen.has(u.installationId) || !Array.isArray(u.nights) || u.nights.length > 400) throw Error('Health inconsistent');
+    seen.add(u.installationId);
+    const nights = u.nights.map((n: any): [string, number] => {
+      if (!Array.isArray(n) || n.length !== 2 || typeof n[0] !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(n[0]) || !Number.isSafeInteger(n[1]) || n[1] < 200 || n[1] > 20000) throw Error('Health night invalid');
+      return [n[0], n[1]];
+    });
+    return {installationId: u.installationId, nights};
+  });
+  return {units};
+}
