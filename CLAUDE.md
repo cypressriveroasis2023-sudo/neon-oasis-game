@@ -59,6 +59,9 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-27** — Tech Check: `app_private.cos_router_swaps_compute()` now lists an unlinked router that is online
+  in an InHand pull from the last 2 hours (`observed_at`), not by `last_seen` (InHand's last *connect* time). Spotter
+  265's swap is listed again; not applied. Record in `tech-checks/docs/db-changes/20261127_router_swap_seen_fix.md`.
 - **2026-11-27** — Tech Check: mHelp alert (applied 21:58 UTC). `cos_router_down_alerts_v1` (anchored edit)
   now appends `cos_mhelp_auth_alerts_safe_v1()` to its alerts, so job 16 pushes "mHelpDesk needs reconnecting"
   (from the `COS_MHELP_RENEWAL_STATUS_V1` answer of job 10 in `net._http_response`) and "reconnected". State in
