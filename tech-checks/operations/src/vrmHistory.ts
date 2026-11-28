@@ -290,3 +290,43 @@ export function darkHours(d: Date): number {
   const day = (Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(d.getFullYear(), 0, 0)) / 864e5;
   return Math.round((12 + 2 * Math.cos((day + 10) / 365 * 2 * Math.PI)) * 10) / 10;
 }
+
+/** Battery health from the nights in the saved history: energy out of the battery after dark (no sun) over the
+ * charge it took, scaled to 100%. A healthy DD3 measures 2.8-3.1 kWh (rated 2772 Wh). Each night needs an 8-point
+ * drop so the 1% charge steps do not swamp it; nights are averaged. Null until one good night is saved. */
+export const HEALTH_WARN = 0.8;
+export type BatteryHealth = {capacityWh: number; health: number; nights: number};
+export function batteryHealth(points: readonly HistoryPoint[] | null | undefined): BatteryHealth | null {
+  if (!points?.length) return null;
+  const nights = new Map<string, {wh: number; hi: number; lo: number; n: number}>();
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1], b = points[i], hours = (b[0] - a[0]) / 3600;
+    if (hours <= 0 || hours > 1 || a[1] === null || b[1] === null || a[3] === null || b[3] === null) continue;
+    if ((a[3] as number) >= 0 || (b[3] as number) >= 0 || (a[2] ?? 0) >= 5 || (b[2] ?? 0) >= 5) continue;
+    const h = new Date(a[0] * 1000).getHours();
+    if (h >= 6 && h < 19) continue;
+    const key = new Date((a[0] - 12 * 3600) * 1000).toDateString();
+    const k = nights.get(key) ?? {wh: 0, hi: -Infinity, lo: Infinity, n: 0};
+    k.wh += -((a[3] as number) + (b[3] as number)) / 2 * hours;
+    k.hi = Math.max(k.hi, a[1] as number); k.lo = Math.min(k.lo, b[1] as number); k.n++;
+    nights.set(key, k);
+  }
+  const good = [...nights.values()].filter(k => k.n >= 8 && k.hi - k.lo >= 8).map(k => k.wh / (k.hi - k.lo) * 100);
+  if (!good.length) return null;
+  const capacityWh = Math.round(good.reduce((s, v) => s + v, 0) / good.length);
+  return {capacityWh, health: Math.round(capacityWh / DD3_BATTERY_WH * 100) / 100, nights: good.length};
+}
+/** "100%+" for a battery that measures at or above its rating; otherwise the rounded percent. */
+export const healthLabel = (h: BatteryHealth) => h.health >= 1 ? '100%+' : Math.round(h.health * 100) + '%';
+
+/** Battery health from the saved nights (up to 60): the middle of the last 7 nights, and, once 14 nights are
+ * saved, the change from the first week of the last 30 days to the last week. Steadier than the 2-day view. */
+export type HealthTrend = BatteryHealth & {changeWh: number | null; series: [string, number][]};
+export function healthTrend(nights: readonly [string, number][] | null | undefined): HealthTrend | null {
+  if (!nights?.length) return null;
+  const mid = (v: number[]) => { const x = [...v].sort((a, b) => a - b); return x[Math.floor(x.length / 2)]; };
+  const series = nights.slice(-30), recent = series.slice(-7).map(n => n[1]);
+  const capacityWh = mid(recent);
+  const changeWh = series.length >= 14 ? capacityWh - mid(series.slice(0, 7).map(n => n[1])) : null;
+  return {capacityWh, health: Math.round(capacityWh / DD3_BATTERY_WH * 100) / 100, nights: nights.length, changeWh, series};
+}

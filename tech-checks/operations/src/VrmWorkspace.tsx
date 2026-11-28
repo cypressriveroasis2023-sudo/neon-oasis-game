@@ -8,9 +8,9 @@ import VrmReadOnlyDashboard from './VrmReadOnlyDashboard';
 import { readDashboardPower, shortDate, unitTileSummary } from './vrmReadOnlyModel';
 import { heliosPlacement, placementLabel, victronFleetView, victronNeedsAttention, withMhelpPlacement } from './victronAttention';
 import { canonicalCameraUnit } from './fieldCameraHealth';
-import { mpptLine, readVrmExtras, type MhelpPlace, type Mppt } from './vrmMppt';
+import { mpptLine, readVrmExtras, type HealthNights, type MhelpPlace, type Mppt } from './vrmMppt';
 import { cloudyWarning, darkSpell, fleetSky, harvestWh, heliosSpots, outlookLine, readSunForecast, sayDay, sunOutlook, type SunDay } from './vrmWeather';
-import { dayPeak, historyFlags, isNightForecastTime, nightLoad, last24h, overnightLow, withoutSun, DD3_BATTERY_WH, readVrmHistory, solarVsYesterday, systemLead, tonightBasis, tonightForecast, tonightHeadline, tonightSteps, type HistoryPoint, type Tonight } from './vrmHistory';
+import { dayPeak, historyFlags, isNightForecastTime, nightLoad, last24h, overnightLow, withoutSun, DD3_BATTERY_WH, batteryHealth, healthLabel, healthTrend, HEALTH_WARN, readVrmHistory, solarVsYesterday, systemLead, tonightBasis, tonightForecast, tonightHeadline, tonightSteps, type HistoryPoint, type Tonight } from './vrmHistory';
 import VrmTechGuide from './VrmTechGuide';
 import VrmNightReport, { nightLevel } from './VrmNightReport';
 import { nightReport } from './vrmNightReport';
@@ -82,6 +82,7 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
   const [savedInventory, setInventory] = useState<{unitNumber?: string}[] | null>(null);
   // The saved list does not hold every Helios, so mHelp's own current list fills in the ones it lacks.
   const [places, setPlaces] = useState<MhelpPlace[] | null>(null);
+  const [healthNights, setHealthNights] = useState<HealthNights | null>(null);
   const inventory = useMemo(() => withMhelpPlacement(savedInventory, places) as {unitNumber?: string}[] | null, [savedInventory, places]);
   // Sun forecast for Field Helios units (best-effort, every 3 hours). Nothing is stored.
   const [sky, setSky] = useState<Map<string, SunDay[]> | null>(null);
@@ -157,7 +158,7 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
       setInventory(items ? items.filter((item): item is {unitNumber?: string} => Boolean(item) && typeof item === 'object') : null);
     }).catch(() => { if (active) setInventory(null); });
     const readHistory = () => { void readVrmHistory().then(units => { if (active && units) setHistory(new Map(units.map(u => [u.installationId, u.points]))); }); };
-    const readMppt = () => { void readVrmExtras().then(extra => { if (!active) return; if (extra.mppt) setMppt(extra.mppt); /* An empty placement answer keeps the last list. */ if (extra.places?.length) setPlaces(extra.places); }); };
+    const readMppt = () => { void readVrmExtras().then(extra => { if (!active) return; if (extra.mppt) setMppt(extra.mppt); /* An empty placement answer keeps the last list. */ if (extra.places?.length) setPlaces(extra.places); if (extra.health) setHealthNights(extra.health); }); };
     readHistory(); readMppt();
     const historyTimer = window.setInterval(() => { if (workspaceVisible()) { readHistory(); readMppt(); } }, 15 * 60_000);
     const dropHistory = () => { setHistory(null); setMppt(null); setPlaces(null); };
@@ -200,6 +201,11 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
   });
   const reserve = units.filter(u => place.get(u.installationId) === 'field').flatMap(u => { const r = withoutSun(history?.get(u.installationId), now); return r ? [{...r, installationId: u.installationId, name: u.name}] : []; })
     .sort((a, b) => a.fromNow - b.fromNow || a.name.localeCompare(b.name, undefined, {numeric: true}));
+  const unitHealth = (id: number) => healthTrend(healthNights?.get(id)) ?? batteryHealth(history?.get(id));
+  const healths = reserve.flatMap(r => { const h = unitHealth(r.installationId); return h ? [{...h, installationId: r.installationId, name: r.name}] : []; });
+  const weak = healths.filter(h => h.health < HEALTH_WARN && h.nights >= 2).sort((a, b) => a.health - b.health);
+  const watch = healths.filter(h => h.health < HEALTH_WARN && h.nights < 2);
+  const capKwh = healths.map(h => h.capacityWh / 1000).sort((a, b) => a - b);
   const skyStrip = fleetSky(sky, reserve.flatMap(r => { const k = canonicalCameraUnit(r.name); return k ? [k] : []; }), now, 4);
   const spells = reserve.flatMap(r => { const k = canonicalCameraUnit(r.name), o = k ? sunOutlook(sky?.get(k), now, 4) : [];
     const d = darkSpell(o, DD3_BATTERY_WH * r.soc / 100, r.usedWh, DD3_BATTERY_WH); return d ? [{...d, installationId: r.installationId, name: r.name}] : []; });
@@ -220,9 +226,14 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
         line: 'Dark spell · ' + gd(d.grayDays) + ' · battery about ' + d.low + '% by ' + sayDay(d.by) + ' · swap, top up or plug into AC'}))
     : [{installationId: sorted[0].installationId, name: sorted.length + ' units', kind: 'darkspell' as const,
         line: 'Dark spell · ' + gd(Math.max(...sorted.map(d => d.grayDays))) + ' · under 20% by ' + sayDay(sorted[0].by) + ': ' + sorted.map(d => short(d.name) + ' ' + d.low + '%').join(', ') + ' · lowest first'}];
+  const fading = healths.flatMap(h => { const c = (h as {changeWh?: number | null}).changeWh; return c !== undefined && c !== null && c <= -0.1 * DD3_BATTERY_WH ? [{...h, changeWh: c}] : []; });
+  const fadeLines = fading.filter(h => !weak.some(w => w.installationId === h.installationId)).map(h => ({installationId: h.installationId, name: h.name, kind: 'darkspell' as const,
+    line: 'Battery fading · lost about ' + (Math.abs(h.changeWh) / 1000).toFixed(1) + ' kWh in 30 days, now ' + (h.capacityWh / 1000).toFixed(1) + ' kWh · plan a replacement before winter'}));
+  const weakLines = weak.map(h => ({installationId: h.installationId, name: h.name, kind: 'darkspell' as const,
+    line: 'Battery wearing out · holds about ' + (h.capacityWh / 1000).toFixed(1) + ' kWh (' + healthLabel(h) + ' of rated) · plan a replacement'}));
   const keep = attentionAll.filter(item => item.kind !== 'monitors' && !(item.kind === 'cloudy' && spellIds.has(item.installationId)));
   const firstAfter = keep.findIndex(item => item.kind !== 'alarm' && item.kind !== 'deploy');
-  const attention = firstAfter < 0 ? [...keep, ...darkLines] : [...keep.slice(0, firstAfter), ...darkLines, ...keep.slice(firstAfter)];
+  const attention = firstAfter < 0 ? [...keep, ...darkLines, ...weakLines, ...fadeLines] : [...keep.slice(0, firstAfter), ...darkLines, ...weakLines, ...fadeLines, ...keep.slice(firstAfter)];
   const monitors = attentionAll.find(item => item.kind === 'monitors');
   const syncTone = !sync ? 'stale' : error || sync.state === 'error' ? 'low' : sync.state === 'current' ? 'good' : 'stale';
   const lastSuccess = readableTime(sync?.lastSuccessAt ?? null);
@@ -253,6 +264,7 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
           <p className='vrm-sun-lede'>How long a full Helios runs on its 2.8 kWh battery (22.2 V · 126 Ah) with no sun at all, at its real use. {fleetSafe !== null && <>Keeping to the maker's 80% safe limit: <b>{fleetSafe.toFixed(1)} days</b>. </>}Cloudy days still add some charge, so real runs go longer.</p></div>
         <dl className='vrm-sun-facts'>
           <div><dt>Shortest from now</dt><dd>{reserve[0].name.replace(/^HELIOS\s+/i, '')} · {reserve[0].fromNow.toFixed(1)} days</dd></div>
+          {healths.length > 0 && <div className={weak.length || watch.length ? 'vrm-sun-short' : 'vrm-sun-even'}><dt>Battery health</dt><dd>{weak.length ? weak.length + ' weak · ' + weak.map(h => h.name.replace(/^HELIOS\s+/i, '') + ' ' + healthLabel(h)).join(', ') : watch.length ? watch.length + ' low on one night · checking again tonight' : 'All ' + healths.length + ' healthy · ' + capKwh[0].toFixed(1) + (capKwh[0].toFixed(1) !== capKwh[capKwh.length - 1].toFixed(1) ? '–' + capKwh[capKwh.length - 1].toFixed(1) : '') + ' kWh'}</dd></div>}
           <div><dt>Use per day</dt><dd>{fleetUsed !== null ? (fleetUsed / 1000).toFixed(2) + ' kWh' : '—'} · {watts[0] === watts[watts.length - 1] ? watts[0] : watts[0] + '–' + watts[watts.length - 1]} W</dd></div>
           {sunYesterday !== null && fleetUsed !== null && <div className={sunYesterday >= fleetUsed ? 'vrm-sun-even' : 'vrm-sun-short'}><dt>Sun yesterday</dt><dd>{(sunYesterday / 1000).toFixed(2)} kWh {sunYesterday >= fleetUsed ? '· covered the day' : '· short by ' + ((fleetUsed - sunYesterday) / 1000).toFixed(2)}</dd></div>}
         </dl>
@@ -356,8 +368,25 @@ export default function VrmWorkspace({initialUnit,initialInstallationId,onSelect
           <li className={night && night.low < 30 ? 'bad' : ''}><span>Overnight low</span><b>{night ? night.low + '%' : '—'}</b></li>
           <li className={sun && sun.share < 0.5 ? 'warn' : ''}><span>Solar vs yesterday</span><b>{sun ? Math.round(sun.share * 100) + '%' : '—'}</b></li>
           {(() => { const peak = dayPeak(points, now); return <li className={peak && peak.peak < 95 ? 'warn' : ''}><span>{peak ? 'Best battery ' + peak.label : 'Best battery today'}</span><b>{peak ? peak.peak + '%' : '—'}</b></li>; })()}
+          {(() => { const bh = unitHealth(unit.installationId); return <li className={bh && bh.health < HEALTH_WARN ? (bh.nights >= 2 ? 'bad' : 'warn') : ''} title={bh ? 'Measured over ' + bh.nights + ' night' + (bh.nights > 1 ? 's' : '') + ' from the energy the battery gave after dark. Rated 2.77 kWh (GAGO DD3).' : 'Needs one night with an 8-point drop'}><span>Battery health</span><b>{bh ? healthLabel(bh) + ' · ' + (bh.capacityWh / 1000).toFixed(1) + ' kWh' + (bh.health < HEALTH_WARN && bh.nights < 2 ? ' (1 night)' : '') : '—'}</b></li>; })()}
           {(() => { const load = nightLoad(points, now); return <li className={load?.high ? 'warn' : ''}><span>Night power use</span><b>{load ? load.recent + ' W' + (load.high ? ' (normal ' + load.normal + ')' : '') : '—'}</b></li>; })()}
         </ul>
+        {(() => {
+          const t = healthTrend(healthNights?.get(unit.installationId));
+          if (!t || t.series.length < 2) return null;
+          const v = t.series.map(n => n[1]), lo = Math.min(...v, DD3_BATTERY_WH * 0.75), hi = Math.max(...v, DD3_BATTERY_WH * 1.15);
+          const x = (i: number) => 4 + i / (v.length - 1) * 232, y = (w: number) => 4 + (hi - w) / (hi - lo) * 40;
+          return <div className='vrm-health-trend'>
+            <p><span>Battery health · last {t.series.length} night{t.series.length > 1 ? 's' : ''}</span><b>{t.changeWh === null ? 'trend builds over 2 weeks' : (t.changeWh >= 0 ? 'steady' : (t.changeWh / 1000).toFixed(2) + ' kWh in 30 days')}</b></p>
+            <svg viewBox='0 0 240 48' preserveAspectRatio='none' aria-label={'Nightly battery capacity, ' + (v[0] / 1000).toFixed(1) + ' to ' + (v[v.length - 1] / 1000).toFixed(1) + ' kWh'}>
+              <line x1='4' x2='236' y1={y(DD3_BATTERY_WH)} y2={y(DD3_BATTERY_WH)} className='vrm-health-rated'/>
+              <line x1='4' x2='236' y1={y(DD3_BATTERY_WH * 0.8)} y2={y(DD3_BATTERY_WH * 0.8)} className='vrm-health-warn'/>
+              <polyline points={v.map((w, i) => x(i) + ',' + y(w)).join(' ')} className='vrm-health-line'/>
+              {v.map((w, i) => <circle key={i} cx={x(i)} cy={y(w)} r='2'/>)}
+            </svg>
+            <small>Gold line: rated 2.77 kWh · red: 80% (replace)</small>
+          </div>;
+        })()}
         {(() => {
           const key = canonicalCameraUnit(unit.name), o = key ? weather.get(key) : undefined;
           if (!o?.length) return null;

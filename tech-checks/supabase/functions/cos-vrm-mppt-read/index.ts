@@ -5,9 +5,10 @@
 // (GET /api/vrm-fleet). Only a 200 there lets readings through. Then it reads public.cos_vrm_mppt_read
 // with the service role, which only that role may call. Nothing is written anywhere.
 // It also returns each Helios's Field/Shop from mHelp's current list (public.cos_vrm_placement_read),
-// because the saved equipment list does not hold every Helios.
+// because the saved equipment list does not hold every Helios, and each Helios's nightly battery capacity
+// (public.cos_vrm_battery_health_read) for the battery health trend.
 import {corsHeaders, gateVerdict, isHistoryRequest} from '../cos-vrm-history/history.ts';
-import {safeVrmMppt, safeVrmPlacement} from './read.ts';
+import {safeVrmHealth, safeVrmMppt, safeVrmPlacement} from './read.ts';
 
 const platform = Deno.env.get('SUPABASE_URL') ?? '';
 const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -48,12 +49,14 @@ Deno.serve(async request => {
   try {
     // Field/Shop from mHelp's own list rides along. It is an extra: if it cannot be read, the charger
     // readings still go out and the page keeps the placement it already had.
-    const [rpc, place] = await Promise.allSettled([call('cos_vrm_mppt_read'), call('cos_vrm_placement_read')]);
+    const [rpc, place, health] = await Promise.allSettled([call('cos_vrm_mppt_read'), call('cos_vrm_placement_read'), call('cos_vrm_battery_health_read')]);
     if (rpc.status !== 'fulfilled' || !rpc.value.ok) throw Error('rpc');
     const body = safeVrmMppt(await rpc.value.json());
     let placements: ReturnType<typeof safeVrmPlacement>['units'] | null = null;
     try { if (place.status === 'fulfilled' && place.value.ok) placements = safeVrmPlacement(await place.value.json()).units; } catch { placements = null; }
-    return reply({...body, placements});
+    let nights: ReturnType<typeof safeVrmHealth>['units'] | null = null;
+    try { if (health.status === 'fulfilled' && health.value.ok) nights = safeVrmHealth(await health.value.json()).units; } catch { nights = null; }
+    return reply({...body, placements, health: nights});
   } catch {
     return reply({error: 'Victron MPPT readings are unavailable.'}, 503);
   }

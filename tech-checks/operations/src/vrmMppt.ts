@@ -50,7 +50,20 @@ export function parsePlacements(value: unknown): MhelpPlace[] | null {
 }
 
 /** One read: the charger readings and, with them, mHelp's Field/Shop for every Helios. */
-export async function readVrmExtras(fetcher: typeof fetch = fetch, token?: string | null): Promise<{mppt: Map<number, Mppt> | null; places: MhelpPlace[] | null}> {
+/** Saved nightly battery capacity per installation, oldest first: [date, Wh]. Null when absent or malformed. */
+export type HealthNights = Map<number, [string, number][]>;
+export function parseHealth(body: unknown): HealthNights | null {
+  const list = (body as {health?: unknown})?.health;
+  if (!Array.isArray(list)) return null;
+  const out: HealthNights = new Map();
+  for (const u of list as any[]) {
+    if (!u || !Number.isSafeInteger(u.installationId) || !Array.isArray(u.nights)) return null;
+    const nights = (u.nights as any[]).filter(n => Array.isArray(n) && typeof n[0] === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(n[0]) && Number.isFinite(n[1]) && n[1] >= 200 && n[1] <= 20000) as [string, number][];
+    out.set(u.installationId, nights.sort((a, b) => a[0].localeCompare(b[0])));
+  }
+  return out;
+}
+export async function readVrmExtras(fetcher: typeof fetch = fetch, token?: string | null): Promise<{mppt: Map<number, Mppt> | null; places: MhelpPlace[] | null; health?: HealthNights | null}> {
   try {
     const access = token === undefined ? await readParentAccessToken() : token;
     if (!access) return {mppt: null, places: null};
@@ -58,7 +71,7 @@ export async function readVrmExtras(fetcher: typeof fetch = fetch, token?: strin
       body: JSON.stringify({action: 'read'}), cache: 'no-store'});
     if (!response.ok) return {mppt: null, places: null};
     const body = await response.json();
-    return {mppt: parseMppt(body), places: parsePlacements(body)};
+    return {mppt: parseMppt(body), places: parsePlacements(body), health: parseHealth(body)};
   } catch { return {mppt: null, places: null}; }
 }
 export async function readVrmMppt(fetcher: typeof fetch = fetch, token?: string | null): Promise<Map<number, Mppt> | null> {
