@@ -59,6 +59,13 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-28** — Tech Check: **Watchful setup check** (James's spec of 11/27; **prepared, not applied**). New
+  `app_private.ws_*` tables, `public.ws_*_v1` functions, private bucket `techcheck-watchful-setup` and its two
+  `storage.objects` policies, in `tech-checks/database-maintenance/watchful-setup-check-v1.sql` (built from
+  `tech-checks/watchful-setup/sql/`; rollback file beside it). No existing object, cron job or edge function changed;
+  no `camera_inventory_audit` row or action value; `camera_devices` is only read. Screens in `tech-checks/watchful-setup/`
+  loaded from `index.html`; the button shows only once `ws_home_v1` answers, so publishing before the apply is safe.
+  Record: `tech-checks/docs/db-changes/20261128_watchful_setup_check.md`. Applying needs James's go.
 - **2026-11-28** — Tech Check: routers matched to units (James's go). 17 hand A# links in `cos_mhelp_unit_link`, and
   5 `camera_unit_routers.unit_key` renames to the unit's own spelling (ids 91, 116, 124, 126, 190) plus SOLARSPOTTER 310's
   A#. Unplaced router rows 30 → 8. No audit row. Record `tech-checks/docs/db-changes/20261127_router_units_matched.md`.

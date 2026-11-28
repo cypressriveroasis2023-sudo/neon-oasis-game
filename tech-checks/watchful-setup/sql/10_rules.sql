@@ -1,0 +1,1334 @@
+-- Watchful setup check (Tech Check) -- spec "COS install checklist" v1.0, 2026-11-27, James Martin.
+-- Project: Tech Check (goqrnolcvqnirjmzaeyk). NOT APPLIED. Apply only with James's go.
+-- Tables live in app_private (not exposed to PostgREST); the app talks to public.ws_*_v1 functions only.
+--
+-- Ground rules enforced here:
+--   * COS never logs into, reads from or writes to a device. Nothing here calls out to anything.
+--   * No column anywhere for passwords, tokens, IPs or serials. Free text rejects IPv4-looking,
+--     token-shaped and "password:" strings with a clear message.
+--   * Missing data => 'unknown'. No computed status is ever 'offline' or 'outage'.
+--   * Units not placed in the field (shop/test/burn-in) are excluded, never quiet, never an outage.
+--   * Checklist content lives in tables and is versioned; published versions are frozen.
+--   * The audit log refuses UPDATE/DELETE/TRUNCATE for every role.
+-- Roles come from public.profiles: service, it and owner do the tech steps; it and owner sign off
+-- as the office; owner is the admin (waivers, overrides, templates, hidden photos).
+-- Writes no row to camera_inventory_audit (no new action value; the camera sweep is unaffected).
+
+-- ---------------------------------------------------------------- enums
+create type app_private.ws_device_role     as enum ('nvr','camera_on_nvr_channel','camera_standalone','camera_ptz','ip_speaker','cloud_system','closed_system');
+create type app_private.ws_position        as enum ('nvr','nvr_channel','standalone','ptz','speaker','cloud','closed');
+create type app_private.ws_standard_status as enum ('CONFIRMED','UNCONFIRMED','PLACEHOLDER');
+create type app_private.ws_template_scope  as enum ('unit','nvr','nvr_channel','camera','watchful');
+create type app_private.ws_template_status as enum ('draft','published','retired');
+create type app_private.ws_repeat_per      as enum ('once','channel','camera');
+create type app_private.ws_value_type      as enum ('none','enum','hours');
+create type app_private.ws_evidence_rule   as enum ('required','recommended','never','optional');
+create type app_private.ws_install_kind    as enum ('new','reinstall','recommission');
+create type app_private.ws_install_status  as enum ('draft','in_progress','awaiting_office','returned','live','cancelled');
+create type app_private.ws_item_result     as enum ('pending','done','na','cannot_complete','waived');
+create type app_private.ws_camera_status   as enum ('ok','quiet','never_sent','unknown','excluded');
+create type app_private.ws_alert_state     as enum ('quiet','never_sent','unknown');
+
+-- ---------------------------------------------------------------- who is signed in
+-- The caller's Tech Check role, or null when not an active, unarchived profile.
+create or replace function app_private.ws_my_role() returns text
+language sql stable security definer set search_path = app_private, public, pg_temp as
+$$ select p.role::text from public.profiles p
+   where p.user_id = auth.uid() and p.active and p.archived_at is null and p.role::text in ('service','it','owner') $$;
+
+create or replace function app_private.ws_my_name() returns text
+language sql stable security definer set search_path = app_private, public, pg_temp as
+$$ select coalesce(nullif(p.full_name, ''), p.username, 'Someone') from public.profiles p where p.user_id = auth.uid() $$;
+
+create or replace function app_private.ws_name(p_user uuid) returns text
+language sql stable security definer set search_path = app_private, public, pg_temp as
+$$ select coalesce(nullif(p.full_name, ''), p.username) from public.profiles p where p.user_id = p_user $$;
+
+create or replace function app_private.ws_require(variadic allowed text[]) returns uuid
+language plpgsql stable security definer set search_path = app_private, public, pg_temp as $$
+declare r text := app_private.ws_my_role();
+begin
+  if auth.uid() is null or r is null then
+    raise exception 'Sign in to Tech Check first.' using errcode = '42501';
+  end if;
+  if not (r = any(allowed)) then
+    raise exception '%', case
+      when allowed = array['owner'] then 'Only the owner can do this.'
+      when allowed = array['it','owner'] then 'Only IT or the owner can do this.'
+      else 'Your account cannot do this.' end using errcode = '42501';
+  end if;
+  return auth.uid();
+end $$;
+
+-- ---------------------------------------------------------------- secret-shaped text guard
+create or replace function app_private.ws_secret_reason(t text) returns text
+language plpgsql immutable as $$
+begin
+  if t is null or t = '' then return null; end if;
+  if t ~ '(^|[^0-9.])(25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])(\.(25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])){3}($|[^0-9.])' then
+    return 'it looks like an IP address';
+  end if;
+  if t ~* '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' then
+    return 'it looks like a token';
+  end if;
+  if exists (select 1 from regexp_matches(t, '([A-Za-z0-9]{20,})', 'g') m
+             where m[1] ~ '[0-9]' and m[1] ~ '[A-Za-z]') then
+    return 'it looks like a token';
+  end if;
+  if t ~* '(password|passwd|pwd)\s*[:=]' then
+    return 'it looks like a password';
+  end if;
+  return null;
+end $$;
+
+create or replace function app_private.ws_assert_no_secrets(field text, t text) returns void
+language plpgsql immutable as $$
+declare why text := app_private.ws_secret_reason(t);
+begin
+  if why is not null then
+    raise exception 'Remove it from "%": %. COS never stores passwords, tokens, IP addresses or serial numbers.', field, why
+      using errcode = '22023';
+  end if;
+end $$;
+
+-- generic trigger: TG_ARGV = list of text columns to check
+create or replace function app_private.ws_trg_reject_secrets() returns trigger
+language plpgsql as $$
+declare c text; j jsonb := to_jsonb(new);
+begin
+  foreach c in array tg_argv loop
+    perform app_private.ws_assert_no_secrets(c, j->>c);
+  end loop;
+  return new;
+end $$;
+
+-- ---------------------------------------------------------------- audit (append-only)
+create table app_private.ws_audit_log (
+  id bigint generated always as identity primary key,
+  at timestamptz not null default now(),
+  actor_user_id uuid,
+  action text not null,
+  entity_type text not null,
+  entity_id text,
+  before jsonb,
+  after jsonb,
+  reason text,
+  unit_key text
+);
+create index on app_private.ws_audit_log (unit_key, at desc);
+create index on app_private.ws_audit_log (actor_user_id, at desc);
+create index on app_private.ws_audit_log (action, at desc);
+
+create or replace function app_private.ws_trg_audit_immutable() returns trigger language plpgsql as $$
+begin
+  raise exception 'The audit log cannot be changed or deleted' using errcode = '42501';
+end $$;
+create trigger ws_audit_no_update before update or delete on app_private.ws_audit_log
+  for each row execute function app_private.ws_trg_audit_immutable();
+create trigger ws_audit_no_truncate before truncate on app_private.ws_audit_log
+  for each statement execute function app_private.ws_trg_audit_immutable();
+
+create or replace function app_private.ws_audit(p_action text, p_entity text, p_id text,
+  p_before jsonb, p_after jsonb, p_reason text default null, p_unit text default null) returns void
+language sql security definer set search_path = app_private, public, pg_temp as $$
+  insert into app_private.ws_audit_log(actor_user_id, action, entity_type, entity_id, before, after, reason, unit_key)
+  values (auth.uid(), p_action, p_entity, p_id, p_before, p_after, p_reason, p_unit);
+$$;
+
+-- generic row audit for admin-edited content tables
+create or replace function app_private.ws_trg_row_audit() returns trigger
+language plpgsql security definer set search_path = app_private, public, pg_temp as $$
+begin
+  perform app_private.ws_audit(lower(tg_op) || ':' || tg_table_name, tg_table_name,
+    coalesce((to_jsonb(new)->>'id'), (to_jsonb(old)->>'id')),
+    case when tg_op <> 'INSERT' then to_jsonb(old) end,
+    case when tg_op <> 'DELETE' then to_jsonb(new) end,
+    nullif(current_setting('cos.audit_reason', true), ''));
+  return coalesce(new, old);
+end $$;
+
+-- ---------------------------------------------------------------- catalog
+create table app_private.ws_unit_types (
+  unit_type text primary key,
+  has_recorder_option boolean not null,
+  sort_order int not null
+);
+
+create table app_private.ws_device_models (
+  id uuid primary key default gen_random_uuid(),
+  device_role app_private.ws_device_role not null,
+  brand text not null,
+  model text not null,
+  firmware_seen text,                 -- informational only
+  reference_standard text,
+  reference_units text,
+  setup_checklist text,               -- seed text, shown as help
+  standard_status app_private.ws_standard_status not null default 'UNCONFIRMED',
+  source text,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (brand, model, device_role)
+);
+
+create table app_private.ws_unit_type_models (
+  unit_type text not null references app_private.ws_unit_types(unit_type),
+  device_model_id uuid not null references app_private.ws_device_models(id) on delete restrict,
+  position app_private.ws_position not null,
+  -- fleet snapshot from model_catalog_v3.csv, information only
+  snapshot_units int, snapshot_units_field int, snapshot_units_shop int,
+  snapshot_units_not_in_tracker int, snapshot_devices_or_channels int, snapshot_sites int,
+  snapshot_example_units text,
+  primary key (unit_type, device_model_id, position)
+);
+
+-- the nine "(model not on file)" rows of the catalog: units with no model read yet
+create table app_private.ws_unit_type_model_gaps (
+  unit_type text primary key references app_private.ws_unit_types(unit_type),
+  snapshot_units int, snapshot_units_field int, snapshot_units_shop int,
+  guidance text, source text
+);
+
+-- device role -> pick-list position
+create or replace function app_private.ws_position_for(r app_private.ws_device_role) returns app_private.ws_position
+language sql immutable as $$
+  select case r when 'nvr' then 'nvr' when 'camera_on_nvr_channel' then 'nvr_channel'
+    when 'camera_standalone' then 'standalone' when 'camera_ptz' then 'ptz'
+    when 'ip_speaker' then 'speaker' when 'cloud_system' then 'cloud' else 'closed' end::app_private.ws_position
+$$;
+
+create view app_private.ws_pick_list as
+  select utm.unit_type, utm.position, m.id as device_model_id, m.brand, m.model, m.device_role,
+         m.reference_standard, m.standard_status
+  from app_private.ws_unit_type_models utm join app_private.ws_device_models m on m.id = utm.device_model_id
+  where m.is_active;
+-- UI always adds a "Model not on file" choice at every level (spec 1.1 step 4).
+
+-- ---------------------------------------------------------------- templates
+create table app_private.ws_checklist_templates (
+  id uuid primary key default gen_random_uuid(),
+  device_model_id uuid references app_private.ws_device_models(id) on delete restrict,
+  device_role app_private.ws_device_role,          -- set for role-generic templates (model not on file / no reference)
+  scope app_private.ws_template_scope not null,
+  name text not null,
+  version int not null,
+  status app_private.ws_template_status not null default 'draft',
+  published_by uuid, published_at timestamptz, change_note text,
+  created_at timestamptz not null default now(),
+  check (device_model_id is null or device_role is null)
+);
+create unique index ws_tpl_key_version on app_private.ws_checklist_templates
+  (device_model_id, device_role, scope, version) nulls not distinct;
+create unique index ws_tpl_one_published on app_private.ws_checklist_templates
+  (device_model_id, device_role, scope) nulls not distinct where status = 'published';
+
+create table app_private.ws_checklist_template_items (
+  id uuid primary key default gen_random_uuid(),
+  template_id uuid not null references app_private.ws_checklist_templates(id) on delete restrict,
+  code text not null,
+  title text not null,
+  standard text,                 -- what "right" looks like
+  instructions text,
+  help_text text,
+  standard_status app_private.ws_standard_status not null,
+  repeat_per app_private.ws_repeat_per not null default 'once',
+  value_type app_private.ws_value_type not null default 'none',
+  value_options text[],
+  evidence app_private.ws_evidence_rule not null default 'optional',
+  evidence_group text,           -- items sharing one screenshot (M1-M3)
+  required boolean not null default true,
+  placeholder_key text,
+  sort_order int not null,
+  unique (template_id, code)
+);
+
+create table app_private.ws_placeholders (
+  key text primary key,
+  description text,
+  filled_value text,
+  filled_by uuid, filled_at timestamptz
+);
+
+-- published/retired templates and their items are frozen
+create or replace function app_private.ws_trg_template_frozen() returns trigger language plpgsql as $$
+declare st app_private.ws_template_status;
+begin
+  if tg_table_name = 'ws_checklist_templates' then
+    if tg_op = 'DELETE' and old.status <> 'draft' then
+      raise exception 'Published templates cannot be deleted';
+    end if;
+    if tg_op = 'UPDATE' and old.status <> 'draft' then
+      -- only allowed change: published -> retired
+      if not (old.status = 'published' and new.status = 'retired'
+              and (to_jsonb(new) - 'status') = (to_jsonb(old) - 'status')) then
+        raise exception 'Published template versions cannot be edited; create a new draft version';
+      end if;
+    end if;
+    return coalesce(new, old);
+  end if;
+  select status into st from app_private.ws_checklist_templates
+   where id = coalesce(new.template_id, old.template_id);
+  if st <> 'draft' then
+    raise exception 'Items of a published template version cannot be changed; create a new draft version';
+  end if;
+  if tg_op = 'UPDATE' and new.template_id <> old.template_id then
+    raise exception 'Items cannot move between templates';
+  end if;
+  return coalesce(new, old);
+end $$;
+create trigger ws_tpl_frozen before update or delete on app_private.ws_checklist_templates
+  for each row execute function app_private.ws_trg_template_frozen();
+create trigger ws_tpl_items_frozen before insert or update or delete on app_private.ws_checklist_template_items
+  for each row execute function app_private.ws_trg_template_frozen();
+
+-- latest published template for a model (falls back to the role-generic one)
+create or replace function app_private.ws_published_template(p_model uuid, p_role app_private.ws_device_role,
+  p_scope app_private.ws_template_scope) returns uuid
+language sql stable as $$
+  select coalesce(
+    (select id from app_private.ws_checklist_templates
+      where p_model is not null and device_model_id = p_model and scope = p_scope and status = 'published'),
+    (select id from app_private.ws_checklist_templates
+      where device_model_id is null and device_role is not distinct from p_role and scope = p_scope and status = 'published'))
+$$;
+
+-- ---------------------------------------------------------------- installs
+create table app_private.ws_installs (
+  id uuid primary key default gen_random_uuid(),
+  unit_key text not null,                 -- COS unit key, as on camera_devices.unit_key (e.g. 'SPOTTER 236')
+  unit_label text not null,               -- what the tech sees, e.g. 'Spotter 236HD'
+  site_name text,                         -- the site, as the tech or COS gives it
+  kind app_private.ws_install_kind not null,
+  status app_private.ws_install_status not null default 'draft',
+  unit_type text not null references app_private.ws_unit_types(unit_type),
+  no_recorder boolean not null default false,
+  nvr_model_id uuid references app_private.ws_device_models(id),
+  nvr_model_not_on_file_text text,
+  nvr_label_evidence_id uuid,
+  system_model_id uuid references app_private.ws_device_models(id),   -- Avigilon / Reconeyez system
+  started_by uuid not null, started_at timestamptz not null default now(),
+  tech_signed_by uuid, tech_signed_at timestamptz,
+  office_signed_by uuid, office_signed_at timestamptz,
+  separation_override_by uuid, separation_override_reason text,
+  watchful_sending_x int, watchful_sending_y int, cos_camera_count int,
+  office_evidence_id uuid,
+  returned_reason text,
+  cancelled_reason text,
+  updated_at timestamptz not null default now()
+);
+create unique index ws_one_open_install_per_unit on app_private.ws_installs(unit_key)
+  where status in ('draft','in_progress','awaiting_office','returned');
+
+create table app_private.ws_install_cameras (
+  id uuid primary key default gen_random_uuid(),
+  install_id uuid not null references app_private.ws_installs(id),
+  position int not null,                    -- channel number (NVR) or camera index
+  role app_private.ws_device_role not null,
+  device_model_id uuid references app_private.ws_device_models(id) on delete restrict,
+  model_not_on_file_text text,
+  label_evidence_id uuid,
+  camera_name text not null,
+  is_speaker boolean generated always as (role = 'ip_speaker') stored,
+  unique (install_id, position),
+  check (device_model_id is not null or model_not_on_file_text is not null)
+);
+
+create table app_private.ws_install_items (
+  id uuid primary key default gen_random_uuid(),
+  install_id uuid not null references app_private.ws_installs(id),
+  install_camera_id uuid references app_private.ws_install_cameras(id),
+  template_item_id uuid not null references app_private.ws_checklist_template_items(id),
+  template_id uuid not null references app_private.ws_checklist_templates(id),
+  template_version int not null,
+  section text not null,                    -- Unit / Recorder / Channel n / Camera n / Watchful
+  sort_key int not null,
+  result app_private.ws_item_result not null default 'pending',
+  value text,
+  reason text,
+  note text check (char_length(note) <= 1000),
+  done_by uuid, done_at timestamptz,
+  waived_by uuid, waived_reason text,
+  reopened boolean not null default false,  -- flagged by office on send-back
+  returned_note text
+);
+create index on app_private.ws_install_items (install_id);
+
+create table app_private.ws_walk_test_sessions (
+  id uuid primary key default gen_random_uuid(),
+  install_id uuid not null references app_private.ws_installs(id),
+  test_mode_on_by uuid, test_mode_on_at timestamptz, test_mode_on_evidence_id uuid,
+  test_mode_off_by uuid, test_mode_off_at timestamptz, test_mode_off_evidence_id uuid
+);
+
+create table app_private.ws_walk_test_attempts (
+  id uuid primary key default gen_random_uuid(),
+  install_camera_id uuid not null references app_private.ws_install_cameras(id),
+  attempt_no int not null,
+  watchful_event_time timestamptz,
+  event_received boolean not null,
+  evidence_id uuid,
+  recorded_by uuid not null, recorded_at timestamptz not null default now(),
+  unique (install_camera_id, attempt_no)
+);
+
+create table app_private.ws_walk_test_waivers (
+  install_camera_id uuid primary key references app_private.ws_install_cameras(id),
+  waived_by uuid not null, waived_at timestamptz not null default now(),
+  reason text not null
+);
+
+create table app_private.ws_evidence (
+  id uuid primary key default gen_random_uuid(),
+  install_id uuid not null references app_private.ws_installs(id),
+  install_item_id uuid references app_private.ws_install_items(id),
+  walk_test_attempt_id uuid references app_private.ws_walk_test_attempts(id),
+  kind text not null default 'item',        -- item | walk_test | test_mode | label | office_count
+  storage_path text not null,               -- private bucket path; served via signed URLs only
+  mime text not null check (mime in ('image/jpeg','image/png')),   -- HEIC converted to JPEG before storing
+  bytes int not null check (bytes > 0 and bytes <= 15 * 1024 * 1024),
+  exif_stripped boolean not null check (exif_stripped),
+  captured_at timestamptz,
+  uploaded_by uuid not null, uploaded_at timestamptz not null default now(),
+  hidden boolean not null default false, hidden_by uuid, hidden_reason text
+);
+alter table app_private.ws_installs add foreign key (office_evidence_id) references app_private.ws_evidence(id);
+alter table app_private.ws_installs add foreign key (nvr_label_evidence_id) references app_private.ws_evidence(id);
+alter table app_private.ws_install_cameras add foreign key (label_evidence_id) references app_private.ws_evidence(id);
+alter table app_private.ws_walk_test_attempts add foreign key (evidence_id) references app_private.ws_evidence(id);
+alter table app_private.ws_walk_test_sessions add foreign key (test_mode_on_evidence_id) references app_private.ws_evidence(id);
+alter table app_private.ws_walk_test_sessions add foreign key (test_mode_off_evidence_id) references app_private.ws_evidence(id);
+
+-- ---------------------------------------------------------------- current unit state (after go-live)
+create table app_private.ws_unit_cameras (
+  id uuid primary key default gen_random_uuid(),
+  unit_key text not null,
+  unit_label text,                          -- for legacy cameras added from the Watchful list
+  site_name text,
+  position int not null,
+  device_model_id uuid references app_private.ws_device_models(id) on delete restrict,
+  camera_name text not null,
+  watchful_feed_name text,
+  is_speaker boolean not null default false,
+  monitored boolean not null default true,
+  retired boolean not null default false,
+  live_since timestamptz,
+  installed_via_install_id uuid references app_private.ws_installs(id),  -- null = legacy, not checklisted
+  template_versions jsonb,                  -- {template_id: version} the camera was signed off on
+  flag_walk_test_waived boolean not null default false,
+  flag_recheck_needed boolean not null default false,
+  flag_recheck_items text[],
+  flag_known_issue boolean not null default false,
+  flag_text text,
+  unique (unit_key, position)
+);
+
+create table app_private.ws_unit_setup (
+  unit_key text primary key,
+  unit_label text,
+  site_name text,
+  unit_type text references app_private.ws_unit_types(unit_type),
+  nvr_model_id uuid references app_private.ws_device_models(id),
+  system_model_id uuid references app_private.ws_device_models(id),
+  live_install_id uuid references app_private.ws_installs(id),
+  tech_signed_by uuid, tech_signed_at timestamptz,
+  office_signed_by uuid, office_signed_at timestamptz,
+  updated_at timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------- quiet-camera data
+create table app_private.ws_event_imports (
+  id uuid primary key default gen_random_uuid(),
+  source text not null check (source in ('csv','api')),
+  uploaded_by uuid,
+  read_at timestamptz not null,
+  imported_at timestamptz not null default now(),
+  row_count int not null default 0, matched_count int not null default 0, unmatched_count int not null default 0
+);
+
+create table app_private.ws_camera_last_events (
+  id bigint generated always as identity primary key,
+  unit_camera_id uuid references app_private.ws_unit_cameras(id),
+  import_id uuid not null references app_private.ws_event_imports(id),
+  raw_site text not null, raw_unit text not null, raw_camera text not null,
+  last_event_at timestamptz,                -- null = Watchful shows no event
+  read_at timestamptz not null
+);
+create index on app_private.ws_camera_last_events (unit_camera_id, read_at desc);
+create index on app_private.ws_camera_last_events (raw_site, raw_unit, raw_camera);
+
+create table app_private.ws_camera_name_mappings (
+  raw_site text not null, raw_unit text not null, raw_camera text not null,
+  unit_camera_id uuid not null references app_private.ws_unit_cameras(id),
+  mapped_by uuid not null, mapped_at timestamptz not null default now(),
+  primary key (raw_site, raw_unit, raw_camera)
+);
+
+create table app_private.ws_alert_settings (
+  id uuid primary key default gen_random_uuid(),
+  scope text not null check (scope in ('global','site','unit')),
+  scope_id text,                          -- unit key, or site name (lower-case); null for global
+  quiet_days int check (quiet_days between 1 and 365),
+  stale_read_hours int check (stale_read_hours between 1 and 720),
+  digest_time time,
+  check ((scope = 'global') = (scope_id is null))
+);
+create unique index ws_alert_settings_scope on app_private.ws_alert_settings (scope, scope_id) nulls not distinct;
+
+-- Where a checked unit is. Only 'field' units are watched; shop/test/burn-in are never quiet and
+-- never an outage. Set to 'field' at office sign-off; IT or the owner change it by hand.
+create table app_private.ws_unit_placement (
+  unit_key text primary key,
+  placement text not null check (placement in ('field','shop','test','burn_in')),
+  set_by uuid, set_at timestamptz not null default now()
+);
+
+create table app_private.ws_quiet_camera_alerts (
+  id uuid primary key default gen_random_uuid(),
+  unit_camera_id uuid not null references app_private.ws_unit_cameras(id),
+  state app_private.ws_alert_state not null,
+  opened_at timestamptz not null default now(),
+  last_event_at timestamptz, days_quiet numeric,
+  acknowledged_by uuid, acknowledged_at timestamptz, ack_note text,
+  closed_at timestamptz, close_reason text
+);
+create unique index ws_one_open_alert on app_private.ws_quiet_camera_alerts (unit_camera_id) where closed_at is null;
+
+create table app_private.ws_notices (
+  key text primary key,
+  title text not null,
+  body text not null
+);
+
+create table app_private.ws_digests (
+  id uuid primary key default gen_random_uuid(),
+  generated_at timestamptz not null default now(),
+  body jsonb not null           -- in-app only; nothing is sent outside COS
+);
+
+-- ---------------------------------------------------------------- free-text guards
+create trigger ws_sec_installs before insert or update on app_private.ws_installs for each row
+  execute function app_private.ws_trg_reject_secrets('nvr_model_not_on_file_text','separation_override_reason','returned_reason','cancelled_reason');
+create trigger ws_sec_cams before insert or update on app_private.ws_install_cameras for each row
+  execute function app_private.ws_trg_reject_secrets('model_not_on_file_text','camera_name');
+create trigger ws_sec_items before insert or update on app_private.ws_install_items for each row
+  execute function app_private.ws_trg_reject_secrets('value','reason','note','waived_reason','returned_note');
+create trigger ws_sec_waivers before insert or update on app_private.ws_walk_test_waivers for each row
+  execute function app_private.ws_trg_reject_secrets('reason');
+create trigger ws_sec_evidence before insert or update on app_private.ws_evidence for each row
+  execute function app_private.ws_trg_reject_secrets('hidden_reason');
+create trigger ws_sec_ucams before insert or update on app_private.ws_unit_cameras for each row
+  execute function app_private.ws_trg_reject_secrets('camera_name','watchful_feed_name','flag_text');
+create trigger ws_sec_alerts before insert or update on app_private.ws_quiet_camera_alerts for each row
+  execute function app_private.ws_trg_reject_secrets('ack_note');
+create trigger ws_sec_tpl_items before insert or update on app_private.ws_checklist_template_items for each row
+  execute function app_private.ws_trg_reject_secrets('title','standard','instructions','help_text');
+create trigger ws_sec_placeholders before insert or update on app_private.ws_placeholders for each row
+  execute function app_private.ws_trg_reject_secrets('filled_value');
+create trigger ws_sec_audit before insert on app_private.ws_audit_log for each row
+  execute function app_private.ws_trg_reject_secrets('reason');
+
+-- row audit on admin-edited content
+create trigger ws_audit_models after insert or update or delete on app_private.ws_device_models
+  for each row execute function app_private.ws_trg_row_audit();
+create trigger ws_audit_utm after insert or update or delete on app_private.ws_unit_type_models
+  for each row execute function app_private.ws_trg_row_audit();
+create trigger ws_audit_tpl after insert or update or delete on app_private.ws_checklist_templates
+  for each row execute function app_private.ws_trg_row_audit();
+create trigger ws_audit_tpl_items after insert or update or delete on app_private.ws_checklist_template_items
+  for each row execute function app_private.ws_trg_row_audit();
+create trigger ws_audit_settings after insert or update or delete on app_private.ws_alert_settings
+  for each row execute function app_private.ws_trg_row_audit();
+
+-- ================================================================ functions: install flow
+
+create or replace function app_private.ws_install_unit(p_install uuid) returns text
+language sql stable as $$ select unit_key from app_private.ws_installs where id = p_install $$;
+
+create or replace function app_private.ws_lock_install(p_install uuid, variadic ok app_private.ws_install_status[])
+returns app_private.ws_installs language plpgsql as $$
+declare i app_private.ws_installs;
+begin
+  select * into i from app_private.ws_installs where id = p_install for update;
+  if not found then raise exception 'Install not found'; end if;
+  if not (i.status = any(ok)) then
+    raise exception 'This install is % and cannot be changed this way', i.status;
+  end if;
+  return i;
+end $$;
+
+-- S1: start an install
+create or replace function app_private.ws_start_install(p_unit text, p_label text, p_site text,
+  p_kind app_private.ws_install_kind, p_unit_type text)
+returns uuid language plpgsql security definer set search_path = app_private, public, pg_temp as $$
+declare me uuid := app_private.ws_require('service','it','owner'); new_id uuid; open_id uuid;
+begin
+  if coalesce(trim(p_unit), '') = '' then raise exception 'Pick the unit first.'; end if;
+  if not exists (select 1 from app_private.ws_unit_types where unit_type = p_unit_type) then
+    raise exception 'Pick the kind of unit from the list.';
+  end if;
+  perform app_private.ws_assert_no_secrets('site', p_site);
+  select id into open_id from app_private.ws_installs
+   where unit_key = upper(trim(p_unit)) and status in ('draft','in_progress','awaiting_office','returned');
+  if open_id is not null then return open_id; end if;   -- carry on with the open check, never a second one
+  insert into app_private.ws_installs(unit_key, unit_label, site_name, kind, unit_type, started_by, status)
+  values (upper(trim(p_unit)), coalesce(nullif(trim(p_label), ''), trim(p_unit)), nullif(trim(p_site), ''), p_kind, p_unit_type, me, 'draft')
+  returning id into new_id;
+  perform app_private.ws_audit('install_created', 'install', new_id::text, null,
+    jsonb_build_object('unit', upper(trim(p_unit)), 'kind', p_kind, 'unit_type', p_unit_type, 'site', p_site), null, upper(trim(p_unit)));
+  return new_id;
+end $$;
+
+-- S1: save the selection. p_cameras = [{position, role, device_model_id|null, model_not_on_file_text|null, camera_name, label_evidence_id|null}]
+create or replace function app_private.ws_save_selection(p_install uuid, p_no_recorder boolean,
+  p_nvr_model uuid, p_nvr_not_on_file_text text, p_system_model uuid, p_cameras jsonb)
+returns void language plpgsql security definer set search_path = app_private, public, pg_temp as $$
+declare me uuid := app_private.ws_require('service','it','owner');
+        i app_private.ws_installs; c jsonb; m app_private.ws_device_models; pos app_private.ws_position;
+        before jsonb;
+begin
+  i := app_private.ws_lock_install(p_install, 'draft', 'in_progress');
+  if i.status = 'in_progress' and (
+       exists (select 1 from app_private.ws_install_items where install_id = p_install and result <> 'pending')
+    or exists (select 1 from app_private.ws_evidence where install_id = p_install and install_item_id is not null)
+    or exists (select 1 from app_private.ws_walk_test_attempts a join app_private.ws_install_cameras c on c.id = a.install_camera_id
+               where c.install_id = p_install)) then
+    raise exception 'Items have already been completed; an admin must rebuild the checklist to change the selection';
+  end if;
+  select jsonb_build_object('install', to_jsonb(i),
+         'cameras', coalesce((select jsonb_agg(to_jsonb(x)) from app_private.ws_install_cameras x where install_id = p_install), '[]'))
+    into before;
+
+  -- recorder / system checks
+  if p_nvr_model is not null then
+    if p_no_recorder then raise exception 'Pick either a recorder model or "No recorder", not both'; end if;
+    if not exists (select 1 from app_private.ws_pick_list where unit_type = i.unit_type and position = 'nvr' and device_model_id = p_nvr_model) then
+      raise exception 'That recorder model is not valid for unit type %', i.unit_type;
+    end if;
+  end if;
+  if p_nvr_not_on_file_text is not null and p_nvr_model is not null then
+    raise exception 'Pick a recorder model or "Model not on file", not both';
+  end if;
+  perform app_private.ws_assert_no_secrets('recorder model text', p_nvr_not_on_file_text);
+  if p_system_model is not null and not exists (select 1 from app_private.ws_pick_list
+      where unit_type = i.unit_type and position in ('closed','cloud') and device_model_id = p_system_model) then
+    raise exception 'That system model is not valid for unit type %', i.unit_type;
+  end if;
+
+  delete from app_private.ws_install_items where install_id = p_install;   -- all pending; regenerated below
+  delete from app_private.ws_install_cameras where install_id = p_install;
+
+  for c in select * from jsonb_array_elements(coalesce(p_cameras, '[]')) loop
+    if c->>'device_model_id' is not null then
+      select * into m from app_private.ws_device_models where id = (c->>'device_model_id')::uuid;
+      if not found then raise exception 'Unknown model on camera row %', c->>'position'; end if;
+      if m.device_role::text <> c->>'role' then
+        raise exception 'Camera row %: model % is a %, not a %', c->>'position', m.model, m.device_role, c->>'role';
+      end if;
+      pos := app_private.ws_position_for(m.device_role);
+      if not exists (select 1 from app_private.ws_pick_list where unit_type = i.unit_type and position = pos and device_model_id = m.id) then
+        raise exception 'Camera row %: % is not valid for unit type %', c->>'position', m.model, i.unit_type;
+      end if;
+    elsif coalesce(trim(c->>'model_not_on_file_text'), '') = '' then
+      raise exception 'Camera row %: pick a model or enter the model exactly as printed on the label', c->>'position';
+    end if;
+    insert into app_private.ws_install_cameras(install_id, position, role, device_model_id, model_not_on_file_text, camera_name, label_evidence_id)
+    values (p_install, (c->>'position')::int, (c->>'role')::app_private.ws_device_role,
+            (c->>'device_model_id')::uuid, nullif(trim(c->>'model_not_on_file_text'), ''),
+            c->>'camera_name', (c->>'label_evidence_id')::uuid);
+  end loop;
+
+  update app_private.ws_installs set no_recorder = coalesce(p_no_recorder, false), nvr_model_id = p_nvr_model,
+         nvr_model_not_on_file_text = nullif(trim(p_nvr_not_on_file_text), ''), system_model_id = p_system_model,
+         status = 'in_progress', updated_at = now()
+   where id = p_install;
+
+  perform app_private.ws_generate_items(p_install);
+
+  perform app_private.ws_audit('selection_changed', 'install', p_install::text, before,
+    jsonb_build_object('no_recorder', p_no_recorder, 'nvr_model_id', p_nvr_model,
+      'nvr_not_on_file', p_nvr_not_on_file_text, 'system_model_id', p_system_model, 'cameras', p_cameras),
+    null, i.unit_key);
+end $$;
+
+-- spec 2.1: build the checklist snapshot from the current published templates
+create or replace function app_private.ws_generate_items(p_install uuid) returns int
+language plpgsql security definer set search_path = app_private, public, pg_temp as $$
+declare i app_private.ws_installs; t uuid; cam record; n int := 0; nvr_role app_private.ws_device_role;
+        sysm app_private.ws_device_models;
+begin
+  select * into i from app_private.ws_installs where id = p_install;
+  select * into sysm from app_private.ws_device_models where id = i.system_model_id;
+
+  -- 1. unit-level
+  t := app_private.ws_published_template(null, null, 'unit');
+  insert into app_private.ws_install_items(install_id, template_item_id, template_id, template_version, section, sort_key)
+  select p_install, ti.id, tp.id, tp.version, 'Unit', 100000 + ti.sort_order
+  from app_private.ws_checklist_template_items ti join app_private.ws_checklist_templates tp on tp.id = ti.template_id
+  where tp.id = t;
+
+  -- 2. recorder: once-items, then per-channel items for every channel with a (non-speaker) camera
+  if i.nvr_model_id is not null or i.nvr_model_not_on_file_text is not null then
+    t := app_private.ws_published_template(i.nvr_model_id, 'nvr', 'nvr');
+    insert into app_private.ws_install_items(install_id, template_item_id, template_id, template_version, section, sort_key)
+    select p_install, ti.id, tp.id, tp.version, 'Recorder', 200000 + ti.sort_order
+    from app_private.ws_checklist_template_items ti join app_private.ws_checklist_templates tp on tp.id = ti.template_id
+    where tp.id = t and ti.repeat_per = 'once';
+    insert into app_private.ws_install_items(install_id, install_camera_id, template_item_id, template_id, template_version, section, sort_key)
+    select p_install, c.id, ti.id, tp.id, tp.version, 'Channel ' || c.position, 300000 + c.position * 1000 + ti.sort_order
+    from app_private.ws_checklist_template_items ti join app_private.ws_checklist_templates tp on tp.id = ti.template_id
+    cross join app_private.ws_install_cameras c
+    where tp.id = t and ti.repeat_per = 'channel' and c.install_id = p_install
+      and c.role = 'camera_on_nvr_channel';
+  end if;
+
+  -- 3. camera rows
+  for cam in select * from app_private.ws_install_cameras where install_id = p_install order by position loop
+    t := app_private.ws_published_template(cam.device_model_id, cam.role, 'camera');
+    if t is not null then
+      insert into app_private.ws_install_items(install_id, install_camera_id, template_item_id, template_id, template_version, section, sort_key)
+      select p_install, cam.id, ti.id, tp.id, tp.version,
+             case when cam.role = 'camera_on_nvr_channel' then 'Channel ' else 'Camera ' end || cam.position,
+             400000 + cam.position * 1000 + ti.sort_order
+      from app_private.ws_checklist_template_items ti join app_private.ws_checklist_templates tp on tp.id = ti.template_id
+      where tp.id = t;
+    end if;
+  end loop;
+
+  -- 4. Watchful: Avigilon / Reconeyez system template, else the generic one
+  t := case when sysm.id is not null then app_private.ws_published_template(sysm.id, sysm.device_role, 'watchful') end;
+  t := coalesce(t, app_private.ws_published_template(null, null, 'watchful'));
+  insert into app_private.ws_install_items(install_id, template_item_id, template_id, template_version, section, sort_key)
+  select p_install, ti.id, tp.id, tp.version, 'Watchful', 900000 + ti.sort_order
+  from app_private.ws_checklist_template_items ti join app_private.ws_checklist_templates tp on tp.id = ti.template_id
+  where tp.id = t and ti.repeat_per = 'once';
+  insert into app_private.ws_install_items(install_id, install_camera_id, template_item_id, template_id, template_version, section, sort_key)
+  select p_install, c.id, ti.id, tp.id, tp.version, 'Watchful', 900000 + c.position * 100 + ti.sort_order
+  from app_private.ws_checklist_template_items ti join app_private.ws_checklist_templates tp on tp.id = ti.template_id
+  cross join app_private.ws_install_cameras c
+  where tp.id = t and ti.repeat_per = 'camera' and c.install_id = p_install and not c.is_speaker;
+
+  get diagnostics n = row_count;
+  return n;
+end $$;
+
+-- admin: rebuild an open install from the latest published templates (audited)
+create or replace function app_private.ws_rebuild_from_latest(p_install uuid, p_reason text)
+returns void language plpgsql security definer set search_path = app_private, public, pg_temp as $$
+declare me uuid := app_private.ws_require('owner'); i app_private.ws_installs; before jsonb;
+begin
+  if coalesce(trim(p_reason), '') = '' then raise exception 'A reason is required'; end if;
+  i := app_private.ws_lock_install(p_install, 'in_progress', 'returned');
+  select jsonb_agg(jsonb_build_object('code', ti.code, 'version', ii.template_version, 'result', ii.result))
+    into before from app_private.ws_install_items ii join app_private.ws_checklist_template_items ti on ti.id = ii.template_item_id
+   where ii.install_id = p_install;
+  -- keep results for items whose code still exists on the same camera
+  create temp table _keep on commit drop as
+    select ii.install_camera_id, ti.code, ii.result, ii.value, ii.reason, ii.note, ii.done_by, ii.done_at
+    from app_private.ws_install_items ii join app_private.ws_checklist_template_items ti on ti.id = ii.template_item_id
+    where ii.install_id = p_install and ii.result <> 'pending';
+  delete from app_private.ws_install_items where install_id = p_install;
+  perform app_private.ws_generate_items(p_install);
+  update app_private.ws_install_items ii set result = k.result, value = k.value, reason = k.reason, note = k.note,
+         done_by = k.done_by, done_at = k.done_at
+    from _keep k, app_private.ws_checklist_template_items ti
+   where ii.install_id = p_install and ti.id = ii.template_item_id and ti.code = k.code
+     and ii.install_camera_id is not distinct from k.install_camera_id
+     and ti.standard_status <> 'PLACEHOLDER';
+  perform app_private.ws_audit('checklist_rebuilt', 'install', p_install::text, before, null, p_reason, i.unit_key);
+end $$;
+
+-- S2: record an item result (tech)
+create or replace function app_private.ws_set_item(p_item uuid, p_result app_private.ws_item_result,
+  p_value text default null, p_reason text default null, p_note text default null)
+returns void language plpgsql security definer set search_path = app_private, public, pg_temp as $$
+declare me uuid := app_private.ws_require('service','it','owner');
+        it app_private.ws_install_items; ti app_private.ws_checklist_template_items; i app_private.ws_installs;
+begin
+  select * into it from app_private.ws_install_items where id = p_item for update;
+  if not found then raise exception 'Item not found'; end if;
+  i := app_private.ws_lock_install(it.install_id, 'in_progress', 'returned');
+  if i.status = 'returned' and not it.reopened then
+    raise exception 'Only the items the office sent back can be changed';
+  end if;
+  select * into ti from app_private.ws_checklist_template_items where id = it.template_item_id;
+  if ti.standard_status = 'PLACEHOLDER' then
+    raise exception 'Pending standard: this item cannot be ticked until the standard is published';
+  end if;
+  if p_result not in ('pending','done','na','cannot_complete') then
+    raise exception 'Use the waiver action for waivers';
+  end if;
+  if p_result in ('na','cannot_complete') and coalesce(trim(p_reason), '') = '' then
+    raise exception 'A reason is required for "%"', p_result;
+  end if;
+  if p_result = 'done' and ti.value_type = 'enum' and not (p_value = any(ti.value_options)) then
+    raise exception 'Pick one of: %', array_to_string(ti.value_options, ', ');
+  end if;
+  if p_result = 'done' and ti.value_type = 'hours' and (p_value is null or not (p_value = any(ti.value_options))) then
+    raise exception 'Pick the arming hours from the list: %', array_to_string(ti.value_options, ', ');
+  end if;
+  update app_private.ws_install_items set result = p_result, value = p_value, reason = p_reason, note = p_note,
+         done_by = case when p_result = 'pending' then null else me end,
+         done_at = case when p_result = 'pending' then null else now() end
+   where id = p_item;
+  perform app_private.ws_audit('item_result', 'install_item', p_item::text,
+    jsonb_build_object('result', it.result, 'value', it.value, 'reason', it.reason),
+    jsonb_build_object('result', p_result, 'value', p_value, 'reason', p_reason, 'code', ti.code),
+    p_reason, i.unit_key);
+end $$;
+
+-- admin waiver of a cannot_complete item
+create or replace function app_private.ws_waive_item(p_item uuid, p_reason text)
+returns void language plpgsql security definer set search_path = app_private, public, pg_temp as $$
+declare me uuid := app_private.ws_require('owner'); it app_private.ws_install_items; i app_private.ws_installs;
+begin
+  if coalesce(trim(p_reason), '') = '' then raise exception 'A reason is required'; end if;
+  select * into it from app_private.ws_install_items where id = p_item for update;
+  i := app_private.ws_lock_install(it.install_id, 'in_progress', 'returned', 'awaiting_office');
+  update app_private.ws_install_items set result = 'waived', waived_by = me, waived_reason = p_reason where id = p_item;
+  perform app_private.ws_audit('item_waived', 'install_item', p_item::text, to_jsonb(it), null, p_reason, i.unit_key);
+end $$;
+
+-- evidence: called after the client uploads the cleaned file to the private bucket
+create or replace function app_private.ws_add_evidence(p_install uuid, p_kind text, p_storage_path text,
+  p_mime text, p_bytes int, p_exif_stripped boolean, p_captured_at timestamptz,
+  p_item uuid default null, p_attempt uuid default null)
+returns uuid language plpgsql security definer set search_path = app_private, public, pg_temp as $$
+declare me uuid := app_private.ws_require('service','it','owner'); new_id uuid; i app_private.ws_installs;
+begin
+  select * into i from app_private.ws_installs where id = p_install;
+  if i.status in ('live','cancelled') then raise exception 'This install is closed'; end if;
+  if p_item is not null and not exists (select 1 from app_private.ws_install_items where id = p_item and install_id = p_install) then
+    raise exception 'Item does not belong to this install';
+  end if;
+  if p_item is not null and exists (select 1 from app_private.ws_install_items ii
+      join app_private.ws_checklist_template_items ti on ti.id = ii.template_item_id
+      where ii.id = p_item and ti.evidence = 'never') then
+    raise exception 'Do not photograph this field';
+  end if;
+  insert into app_private.ws_evidence(install_id, install_item_id, walk_test_attempt_id, kind, storage_path, mime, bytes,
+         exif_stripped, captured_at, uploaded_by)
+  values (p_install, p_item, p_attempt, p_kind, p_storage_path, p_mime, p_bytes, p_exif_stripped, p_captured_at, me)
+  returning id into new_id;
+  perform app_private.ws_audit('evidence_uploaded', 'evidence', new_id::text, null,
+    jsonb_build_object('kind', p_kind, 'item', p_item, 'attempt', p_attempt), null, i.unit_key);
+  return new_id;
+end $$;
+
+create or replace function app_private.ws_hide_evidence(p_evidence uuid, p_reason text)
+returns void language plpgsql security definer set search_path = app_private, public, pg_temp as $$
+declare me uuid := app_private.ws_require('owner'); e app_private.ws_evidence;
+begin
+  if coalesce(trim(p_reason), '') = '' then raise exception 'A reason is required'; end if;
+  select * into e from app_private.ws_evidence where id = p_evidence for update;
+  update app_private.ws_evidence set hidden = true, hidden_by = me, hidden_reason = p_reason where id = p_evidence;
+  -- the edge function moves the object to the restricted bucket on this audit row
+  perform app_private.ws_audit('evidence_hidden', 'evidence', p_evidence::text, jsonb_build_object('hidden', e.hidden),
+    jsonb_build_object('hidden', true, 'storage_path', e.storage_path), p_reason, app_private.ws_install_unit(e.install_id));
+end $$;
+
+-- ---------------------------------------------------------------- walk test
+create or replace function app_private.ws_test_mode(p_install uuid, p_on boolean, p_evidence uuid)
+returns void language plpgsql security definer set search_path = app_private, public, pg_temp as $$
+declare me uuid := app_private.ws_require('service','it','owner'); i app_private.ws_installs; s app_private.ws_walk_test_sessions;
+begin
+  i := app_private.ws_lock_install(p_install, 'in_progress', 'returned');
+  if p_evidence is null then raise exception 'Attach a screenshot of Watchful Test mode'; end if;
+  select * into s from app_private.ws_walk_test_sessions where install_id = p_install
+    order by coalesce(test_mode_on_at, '-infinity') desc limit 1;
+  if p_on then
+    if s.id is not null and s.test_mode_off_at is null then raise exception 'Test mode is already recorded as on'; end if;
+    insert into app_private.ws_walk_test_sessions(install_id, test_mode_on_by, test_mode_on_at, test_mode_on_evidence_id)
+    values (p_install, me, now(), p_evidence);
+  else
+    if s.id is null or s.test_mode_off_at is not null then raise exception 'Test mode is not recorded as on'; end if;
+    update app_private.ws_walk_test_sessions set test_mode_off_by = me, test_mode_off_at = now(), test_mode_off_evidence_id = p_evidence
+     where id = s.id;
+  end if;
+  perform app_private.ws_audit(case when p_on then 'test_mode_on' else 'test_mode_off' end, 'install', p_install::text,
+    null, null, null, i.unit_key);
+end $$;
+
+-- latest completion of any item that applies to this camera (its own items + its channel's NVR items)
+create or replace function app_private.ws_camera_last_item_done(p_cam uuid) returns timestamptz
+language sql stable as $$
+  select max(done_at) from app_private.ws_install_items where install_camera_id = p_cam and result <> 'pending'
+$$;
+
+create or replace function app_private.ws_record_walk_attempt(p_cam uuid, p_event_received boolean,
+  p_event_time timestamptz, p_evidence uuid)
+returns int language plpgsql security definer set search_path = app_private, public, pg_temp as $$
+declare me uuid := app_private.ws_require('service','it','owner'); c app_private.ws_install_cameras; i app_private.ws_installs;
+        n int; last_done timestamptz; s app_private.ws_walk_test_sessions;
+begin
+  select * into c from app_private.ws_install_cameras where id = p_cam;
+  if not found then raise exception 'Camera not found'; end if;
+  if c.is_speaker then raise exception 'IP speakers are not walk-tested'; end if;
+  i := app_private.ws_lock_install(c.install_id, 'in_progress', 'returned');
+  select * into s from app_private.ws_walk_test_sessions where install_id = i.id and test_mode_off_at is null
+    order by test_mode_on_at desc limit 1;
+  if s.id is null then raise exception 'Record Watchful Test mode on first'; end if;
+  if p_event_received then
+    if p_event_time is null then raise exception 'Enter the event time shown in Watchful'; end if;
+    if p_evidence is null then raise exception 'Attach the Watchful event screenshot'; end if;
+    last_done := app_private.ws_camera_last_item_done(p_cam);
+    -- Watchful shows the time to the minute, so an event in the same minute as the last step counts.
+    if last_done is not null and p_event_time < date_trunc('minute', last_done) then
+      raise exception 'Not a pass: this event (%) is before the camera''s checklist items were last completed (%). Walk the camera again.',
+        to_char(p_event_time at time zone 'America/Chicago', 'Mon DD HH12:MI AM'),
+        to_char(last_done at time zone 'America/Chicago', 'Mon DD HH12:MI AM');
+    end if;
+    if p_event_time > now() + interval '5 minutes' then raise exception 'Event time is in the future'; end if;
+  end if;
+  select coalesce(max(attempt_no), 0) + 1 into n from app_private.ws_walk_test_attempts where install_camera_id = p_cam;
+  insert into app_private.ws_walk_test_attempts(install_camera_id, attempt_no, watchful_event_time, event_received, evidence_id, recorded_by)
+  values (p_cam, n, case when p_event_received then p_event_time end, p_event_received, p_evidence, me);
+  perform app_private.ws_audit('walk_test_attempt', 'install_camera', p_cam::text, null,
+    jsonb_build_object('attempt', n, 'received', p_event_received, 'event_time', p_event_time), null, i.unit_key);
+  return n;
+end $$;
+
+create or replace function app_private.ws_waive_walk_test(p_cam uuid, p_reason text)
+returns void language plpgsql security definer set search_path = app_private, public, pg_temp as $$
+declare me uuid := app_private.ws_require('owner'); c app_private.ws_install_cameras;
+begin
+  if coalesce(trim(p_reason), '') = '' then raise exception 'A reason is required'; end if;
+  select * into c from app_private.ws_install_cameras where id = p_cam;
+  insert into app_private.ws_walk_test_waivers(install_camera_id, waived_by, reason) values (p_cam, me, p_reason);
+  perform app_private.ws_audit('walk_test_waived', 'install_camera', p_cam::text, null, null, p_reason, app_private.ws_install_unit(c.install_id));
+end $$;
+
+create view app_private.ws_walk_test_status as
+  select c.id as install_camera_id, c.install_id, c.position, c.camera_name,
+    exists (select 1 from app_private.ws_walk_test_attempts a
+             where a.install_camera_id = c.id and a.event_received and a.evidence_id is not null
+               and a.watchful_event_time >= coalesce(date_trunc('minute', app_private.ws_camera_last_item_done(c.id)), '-infinity')) as passed,
+    exists (select 1 from app_private.ws_walk_test_waivers w where w.install_camera_id = c.id) as waived,
+    (select count(*) from app_private.ws_walk_test_attempts a where a.install_camera_id = c.id and not a.event_received) as failed_attempts,
+    (select count(*) from app_private.ws_walk_test_attempts a where a.install_camera_id = c.id and not a.event_received) >= 3 as prompt_check_settings
+  from app_private.ws_install_cameras c where not c.is_speaker;
+
+-- ---------------------------------------------------------------- submit / office
+create or replace function app_private.ws_submit_blockers(p_install uuid) returns setof text
+language sql stable security definer set search_path = app_private, public, pg_temp as $$
+  select format('%s, %s (%s): %s', ii.section, ti.title, ti.code, case ii.result when 'pending' then 'not done'
+                 else 'marked "can''t do it" (the owner must waive it)' end)
+  from app_private.ws_install_items ii join app_private.ws_checklist_template_items ti on ti.id = ii.template_item_id
+  where ii.install_id = p_install and ti.required and ti.standard_status <> 'PLACEHOLDER'
+    and ii.result in ('pending','cannot_complete')
+  union all
+  select format('%s, %s (%s): photo missing', ii.section, ti.title, ti.code)
+  from app_private.ws_install_items ii join app_private.ws_checklist_template_items ti on ti.id = ii.template_item_id
+  where ii.install_id = p_install and ti.evidence = 'required' and ti.standard_status <> 'PLACEHOLDER'
+    and ii.result = 'done'
+    and not exists (select 1 from app_private.ws_evidence e where not e.hidden and (e.install_item_id = ii.id
+          or (ti.evidence_group is not null and e.install_item_id in (
+               select ii2.id from app_private.ws_install_items ii2 join app_private.ws_checklist_template_items ti2 on ti2.id = ii2.template_item_id
+               where ii2.install_id = ii.install_id and ti2.evidence_group = ti.evidence_group
+                 and ii2.install_camera_id is not distinct from ii.install_camera_id))))
+  union all
+  select format('Camera %s (%s): photo of the model label missing', c.position, c.camera_name)
+  from app_private.ws_install_cameras c where c.install_id = p_install and c.device_model_id is null and c.label_evidence_id is null
+  union all
+  select 'Recorder: photo of the model label missing'
+  from app_private.ws_installs i where i.id = p_install and i.nvr_model_not_on_file_text is not null and i.nvr_label_evidence_id is null
+  union all
+  select format('Camera %s (%s): walk test not passed yet', w.position, w.camera_name)
+  from app_private.ws_walk_test_status w where w.install_id = p_install and not w.passed and not w.waived
+  union all
+  select 'Watchful Test mode is still recorded as on. Turn it off and record it.'
+  from app_private.ws_walk_test_sessions s where s.install_id = p_install and s.test_mode_on_at is not null and s.test_mode_off_at is null
+  union all
+  select 'No cameras on this install'
+  where not exists (select 1 from app_private.ws_install_cameras where install_id = p_install and not is_speaker)
+$$;
+
+create or replace function app_private.ws_submit_for_office(p_install uuid)
+returns void language plpgsql security definer set search_path = app_private, public, pg_temp as $$
+declare me uuid := app_private.ws_require('service','it','owner'); i app_private.ws_installs; b text;
+begin
+  i := app_private.ws_lock_install(p_install, 'in_progress', 'returned');
+  select string_agg(x, '; ') into b from app_private.ws_submit_blockers(p_install) x;
+  if b is not null then raise exception 'Cannot submit yet: %', b; end if;
+  update app_private.ws_installs set status = 'awaiting_office', tech_signed_by = me, tech_signed_at = now(),
+         returned_reason = null, updated_at = now() where id = p_install;
+  update app_private.ws_install_items set reopened = false where install_id = p_install;
+  perform app_private.ws_audit('tech_submitted', 'install', p_install::text, jsonb_build_object('status', i.status),
+    jsonb_build_object('status', 'awaiting_office'), null, i.unit_key);
+end $$;
+
+create or replace function app_private.ws_office_send_back(p_install uuid, p_reason text, p_item_ids uuid[])
+returns void language plpgsql security definer set search_path = app_private, public, pg_temp as $$
+declare me uuid := app_private.ws_require('it','owner'); i app_private.ws_installs;
+begin
+  if coalesce(trim(p_reason), '') = '' then raise exception 'A reason is required'; end if;
+  i := app_private.ws_lock_install(p_install, 'awaiting_office');
+  update app_private.ws_install_items set reopened = true, returned_note = p_reason
+   where install_id = p_install and id = any(coalesce(p_item_ids, '{}'));
+  update app_private.ws_installs set status = 'returned', returned_reason = p_reason, updated_at = now() where id = p_install;
+  perform app_private.ws_audit('office_sent_back', 'install', p_install::text, null,
+    jsonb_build_object('items', p_item_ids), p_reason, i.unit_key);
+end $$;
+
+create or replace function app_private.ws_office_sign_off(p_install uuid, p_sending_x int, p_sending_y int,
+  p_count_evidence uuid, p_separation_override_reason text default null)
+returns void language plpgsql security definer set search_path = app_private, public, pg_temp as $$
+declare me uuid := app_private.ws_require('it','owner'); i app_private.ws_installs; cnt int; b text;
+        r text := app_private.ws_my_role(); versions jsonb;
+begin
+  i := app_private.ws_lock_install(p_install, 'awaiting_office');
+  select count(*) into cnt from app_private.ws_install_cameras where install_id = p_install and not is_speaker;
+  if p_count_evidence is null then raise exception 'Attach the Watchful screenshot showing the camera count'; end if;
+  if p_sending_x is null or p_sending_y is null then raise exception 'Enter Watchful''s "Cameras sending events X/Y"'; end if;
+  if p_sending_x <> p_sending_y or p_sending_y <> cnt then
+    raise exception 'Counts do not match: Watchful shows %/% sending and COS has % cameras. Send it back to the tech with the reason.',
+      p_sending_x, p_sending_y, cnt;
+  end if;
+  if exists (select 1 from app_private.ws_install_cameras where install_id = p_install and device_model_id is null)
+     or i.nvr_model_not_on_file_text is not null then
+    raise exception 'A "model not on file" must be mapped or added to the catalog by an admin first';
+  end if;
+  select string_agg(x, '; ') into b from app_private.ws_submit_blockers(p_install) x;
+  if b is not null then raise exception 'Still blocked: %', b; end if;
+  if i.tech_signed_by = me then
+    if r <> 'owner' or coalesce(trim(p_separation_override_reason), '') = '' then
+      raise exception 'You did the tech sign-off, so a different person must do the office sign-off (an admin can override with a reason)';
+    end if;
+    update app_private.ws_installs set separation_override_by = me, separation_override_reason = p_separation_override_reason
+     where id = p_install;
+    perform app_private.ws_audit('separation_override', 'install', p_install::text, null, null, p_separation_override_reason, i.unit_key);
+  end if;
+
+  update app_private.ws_installs set status = 'live', office_signed_by = me, office_signed_at = now(),
+         watchful_sending_x = p_sending_x, watchful_sending_y = p_sending_y, cos_camera_count = cnt,
+         office_evidence_id = p_count_evidence, updated_at = now()
+   where id = p_install;
+
+  select jsonb_object_agg(template_id, template_version) into versions
+    from (select distinct template_id, template_version from app_private.ws_install_items where install_id = p_install) v;
+
+  -- current configuration of the unit: replace its camera list
+  update app_private.ws_unit_cameras set retired = true, monitored = false
+   where unit_key = i.unit_key and not retired;
+  insert into app_private.ws_unit_cameras as uc (unit_key, position, device_model_id, camera_name, is_speaker, monitored,
+         live_since, installed_via_install_id, template_versions, flag_walk_test_waived)
+  select i.unit_key, c.position, c.device_model_id, c.camera_name, c.is_speaker, not c.is_speaker, now(), p_install, versions,
+         exists (select 1 from app_private.ws_walk_test_waivers w where w.install_camera_id = c.id)
+  from app_private.ws_install_cameras c where c.install_id = p_install
+  on conflict (unit_key, position) do update set device_model_id = excluded.device_model_id,
+     camera_name = excluded.camera_name, is_speaker = excluded.is_speaker, monitored = excluded.monitored,
+     retired = false, live_since = coalesce(uc.live_since, excluded.live_since),
+     installed_via_install_id = excluded.installed_via_install_id, template_versions = excluded.template_versions,
+     flag_walk_test_waived = excluded.flag_walk_test_waived, flag_recheck_needed = false, flag_recheck_items = null;
+
+  insert into app_private.ws_unit_setup(unit_key, unit_label, site_name, unit_type, nvr_model_id, system_model_id, live_install_id,
+         tech_signed_by, tech_signed_at, office_signed_by, office_signed_at, updated_at)
+  values (i.unit_key, i.unit_label, i.site_name, i.unit_type, i.nvr_model_id, i.system_model_id, p_install, i.tech_signed_by, i.tech_signed_at, me, now(), now())
+  on conflict (unit_key) do update set unit_label = excluded.unit_label, site_name = excluded.site_name, unit_type = excluded.unit_type, nvr_model_id = excluded.nvr_model_id,
+     system_model_id = excluded.system_model_id, live_install_id = excluded.live_install_id,
+     tech_signed_by = excluded.tech_signed_by, tech_signed_at = excluded.tech_signed_at,
+     office_signed_by = excluded.office_signed_by, office_signed_at = excluded.office_signed_at, updated_at = now();
+
+  insert into app_private.ws_unit_placement(unit_key, placement, set_by) values (i.unit_key, 'field', me)
+  on conflict (unit_key) do update set placement = 'field', set_by = me, set_at = now();
+
+  perform app_private.ws_audit('office_signed_off', 'install', p_install::text, jsonb_build_object('status', 'awaiting_office'),
+    jsonb_build_object('status', 'live', 'x', p_sending_x, 'y', p_sending_y, 'cos_count', cnt), null, i.unit_key);
+end $$;
+
+create or replace function app_private.ws_cancel_install(p_install uuid, p_reason text)
+returns void language plpgsql security definer set search_path = app_private, public, pg_temp as $$
+declare me uuid := app_private.ws_require('service','it','owner'); i app_private.ws_installs;
+begin
+  if coalesce(trim(p_reason), '') = '' then raise exception 'A reason is required'; end if;
+  i := app_private.ws_lock_install(p_install, 'draft', 'in_progress', 'returned', 'awaiting_office');
+  update app_private.ws_installs set status = 'cancelled', cancelled_reason = p_reason, updated_at = now() where id = p_install;
+  perform app_private.ws_audit('install_cancelled', 'install', p_install::text, null, null, p_reason, i.unit_key);
+end $$;
+
+-- admin maps a "model not on file" row to a catalog model
+create or replace function app_private.ws_map_not_on_file(p_install_camera uuid, p_model uuid, p_reason text)
+returns void language plpgsql security definer set search_path = app_private, public, pg_temp as $$
+declare me uuid := app_private.ws_require('owner'); c app_private.ws_install_cameras; m app_private.ws_device_models;
+begin
+  select * into c from app_private.ws_install_cameras where id = p_install_camera for update;
+  select * into m from app_private.ws_device_models where id = p_model;
+  if m.device_role <> c.role then raise exception 'That model is a %, the row is a %', m.device_role, c.role; end if;
+  update app_private.ws_install_cameras set device_model_id = p_model where id = p_install_camera;
+  perform app_private.ws_audit('model_mapped', 'install_camera', p_install_camera::text,
+    jsonb_build_object('text', c.model_not_on_file_text), jsonb_build_object('model', m.model), p_reason, app_private.ws_install_unit(c.install_id));
+end $$;
+
+create or replace function app_private.ws_map_nvr_not_on_file(p_install uuid, p_model uuid, p_reason text)
+returns void language plpgsql security definer set search_path = app_private, public, pg_temp as $$
+declare me uuid := app_private.ws_require('owner'); i app_private.ws_installs;
+begin
+  select * into i from app_private.ws_installs where id = p_install for update;
+  if not exists (select 1 from app_private.ws_device_models where id = p_model and device_role = 'nvr') then
+    raise exception 'Not a recorder model';
+  end if;
+  update app_private.ws_installs set nvr_model_id = p_model, nvr_model_not_on_file_text = null where id = p_install;
+  perform app_private.ws_audit('model_mapped', 'install', p_install::text,
+    jsonb_build_object('text', i.nvr_model_not_on_file_text), jsonb_build_object('model', p_model), p_reason, i.unit_key);
+end $$;
+
+-- ---------------------------------------------------------------- templates: publish (S8)
+create or replace function app_private.ws_publish_template(p_template uuid, p_change_note text)
+returns void language plpgsql security definer set search_path = app_private, public, pg_temp as $$
+declare me uuid := app_private.ws_require('owner'); t app_private.ws_checklist_templates; prev app_private.ws_checklist_templates;
+        filled text[];
+begin
+  if coalesce(trim(p_change_note), '') = '' then raise exception 'A change note is required'; end if;
+  select * into t from app_private.ws_checklist_templates where id = p_template for update;
+  if t.status <> 'draft' then raise exception 'Only drafts can be published'; end if;
+  select * into prev from app_private.ws_checklist_templates
+   where coalesce(device_model_id::text,'') = coalesce(t.device_model_id::text,'')
+     and coalesce(device_role::text,'') = coalesce(t.device_role::text,'') and scope = t.scope and status = 'published';
+  if prev.id is not null then
+    update app_private.ws_checklist_templates set status = 'retired' where id = prev.id;
+    -- placeholder items that are no longer placeholders in the new version
+    select array_agg(distinct n.code) into filled
+      from app_private.ws_checklist_template_items o
+      join app_private.ws_checklist_template_items n on n.template_id = t.id and n.code = o.code
+     where o.template_id = prev.id and o.standard_status = 'PLACEHOLDER' and n.standard_status <> 'PLACEHOLDER';
+    if filled is not null then
+      update app_private.ws_unit_cameras uc set flag_recheck_needed = true,
+             flag_recheck_items = (select array_agg(distinct x) from unnest(coalesce(uc.flag_recheck_items, '{}') || filled) x)
+       where not uc.retired and uc.template_versions ? prev.id::text;
+      update app_private.ws_placeholders p set filled_by = me, filled_at = now()
+        from app_private.ws_checklist_template_items o
+       where o.template_id = prev.id and o.code = any(filled) and o.placeholder_key = p.key;
+      perform app_private.ws_audit('placeholder_filled', 'template', t.id::text, null, to_jsonb(filled), p_change_note);
+    end if;
+  end if;
+  update app_private.ws_checklist_templates set status = 'published', published_by = me, published_at = now(), change_note = p_change_note
+   where id = p_template;
+end $$;
+
+-- admin: make a new draft version as a copy of the published one
+create or replace function app_private.ws_new_template_draft(p_published uuid)
+returns uuid language plpgsql security definer set search_path = app_private, public, pg_temp as $$
+declare me uuid := app_private.ws_require('owner'); t app_private.ws_checklist_templates; new_id uuid; v int;
+begin
+  select * into t from app_private.ws_checklist_templates where id = p_published;
+  select max(version) + 1 into v from app_private.ws_checklist_templates
+   where coalesce(device_model_id::text,'') = coalesce(t.device_model_id::text,'')
+     and coalesce(device_role::text,'') = coalesce(t.device_role::text,'') and scope = t.scope;
+  insert into app_private.ws_checklist_templates(device_model_id, device_role, scope, name, version, status)
+  values (t.device_model_id, t.device_role, t.scope, t.name, v, 'draft') returning id into new_id;
+  insert into app_private.ws_checklist_template_items(template_id, code, title, standard, instructions, help_text, standard_status,
+         repeat_per, value_type, value_options, evidence, evidence_group, required, placeholder_key, sort_order)
+  select new_id, code, title, standard, instructions, help_text, standard_status, repeat_per, value_type, value_options,
+         evidence, evidence_group, required, placeholder_key, sort_order
+  from app_private.ws_checklist_template_items where template_id = p_published;
+  return new_id;
+end $$;
+
+-- ================================================================ quiet cameras (section 6)
+
+create or replace function app_private.ws_setting_for(p_unit text, p_site text, col text) returns int
+language sql stable as $$
+  select coalesce(
+    (select (to_jsonb(s)->>col)::int from app_private.ws_alert_settings s where scope = 'unit' and scope_id = p_unit),
+    (select (to_jsonb(s)->>col)::int from app_private.ws_alert_settings s where scope = 'site' and scope_id = lower(p_site)),
+    (select (to_jsonb(s)->>col)::int from app_private.ws_alert_settings s where scope = 'global'),
+    case col when 'quiet_days' then 7 else 24 end)
+$$;
+
+create or replace function app_private.ws_camera_status_at(p_now timestamptz)
+returns table (unit_camera_id uuid, unit_key text, unit_name text, site_name text, camera_name text,
+               model text, status app_private.ws_camera_status, last_event_at timestamptz, site_read_at timestamptz,
+               days_quiet numeric, going_quiet_soon boolean, quiet_days int, status_note text, flag_text text,
+               placement text, legacy boolean)
+language sql stable security definer set search_path = app_private, public, pg_temp as $$
+  with cams as (
+    select uc.*, coalesce(us.unit_label, uc.unit_label, uc.unit_key) as unit_name,
+           coalesce(us.site_name, uc.site_name) as site, m.model,
+           coalesce(pl.placement, 'field') as place,
+           app_private.ws_setting_for(uc.unit_key, coalesce(us.site_name, uc.site_name), 'quiet_days') as qd,
+           app_private.ws_setting_for(uc.unit_key, coalesce(us.site_name, uc.site_name), 'stale_read_hours') as sh
+    from app_private.ws_unit_cameras uc
+    left join app_private.ws_unit_setup us on us.unit_key = uc.unit_key
+    left join app_private.ws_unit_placement pl on pl.unit_key = uc.unit_key
+    left join app_private.ws_device_models m on m.id = uc.device_model_id
+    where not uc.retired and not uc.is_speaker
+  ), latest as (
+    select distinct on (e.unit_camera_id) e.unit_camera_id, e.last_event_at, e.read_at
+    from app_private.ws_camera_last_events e where e.unit_camera_id is not null and e.read_at <= p_now
+    order by e.unit_camera_id, e.read_at desc
+  ), site_read as (
+    -- the latest successful read that covered this unit's site (or the unit itself when it has no site)
+    select coalesce(lower(c.site), c.unit_key) as k, max(l.read_at) as read_at
+    from cams c join latest l on l.unit_camera_id = c.id group by 1
+  )
+  select c.id, c.unit_key, c.unit_name, c.site, c.camera_name, c.model,
+    case
+      when c.place <> 'field' or not c.monitored then 'excluded'
+      when l.unit_camera_id is null or sr.read_at is null or sr.read_at < p_now - make_interval(hours => c.sh) then 'unknown'
+      when l.last_event_at is null and c.live_since is not null and c.live_since < sr.read_at - make_interval(days => c.qd) then 'never_sent'
+      when l.last_event_at is null then 'unknown'
+      when l.last_event_at < sr.read_at - make_interval(days => c.qd) then 'quiet'
+      else 'ok' end::app_private.ws_camera_status,
+    l.last_event_at, sr.read_at,
+    round(extract(epoch from (sr.read_at - l.last_event_at)) / 86400.0, 1),
+    (l.last_event_at is not null and l.last_event_at >= sr.read_at - make_interval(days => c.qd)
+       and l.last_event_at + make_interval(days => c.qd) <= p_now + interval '24 hours'
+       and c.place = 'field' and c.monitored),
+    c.qd,
+    case
+      when c.place <> 'field' then 'Not watched: unit is in the ' || replace(c.place, '_', '-')
+      when not c.monitored then 'Not watched'
+      when l.unit_camera_id is null then 'No Watchful reading for this camera yet'
+      when sr.read_at < p_now - make_interval(hours => c.sh) then 'The last Watchful reading for this site is too old'
+      end,
+    nullif(concat_ws('; ',
+      case when c.flag_walk_test_waived then 'Walk test waived' end,
+      case when c.flag_recheck_needed then 'Re-check needed: ' || array_to_string(c.flag_recheck_items, ', ') end,
+      case when c.flag_known_issue then coalesce('Known issue: ' || c.flag_text, 'Known issue') end), ''),
+    c.place, c.installed_via_install_id is null
+  from cams c left join latest l on l.unit_camera_id = c.id
+  left join site_read sr on sr.k = coalesce(lower(c.site), c.unit_key)
+$$;
+
+-- unmatched import rows (mapping list): latest row per raw name that has no camera
+create view app_private.ws_unmatched_event_rows as
+  select distinct on (raw_site, raw_unit, raw_camera) raw_site, raw_unit, raw_camera, last_event_at, read_at, import_id
+  from app_private.ws_camera_last_events e where unit_camera_id is null
+    and not exists (select 1 from app_private.ws_camera_name_mappings m
+                    where m.raw_site = e.raw_site and m.raw_unit = e.raw_unit and m.raw_camera = e.raw_camera)
+  order by raw_site, raw_unit, raw_camera, read_at desc;
+
+-- open/close alerts from the computed status; never touches any unit's status or placement
+create or replace function app_private.ws_refresh_alerts(p_now timestamptz) returns void
+language plpgsql security definer set search_path = app_private, public, pg_temp as $$
+declare r record;
+begin
+  for r in select * from app_private.ws_camera_status_at(p_now) loop
+    if r.status in ('quiet','never_sent','unknown') then
+      if exists (select 1 from app_private.ws_quiet_camera_alerts a where a.unit_camera_id = r.unit_camera_id and a.closed_at is null
+                 and a.state::text <> r.status::text) then
+        update app_private.ws_quiet_camera_alerts set closed_at = p_now, close_reason = 'now ' || replace(r.status::text, '_', ' ')
+         where unit_camera_id = r.unit_camera_id and closed_at is null;
+      end if;
+      insert into app_private.ws_quiet_camera_alerts(unit_camera_id, state, opened_at, last_event_at, days_quiet)
+      values (r.unit_camera_id, r.status::text::app_private.ws_alert_state, p_now, r.last_event_at, r.days_quiet)
+      on conflict (unit_camera_id) where closed_at is null do update set last_event_at = excluded.last_event_at, days_quiet = excluded.days_quiet;
+    else
+      update app_private.ws_quiet_camera_alerts set closed_at = p_now,
+             close_reason = case when r.status = 'ok' then 'event received' else 'not watched' end
+       where unit_camera_id = r.unit_camera_id and closed_at is null;
+    end if;
+  end loop;
+end $$;
+
+-- import (CSV upload or an approved importer). rows: [{site, unit, camera, last_event_at (ISO with zone, or empty), read_at}]
+create or replace function app_private.ws_import_last_events(p_source text, p_read_at timestamptz, p_rows jsonb)
+returns uuid language plpgsql security definer set search_path = app_private, public, pg_temp as $$
+declare me uuid := app_private.ws_require('it','owner'); imp uuid; total int; matched int; row_ jsonb;
+begin
+  if p_read_at is null or p_read_at > now() + interval '5 minutes' then raise exception 'Enter when the Watchful list was read (not in the future).'; end if;
+  if jsonb_typeof(p_rows) <> 'array' or jsonb_array_length(p_rows) = 0 then raise exception 'The file has no rows.'; end if;
+  if jsonb_array_length(p_rows) > 5000 then raise exception 'Import at most 5,000 rows at a time.'; end if;
+  for row_ in select * from jsonb_array_elements(p_rows) loop
+    if coalesce(trim(row_->>'unit'), '') = '' or coalesce(trim(row_->>'camera'), '') = '' then
+      raise exception 'Every row needs a unit name and a camera name.';
+    end if;
+  end loop;
+  insert into app_private.ws_event_imports(source, uploaded_by, read_at) values (p_source, me, p_read_at) returning id into imp;
+  insert into app_private.ws_camera_last_events(unit_camera_id, import_id, raw_site, raw_unit, raw_camera, last_event_at, read_at)
+  select coalesce(mp.unit_camera_id, direct.id), imp, coalesce(trim(r->>'site'), ''), trim(r->>'unit'), trim(r->>'camera'),
+         nullif(r->>'last_event_at', '')::timestamptz, coalesce(nullif(r->>'read_at', '')::timestamptz, p_read_at)
+  from jsonb_array_elements(p_rows) r
+  left join app_private.ws_camera_name_mappings mp
+    on mp.raw_site = coalesce(trim(r->>'site'), '') and mp.raw_unit = trim(r->>'unit') and mp.raw_camera = trim(r->>'camera')
+  left join lateral (
+    select uc.id from app_private.ws_unit_cameras uc left join app_private.ws_unit_setup us on us.unit_key = uc.unit_key
+    where not uc.retired
+      and lower(trim(r->>'unit')) in (lower(uc.unit_key), lower(coalesce(us.unit_label, uc.unit_label, '')))
+      and lower(trim(r->>'camera')) in (lower(uc.camera_name), lower(coalesce(uc.watchful_feed_name, '')))
+    limit 1) direct on true;
+  select count(*), count(unit_camera_id) into total, matched from app_private.ws_camera_last_events where import_id = imp;
+  update app_private.ws_event_imports set row_count = total, matched_count = matched, unmatched_count = total - matched where id = imp;
+  perform app_private.ws_audit('event_import', 'event_import', imp::text, null,
+    jsonb_build_object('source', p_source, 'rows', total, 'matched', matched), null);
+  perform app_private.ws_refresh_alerts(greatest(now(), p_read_at));
+  return imp;
+end $$;
+
+-- match an unmatched Watchful name to a camera. p_unit_camera null + p_legacy_unit given = watch a camera on a
+-- unit that has not been checklisted yet ("Legacy: not checklisted"), so the fleet is watched from day one.
+create or replace function app_private.ws_map_camera_name(p_site text, p_unit text, p_camera text, p_unit_camera uuid,
+  p_legacy_unit text default null)
+returns uuid language plpgsql security definer set search_path = app_private, public, pg_temp as $$
+declare me uuid := app_private.ws_require('it','owner'); cam uuid := p_unit_camera; pos int;
+begin
+  if cam is null then
+    if coalesce(trim(p_legacy_unit), '') = '' then raise exception 'Pick the camera this Watchful name belongs to.'; end if;
+    perform app_private.ws_assert_no_secrets('camera name', p_camera);
+    select coalesce(max(position), 0) + 1 into pos from app_private.ws_unit_cameras where unit_key = upper(trim(p_legacy_unit));
+    insert into app_private.ws_unit_cameras(unit_key, unit_label, site_name, position, camera_name, watchful_feed_name, monitored, live_since)
+    values (upper(trim(p_legacy_unit)), trim(p_unit), nullif(trim(p_site), ''), pos, trim(p_camera), trim(p_camera), true, null)
+    returning id into cam;
+  end if;
+  insert into app_private.ws_camera_name_mappings(raw_site, raw_unit, raw_camera, unit_camera_id, mapped_by)
+  values (coalesce(p_site, ''), p_unit, p_camera, cam, me)
+  on conflict (raw_site, raw_unit, raw_camera) do update set unit_camera_id = excluded.unit_camera_id, mapped_by = me, mapped_at = now();
+  -- earlier rows with this exact name now count for the camera too
+  update app_private.ws_camera_last_events set unit_camera_id = cam
+   where unit_camera_id is null and raw_site = coalesce(p_site, '') and raw_unit = p_unit and raw_camera = p_camera;
+  perform app_private.ws_audit('name_mapped', 'unit_camera', cam::text, null,
+    jsonb_build_object('site', p_site, 'unit', p_unit, 'camera', p_camera, 'legacy', p_unit_camera is null), null,
+    (select unit_key from app_private.ws_unit_cameras where id = cam));
+  perform app_private.ws_refresh_alerts(now());
+  return cam;
+end $$;
+
+create or replace function app_private.ws_ack_alert(p_alert uuid, p_note text)
+returns void language plpgsql security definer set search_path = app_private, public, pg_temp as $$
+declare me uuid := app_private.ws_require('it','owner');
+begin
+  if coalesce(trim(p_note), '') = '' then raise exception 'Say who is on it or what is being done.'; end if;
+  update app_private.ws_quiet_camera_alerts set acknowledged_by = me, acknowledged_at = now(), ack_note = p_note
+   where id = p_alert and closed_at is null;
+  if not found then raise exception 'That alert is already closed.'; end if;
+  perform app_private.ws_audit('alert_acknowledged', 'alert', p_alert::text, null, null, p_note);
+end $$;
+
+create or replace function app_private.ws_set_alert_setting(p_scope text, p_scope_id text, p_quiet_days int,
+  p_stale_hours int, p_digest_time time)
+returns void language plpgsql security definer set search_path = app_private, public, pg_temp as $$
+declare me uuid := app_private.ws_require('owner'); k text := case p_scope when 'site' then lower(trim(p_scope_id)) when 'unit' then upper(trim(p_scope_id)) end;
+begin
+  insert into app_private.ws_alert_settings(scope, scope_id, quiet_days, stale_read_hours, digest_time)
+  values (p_scope, k, p_quiet_days, p_stale_hours, p_digest_time)
+  on conflict (scope, scope_id) do update set quiet_days = excluded.quiet_days,
+     stale_read_hours = excluded.stale_read_hours, digest_time = excluded.digest_time;
+end $$;
+
+create or replace function app_private.ws_set_placement(p_unit text, p_placement text, p_reason text)
+returns void language plpgsql security definer set search_path = app_private, public, pg_temp as $$
+declare me uuid := app_private.ws_require('it','owner'); before text;
+begin
+  select placement into before from app_private.ws_unit_placement where unit_key = upper(trim(p_unit));
+  insert into app_private.ws_unit_placement(unit_key, placement, set_by, set_at) values (upper(trim(p_unit)), p_placement, me, now())
+  on conflict (unit_key) do update set placement = excluded.placement, set_by = me, set_at = now();
+  perform app_private.ws_audit('placement_set', 'unit', upper(trim(p_unit)), jsonb_build_object('placement', before),
+    jsonb_build_object('placement', p_placement), p_reason, upper(trim(p_unit)));
+  perform app_private.ws_refresh_alerts(now());
+end $$;
+
+-- daily in-app summary (pg_cron at the set time; writes a row, sends nothing outside COS)
+create or replace function app_private.ws_build_digest() returns uuid
+language plpgsql security definer set search_path = app_private, public, pg_temp as $$
+declare d uuid;
+begin
+  perform app_private.ws_refresh_alerts(now());
+  insert into app_private.ws_digests(body)
+  select jsonb_build_object(
+    'quiet', count(*) filter (where status = 'quiet'),
+    'never_sent', count(*) filter (where status = 'never_sent'),
+    'unknown', count(*) filter (where status = 'unknown'),
+    'going_quiet_soon', count(*) filter (where going_quiet_soon),
+    'not_watched', count(*) filter (where status = 'excluded'))
+  from app_private.ws_camera_status_at(now()) returning id into d;
+  return d;
+end $$;
