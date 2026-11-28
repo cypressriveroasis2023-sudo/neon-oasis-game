@@ -59,6 +59,11 @@ new action value needs adding to the allow-list.
 
 Newest first. One line: date, what changed, what to watch.
 
+- **2026-11-28** — Board: **Not monitored** state (`src/cosBoard/boardApp.ts`, James's go). A field unit from mHelp with
+  no camera feed reads `nm` (not Unknown) when it is a Wall-E (the stand a Recon goes on) or one of the witness Spotters
+  052 / 088 (A# 1713914 / 2036036, `WITNESS_PIDS`). It counts in the field, sits on the map at its mHelp site, is left out
+  of Down/Issues/Unknown/Up and of the punch list's "Field, no camera feed". Sniper 318 is held by mHelp's own DO NOT USE
+  mark (lifecycle `DO_NOT_USE` → `existing_source_hold`); left for James to clear in mHelp, nothing changed in COS.
 - **2026-11-28** — **Deployed both** (James's go, ~05:44 UTC). (1) Operations `cos-sheets-placement-publish`
   **v25 `00013c1e`**: loader pinned to `c1733c1`, `tech-checks/docs/endpoint-source-inventory-grace-20261127/source/serve.ts`
   (24 h mHelp inventory grace + a lone `customer_mismatch` no longer holds). Next sweep published 38 of 44 (was 34):
